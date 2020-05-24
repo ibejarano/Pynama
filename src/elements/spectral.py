@@ -4,7 +4,7 @@ import itertools
 from functools import reduce
 import operator
 from elements.element import Element
-from utilities import generateGaussPoints2D, generateGaussPoints3D, lobattoPoints, gaussPoints
+from elements.utilities import generateGaussPoints2D, generateGaussPoints3D, lobattoPoints, gaussPoints
 
 class Spectral(Element):
     """Spectral element.

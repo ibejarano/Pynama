@@ -4,7 +4,7 @@ import numpy as np
 class Element(Base):
 
     def __init__(self, dim):
-        super.__init__(dim)
+        super().__init__(dim)
     
     def interpFun1D(self, Nodes, evalPoi):
         """Interpolate functions in 1D."""
