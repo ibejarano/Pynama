@@ -85,7 +85,6 @@ class Spectral(Element):
         for idx, gp in enumerate(self.gps):
             Hrs = self.Hrs[idx]
             H = self.H[idx]
-
             J = self.HrsCoo[idx] * coords #coords
             Hxy = inv(J) * Hrs
             detJ = det(J)
@@ -96,7 +95,9 @@ class Spectral(Element):
 
             for i,ind in enumerate (self.indWCurl):
                 Bw_curl[ind[0],ind[1]::self.dim_w]= (-1)**(i)*Hxy[ind[2]]
-                
+            
+            # print(elStiffMat)
+            print(gp.w)
             elStiffMat += gp.w * detJ * B_gr.T * B_gr
             elR_wMat += gp.w * detJ * Hvel.T * Bw_curl
             elR_dMat -= gp.w * detJ * Hvel.T * Hxy
@@ -106,7 +107,6 @@ class Spectral(Element):
         for idx, gp in enumerate(self.gpsRed):
             Hrs = self.HrsRed[idx]
             H = self.HRed[idx]
-
             J = self.HrsCooRed[idx] * coords
             Hxy = inv(J) * Hrs
             detJ = det(J)
@@ -118,7 +118,9 @@ class Spectral(Element):
                 B_curl[ind[0],ind[1]::self.dim]= (-1)**(i)*Hxy[ind[2]]
             for nd in range(self.dim_w):
                 Hvel[nd, nd::self.dim_w] = H
+            
 
+            print(gp.w)
             elStiffMat += gp.w * detJ * (alpha_d * B_div.T * B_div +
                                          + alpha_w * B_curl.T * B_curl)
 

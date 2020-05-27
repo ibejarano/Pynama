@@ -12,6 +12,9 @@ class DMPlexDom(Base):
 
     def setUpDmPlex(self, lower, upper, faces):
         self.dm.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=self.comm)
+
+        self.dm.createLabel('marco')
+        self.dm.markBoundaryFaces('marco',0)
         self.dm.distribute()
 
         if not self.comm.rank:
@@ -89,6 +92,7 @@ class DMPlexDom(Base):
                                          cell+self.cellStart)
 
     def setLabelToBorders(self):
+
         label = 'cfgfileBC'
         self.dm.createLabel(label)
         for faceNum in self.dm.getLabelIdIS("Face Sets").getIndices():

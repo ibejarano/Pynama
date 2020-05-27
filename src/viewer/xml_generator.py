@@ -22,7 +22,7 @@ class XmlGenerator(object):
         return root
 
     def printMesh(self,):
-
+        pass
 
     def prettify(self, elem):
         """Return a pretty-printed XML string for the Element.
@@ -33,5 +33,5 @@ class XmlGenerator(object):
 
 a = XmlGenerator()
 root = a.getXMLTemplate()
-print(b)
+print(a.prettify(root))
 

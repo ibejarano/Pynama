@@ -1,5 +1,5 @@
 # *-* makefile -*-
-MPIEXEC=${HOME}/tesis/petsc/arch-linux2-c-debug/bin/mpiexec -n 2
+MPIEXEC=${HOME}/tesis/petsc/arch-linux2-c-debug/bin/mpiexec -n 1
 PYTHON=python3
 CASE=uniform
 
