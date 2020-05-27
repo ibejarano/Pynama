@@ -4,11 +4,11 @@ import numpy as np
 from math import pi
 from numpy.linalg import eig
 
-class GaussPoint2D(namedtuple('GP', 'r s w')):
+class GaussPoint2D(namedtuple('GaussPoint', ['r' ,'s','w'])):
     """ docstring of gausspoint """
     __slots__ = ()
 
-class GaussPoint3D(namedtuple('GP', 'r s t w' )):
+class GaussPoint3D(namedtuple('GaussPoint',['r' ,'s','t','w'] )):
     """ docstring of gausspoint """
     __slots__ = ()
 
@@ -25,11 +25,11 @@ def generateGaussPoints2D(gps1D):
 def generateGaussPoints3D(gps1D):
     gaussPoints = list()
     gpNamed = namedtuple('GaussPoint','r s t w' )
-    for gaussPoints in product( gps1D , repeat=3):
+    for gaussPointsCombination in product( gps1D , repeat=3):
         weight = 1
-        for gaussPoint in gaussPoints:
+        for gaussPoint in gaussPointsCombination:
             weight *= gaussPoint
-        gaussPoints.append(gpNamed(r=gaussPoints[0], s=gaussPoints[1], t=gaussPoints[2], w=(weight)))
+        gaussPoints.append(gpNamed(r=gaussPointsCombination[0], s=gaussPointsCombination[1], t=gaussPointsCombination[2], w=(weight)))
     return gaussPoints
 
 def gaussPoints(N):

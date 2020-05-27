@@ -48,7 +48,6 @@ class Spectral(Element):
 
         (self.HCooOp, self.HrsCooOp, self.gpsCooOp) = \
             self.computeMats(cnodes1D, nodes1D, operWei)
-
         (self.HCoo1D, _) = self.interpFun1D(cnodes1D, nodes1D)
 
     def getElemKLEMatrices(self, coords):
