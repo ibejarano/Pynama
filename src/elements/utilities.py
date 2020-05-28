@@ -12,14 +12,18 @@ class GaussPoint3D(namedtuple('GaussPoint',['r' ,'s','t','w'] )):
     """ docstring of gausspoint """
     __slots__ = ()
 
-def generateGaussPoints2D(gps1D):
+def generateGaussPoints2D(gps1D, gpsWei):
     gaussPoints = list()
     gpNamed = namedtuple('GaussPoint','r s w' )
-    for gaussPointsCombination in product( gps1D , repeat=2):
-        weight = 1
-        for gaussPoint in gaussPointsCombination:
-            weight *= gaussPoint
-        gaussPoints.append(gpNamed(r=gaussPointsCombination[0], s=gaussPointsCombination[1], w=(weight)))
+    # for gaussPointsCombination in product( gps1D , repeat=2):
+    #     weight = 1
+    #     for gaussPoint in gaussPointsCombination:
+    #         weight *= gaussPoint
+    #     gaussPoints.append(gpNamed(r=gaussPointsCombination[0], s=gaussPointsCombination[1], w=(weight)))
+    for c1 in range(len(gps1D)):
+        for c2 in range(len(gps1D)):
+            gaussPoints.append(gpNamed(r=gps1D[c1] , s=gps1D[c2], w=gpsWei[c1]*gpsWei[c2]))
+    
     return gaussPoints
 
 def generateGaussPoints3D(gps1D):

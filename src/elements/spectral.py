@@ -119,7 +119,6 @@ class Spectral(Element):
                 Hvel[nd, nd::self.dim_w] = H
             
 
-            print(gp.w)
             elStiffMat += gp.w * detJ * (alpha_d * B_div.T * B_div +
                                          + alpha_w * B_curl.T * B_curl)
 
@@ -201,8 +200,7 @@ class Spectral(Element):
                       in itertools.product(*doubleTern)]
             Hrs[ind][1, :] = [auxRow[y] for y in invPerm]
 
-        gps = generateGaussPoints2D(gps1D)
-
+        gps = generateGaussPoints2D(gps1D, gps1Dwei)
         H = [H[i] for i in invPerm2]
         Hrs = [Hrs[i] for i in invPerm2]
         gps = [gps[i] for i in invPerm2]

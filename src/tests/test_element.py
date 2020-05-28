@@ -137,14 +137,14 @@ class UtilitiesElementTest(unittest.TestCase):
         for i_test in range(2,5):
             with self.subTest(i_test=i_test):
                 # my new gausspoint list generator func
-                gps_1D = gaussPoints(i_test)
-                gps_list = generateGaussPoints2D(gps_1D)
+                gps_1D, gps_wei = gaussPoints(i_test)
+                gps_list = generateGaussPoints2D(gps_1D, gps_wei)
                 legacy_list = list()
                 
                 # this implementation was made by Alejandro
                 for i in range(len(gps_1D)):
                     for j in range(len(gps_1D)):
-                        legacy_list.append(GaussPoint2D(gps_1D[i], gps_1D[j], gps_1D[i]*gps_1D[j]))
+                        legacy_list.append(GaussPoint2D(gps_1D[i], gps_1D[j], gps_wei[i]*gps_wei[j]))
                 
                 for i in range(len(gps_1D)**2):
                     with self.subTest(i=i):
