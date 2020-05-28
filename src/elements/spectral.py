@@ -96,7 +96,6 @@ class Spectral(Element):
                 Bw_curl[ind[0],ind[1]::self.dim_w]= (-1)**(i)*Hxy[ind[2]]
             
             # print(elStiffMat)
-            print(gp.w)
             elStiffMat += gp.w * detJ * B_gr.T * B_gr
             elR_wMat += gp.w * detJ * Hvel.T * Bw_curl
             elR_dMat -= gp.w * detJ * Hvel.T * Hxy
