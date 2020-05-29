@@ -227,3 +227,19 @@ class UtilitiesElementTest(unittest.TestCase):
                 lobpoi[i]
                 ,lobpoi_calculated 
                 ,decimal=12)
+
+class SpectralKLETest(unittest.TestCase):
+    def setUp(self):
+        self.spElem_test = Spectral2D(2, 2)
+        coords = [[1,1],[0,1],[0,0],[1,0]]
+        self.K_ale , self.Rw_ale, self.Rd_ale = self.spElem_test.getElemKLEMatricesOld(coords)
+        self.K , self.Rw, self.Rd = self.spElem_test.getElemKLEMatrices(coords)
+
+    def test_K(self):
+        np_test.assert_array_almost_equal(self.K_ale, self.K , decimal=15)
+
+    def test_Rw(self):
+        np_test.assert_array_almost_equal(self.Rw_ale, self.Rw , decimal=15)
+
+    def test_Rd(self):
+        np_test.assert_array_almost_equal(self.Rd_ale, self.Rd , decimal=15)

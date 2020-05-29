@@ -53,7 +53,7 @@ class Spectral(Element):
     def getElemKLEMatrices(self, coords):
         """Get the elementary matrices of the KLE Method."""
         # self.logger.debug("getElemKLEMatrices")
-        coords.shape = (int(len(coords)/self.dim), self.dim)
+        # coords.shape = (int(len(coords)/self.dim), self.dim)
         alpha_w = 1e2
         alpha_d = 1e3
 
@@ -100,7 +100,7 @@ class Spectral(Element):
             elR_wMat += gp.w * detJ * Hvel.T * Bw_curl
             elR_dMat -= gp.w * detJ * Hvel.T * Hxy
         # Velocity interpolation
-        Hvel = np.mat(np.zeros((self.dim_w, self.dim_w*elTotNodes)))
+        Hvel = np.zeros((self.dim_w, self.dim_w*elTotNodes))
         # Reduced integration of penalizations
         for idx, gp in enumerate(self.gpsRed):
             Hrs = self.HrsRed[idx]
@@ -205,6 +205,94 @@ class Spectral(Element):
         gps = [gps[i] for i in invPerm2]
 
         return (H, Hrs, gps)
+
+
+    def getElemKLEMatricesOld(self, coords):
+        """Get the elementary matrices of the KLE Method."""
+        # self.logger.debug("getElemKLEMatrices")
+        alpha_w = 1e2
+        alpha_d = 1e3
+
+        # FIXME Parametrize in terms of total element nodes and for the
+        # geometry use a reduced set
+        elTotNodes = self.nnode
+
+        elStiffMat = np.mat(np.zeros((self.dim*elTotNodes,
+                                      self.dim*elTotNodes)))
+        elR_wMat = np.mat(np.zeros((self.dim*elTotNodes,
+                                    self.dim_w*elTotNodes)))
+        elR_dMat = np.mat(np.zeros((self.dim*elTotNodes, elTotNodes)))
+
+        # Velocity interpolation
+        Hvel = np.mat(np.zeros((self.dim, self.dim*elTotNodes)))
+        # Velocity gradient
+        B_gr = np.mat(np.zeros((self.dim**2, self.dim*elTotNodes)))
+        # Velocity divergence
+        B_div = np.mat(np.zeros((1, self.dim*elTotNodes)))
+        # Velocity curl
+        B_curl = np.mat(np.zeros((self.dim_w, self.dim*elTotNodes)))
+        # Vorticty curl
+        Bw_curl = np.mat(np.zeros((self.dim, self.dim_w*elTotNodes)))
+
+        # FIXME: this could be improved to be independent of the element type
+        # the code should know whether we are using all element nodes to
+        # describe its geometry or a reduced set, and compute J accordingly
+        for idx, gp in enumerate(self.gps):
+            Hrs = self.Hrs[idx]
+            H = self.H[idx]
+
+            J = self.HrsCoo[idx] * coords
+            Hxy = inv(J) * Hrs
+            detJ = det(J)
+
+            for nd in range(self.dim):
+                B_gr[self.dim*nd:self.dim*nd + self.dim, nd::self.dim] = Hxy
+                Hvel[nd, nd::self.dim] = H
+
+            if self.dim == 2:
+                Bw_curl[0, :] = Hxy[1]
+                Bw_curl[1, :] = -Hxy[0]
+            elif self.dim == 3:  # Check!
+                Bw_curl[0, 2::self.dim] = Hxy[1]
+                Bw_curl[0, 1::self.dim] = -Hxy[2]
+                Bw_curl[1, 0::self.dim] = Hxy[2]
+                Bw_curl[1, 2::self.dim] = -Hxy[0]
+                Bw_curl[2, 1::self.dim] = Hxy[0]
+                Bw_curl[2, 0::self.dim] = -Hxy[1]
+
+            elStiffMat += gp.w * detJ * B_gr.T * B_gr
+            elR_wMat += gp.w * detJ * Hvel.T * Bw_curl
+            elR_dMat -= gp.w * detJ * Hvel.T * Hxy
+
+        # Reduced integration of penalizations
+        for idx, gp in enumerate(self.gpsRed):
+            Hrs = self.HrsRed[idx]
+            H = self.HRed[idx]
+
+            J = self.HrsCooRed[idx] * coords
+            Hxy = inv(J) * Hrs
+            detJ = det(J)
+
+            for nd in range(self.dim):
+                B_div[0, nd::self.dim] = Hxy[nd]
+                Hvel[nd, ::self.dim] = H
+
+            if self.dim == 2:
+                B_curl[0, ::self.dim] = -Hxy[1]
+                B_curl[0, 1::self.dim] = Hxy[0]
+            elif self.dim == 3:  # FIXME Check!
+                B_curl[0, 2::self.dim] = Hxy[1]
+                B_curl[0, 1::self.dim] = -Hxy[2]
+                B_curl[1, 0::self.dim] = Hxy[2]
+                B_curl[1, 2::self.dim] = -Hxy[0]
+                B_curl[2, 1::self.dim] = Hxy[0]
+                B_curl[2, 0::self.dim] = -Hxy[1]
+
+            elStiffMat += gp.w * detJ * (alpha_d * B_div.T * B_div +
+                                         + alpha_w * B_curl.T * B_curl)
+            elR_wMat += gp.w * detJ * alpha_w * B_curl.T * H
+            elR_dMat += gp.w * detJ * alpha_d * Hxy.flatten('F').T * H
+        return (elStiffMat, elR_wMat, elR_dMat)
 
 class Spectral2D(Spectral):
     """Spectral element in 2D."""
