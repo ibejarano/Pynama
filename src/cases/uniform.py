@@ -1,10 +1,27 @@
+import sys
+import petsc4py
+
+petsc4py.init(sys.argv)
+
 from cases.base_problem import BaseProblem
 from matrices.mat_generator import Mat
+from solver.ksp_solver import KspSolver
 import numpy as np
+import yaml
+from mpi4py import MPI
+from petsc4py import PETSc
 
 class UniformFlow(BaseProblem):
-    def __init__(self, comm):
+    def __init__(self, comm=MPI.COMM_WORLD):
         super().__init__(comm)
+
+        # OptDB = PETSc.Options()
+        # yamlDir = OptDB.getString('-yaml')
+
+        with open('src/cases/uniform.yaml') as f:
+            yamlData = yaml.load(f, Loader=yaml.Loader)
+
+        self.setUp(yamlData)
 
     def setUpBoundaryConditions(self, inputData):
         #aca 
@@ -77,6 +94,7 @@ class UniformFlow(BaseProblem):
             # print(self.comm.rank , 'gldofFree' ,gldofFree) 
 
             if nodeBCintersect:
+                # print("gldof2beSet {}".format(gldof2beSet))
                 self.mat.Krhs.setValues(
                 gldofFree, gldof2beSet,
                 -locK[np.ix_(dofFree, dof2beSet)], addv=True)
@@ -89,6 +107,7 @@ class UniformFlow(BaseProblem):
                     # setting to 1
                     self.mat.Krhs.setValues(indd, indd, 0, addv=True)
 
+            # print('gldoffree : {}'.format(gldofFree))
             # Elemental matrices assembled in the global distributed matrices
             self.mat.K.setValues(gldofFree, gldofFree,
                              locK[np.ix_(dofFree, dofFree)], addv=True)
@@ -102,19 +121,58 @@ class UniformFlow(BaseProblem):
             self.mat.Rd.setValues(gldofFree, nodes,
                               locRd[np.ix_(dofFree, range(len(nodes)))],
                               addv=True)
-            
+        
         self.mat.assembleAll()
         self.mat.setIndices2One(indices2one)
 
     def setUp(self, yamlInput):
-        self.setUpGeneral(yamlInput)
+        self.setUpGeneral(yamlInput['domain'])
 
         self.setUpBoundaryConditions(yamlInput)
         self.setUpEmptyMats()
         self.buildKLEMats()
 
-    def setUpSolver(self, parameter_list):
-        raise NotImplementedError
+    def setUpSolver(self):
+        self.solver = KspSolver()
+        self.solver.createSolver(self.mat.K, self.comm)
+        self.vel = self.mat.K.createVecRight()
+        self.vel.setName("velocity")
+        self.vort = self.mat.Rw.createVecRight()
+        self.vort.setName("vorticity")
+        self.vort.set(0.0)
+        # self.vel.view()
+        # self.vort.view()
+        boundaryNodes = self.getBoundaryNodes()
+        boundaryVelocityIndex = self.dom.getVelocityIndex(boundaryNodes)
+        boundaryVelocityValues = [1 , 0] * len(boundaryNodes)
+        
+        self.vel.setValues(boundaryVelocityIndex, boundaryVelocityValues , addv=False)
+        # self.vel.view()
+        self.vel.assemble()
+
+    def getBoundaryNodes(self):
+        """ IS: Index Set """
+        nodesSet = set()
+        IS =self.dom.dm.getStratumIS('marco', 0)
+        entidades = IS.getIndices()
+        for entity in entidades:
+            nodes = self.dom.getGlobalNodesFromCell(entity, False)
+            # print("[{}]".format(self.comm.rank), "entity: {}".format(entity)  , "nodos: {}".format(nodes))
+            nodesSet |= set(nodes)
+        
+        return list(nodesSet)
+
+    def generateExactVel(self):
+        exactVel = self.mat.K.createVecRight()
+        totalVel = exactVel.getSize()
+        totalNodes = range(int(totalVel/self.dim))
+        exactValues = [ 1, 0 ] * len(totalNodes)
+        indexVel = self.dom.getVelocityIndex(totalNodes)
+        exactVel.setValues( indexVel, exactValues, addv=False )
+        exactVel.assemble()
+        return exactVel
 
     def solve(self):
-        raise NotImplementedError
+        self.solver( self.mat.Rw * self.vort + self.mat.Krhs * self.vel , self.vel)
+        # self.vel.view()
+
