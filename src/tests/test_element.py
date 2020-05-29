@@ -231,9 +231,8 @@ class UtilitiesElementTest(unittest.TestCase):
 class SpectralKLETest(unittest.TestCase):
     def setUp(self):
         self.spElem_test = Spectral2D(2, 2)
-        coords = [[1,1],[0,1],[0,0],[1,0]]
-        self.K_ale , self.Rw_ale, self.Rd_ale = self.spElem_test.getElemKLEMatricesOld(coords)
-        self.K , self.Rw, self.Rd = self.spElem_test.getElemKLEMatrices(coords)
+        self.K_ale , self.Rw_ale, self.Rd_ale = self.spElem_test.getElemKLEMatricesOld(np.array([1,1,0,1,0,0,1,0], dtype=float))
+        self.K , self.Rw, self.Rd = self.spElem_test.getElemKLEMatrices(np.array([1,1,0,1,0,0,1,0], dtype=float))
 
     def test_K(self):
         np_test.assert_array_almost_equal(self.K_ale, self.K , decimal=15)

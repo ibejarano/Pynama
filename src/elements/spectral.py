@@ -53,7 +53,7 @@ class Spectral(Element):
     def getElemKLEMatrices(self, coords):
         """Get the elementary matrices of the KLE Method."""
         # self.logger.debug("getElemKLEMatrices")
-        # coords.shape = (int(len(coords)/self.dim), self.dim)
+        coords.shape = (int(len(coords)/self.dim), self.dim)
         alpha_w = 1e2
         alpha_d = 1e3
 
@@ -210,6 +210,8 @@ class Spectral(Element):
     def getElemKLEMatricesOld(self, coords):
         """Get the elementary matrices of the KLE Method."""
         # self.logger.debug("getElemKLEMatrices")
+        coords.shape = (int(len(coords)/self.dim), self.dim)
+
         alpha_w = 1e2
         alpha_d = 1e3
 
