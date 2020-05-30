@@ -12,8 +12,8 @@ from mpi4py import MPI
 from petsc4py import PETSc
 
 class UniformFlow(BaseProblem):
-    def __init__(self, comm=MPI.COMM_WORLD):
-        super().__init__(comm)
+    def __init__(self):
+        super().__init__()
 
         # OptDB = PETSc.Options()
         # yamlDir = OptDB.getString('-yaml')

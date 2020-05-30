@@ -4,12 +4,12 @@ import math
 import numpy.testing as np_test
 from elements.utilities import gaussPoints, lobattoPoints, GaussPoint2D, generateGaussPoints3D ,GaussPoint3D ,generateGaussPoints2D
 from elements.elemutils import SpElem2D
-from elements.spectral import Spectral2D
+from elements.spectral import Spectral2D, Spectral3D
 
 class SpectralTest(unittest.TestCase):
     def setUp(self):
-        self.spElem_ref = SpElem2D(2)
-        self.spElem_test = Spectral2D(2, 2)
+        self.spElem_ref = SpElem2D(3)
+        self.spElem_test = Spectral2D(3, 2)
 
     def test_H(self):
         H_size = len(self.spElem_ref.H)
@@ -227,6 +227,43 @@ class UtilitiesElementTest(unittest.TestCase):
                 lobpoi[i]
                 ,lobpoi_calculated 
                 ,decimal=12)
+
+class SpectralTestNodes(unittest.TestCase):
+    def setUp(self):
+        self.spectral_elements_2d = list()
+        self.spectral_elements_3d = list()
+        for ngl in range(2,5):
+            self.spectral_elements_2d.append(Spectral2D(ngl,2))
+            self.spectral_elements_3d.append(Spectral3D(ngl,3))
+
+    def test_nnodes(self):
+        for i, spectral in enumerate(self.spectral_elements_2d):
+            with self.subTest(test_ngl=spectral.ngl):
+                self.assertEqual( (i+2) ** 2 , spectral.nnode)
+        for i, spectral in enumerate(self.spectral_elements_3d):
+            with self.subTest(test_ngl=spectral.ngl):
+                self.assertEqual((i+2) ** 3 , spectral.nnode)
+
+    def test_edges_nodes(self):
+        for i, spectral in enumerate(self.spectral_elements_2d):
+            with self.subTest(test_ngl=spectral.ngl):
+                self.assertEqual( i , spectral.nnodedge)
+        for i, spectral in enumerate(self.spectral_elements_3d):
+            with self.subTest(test_ngl=spectral.ngl):
+                self.assertEqual( i , spectral.nnodedge)
+
+    def test_faces_nodes(self):
+        for i, spectral in enumerate(self.spectral_elements_3d):
+            with self.subTest(test_ngl=spectral.ngl):
+                self.assertEqual( i**2 , spectral.nnodface)
+
+    def test_body_nodes(self):
+        for i, spectral in enumerate(self.spectral_elements_2d):
+            with self.subTest(test_ngl=spectral.ngl):
+                self.assertEqual( i**2 , spectral.nnodcell)
+        for i, spectral in enumerate(self.spectral_elements_3d):
+            with self.subTest(test_ngl=spectral.ngl):
+                self.assertEqual( i**3 , spectral.nnodcell)
 
 class SpectralKLETest(unittest.TestCase):
     def setUp(self):

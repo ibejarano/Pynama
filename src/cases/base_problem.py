@@ -14,7 +14,7 @@ class BaseProblem(object):
         self.logger = logging.getLogger("Setting Up Base Problem")
 
     def setUpDomain(self):
-        self.dom = DMPlexDom(self.dim, self.comm)
+        self.dom = DMPlexDom(self.dim)
         self.dom.setUpDmPlex(self.lower, self.upper, self.nelem)
         self.logger.debug("DMPlex dom intialized")
 

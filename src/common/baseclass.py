@@ -1,10 +1,11 @@
 import logging
+from mpi4py import MPI
 
 class Base(object):
     """
     ex Abstracty
     """
-    def __init__(self, dim, comm=None):
+    def __init__(self, dim, comm=MPI.COMM_WORLD):
         self.comm = comm
         self.dim = dim
         self.dim_w = 1 if dim == 2 else 3

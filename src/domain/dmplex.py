@@ -4,9 +4,9 @@ from domain.indices import IndicesManager
 import numpy as np
 
 class DMPlexDom(Base):
-    def __init__(self, dim, comm):
+    def __init__(self, dim):
         """Aca dijimos que una clase madre le va a pasar esta data"""
-        super().__init__(dim, comm)
+        super().__init__(dim)
         self.dm = PETSc.DMPlex()
         self.logger.debug("Domain Instance Created")
 
@@ -46,8 +46,6 @@ class DMPlexDom(Base):
 
     def computeFullCoordinates(self, spElem):
         # self.logger = logging.getLogger("[{}] DomainMin Compute Coordinates".format(self.comm.rank))
-        self.coordinates = self.dm.getCoordinatesLocal()
-        self.coordSection = self.dm.getCoordinateSection()
         coordsComponents = self.dim
         numComp, numDof = self.indicesManager.getNumCompAndNumDof(coordsComponents, 1)
         fullCoordSec = self.dm.createSection(numComp, numDof)
@@ -61,7 +59,7 @@ class DMPlexDom(Base):
         for cell in range(self.cellEnd - self.cellStart):
             coords = self.getCellCornersCoords(cell)
             elTotNodes = spElem.nnode
-            coords.shape = (elTotNodes, coordsComponents)
+            coords.shape = (2**self.dim, coordsComponents)
             # self.logger.debug('coordenadas %s',coords)
             # nodosGlobales = self.getElemNodes(elem, "global")[0]
             cellEntities, orientations = self.dm.getTransitiveClosure(cell)
@@ -85,10 +83,12 @@ class DMPlexDom(Base):
         self.fullCoordVec.owner_range[1], coordsComponents)]
 
     def getCellCornersCoords(self, cell):
+        coordinates = self.dm.getCoordinatesLocal()
+        coordSection = self.dm.getCoordinateSection()
         if cell + self.cellStart >= self.cellEnd:
             raise Exception('elem parameter must be in local numbering!')
-        return self.dm.vecGetClosure(self.coordSection,
-                                         self.coordinates,
+        return self.dm.vecGetClosure(coordSection,
+                                         coordinates,
                                          cell+self.cellStart)
 
     def setLabelToBorders(self):
