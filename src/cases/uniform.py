@@ -10,6 +10,7 @@ import numpy as np
 import yaml
 from mpi4py import MPI
 from petsc4py import PETSc
+from viewer.paraviewer import Paraviewer
 
 class UniformFlow(BaseProblem):
     def __init__(self):
@@ -174,5 +175,9 @@ class UniformFlow(BaseProblem):
 
     def solve(self):
         self.solver( self.mat.Rw * self.vort + self.mat.Krhs * self.vel , self.vel)
+        self.viewer.saveVec(self.vel, timeStep=1)
+        self.viewer.saveStepInXML(self.vel, 1, 0.001)
+        self.viewer.writeXmf("uniform-flow")
+
         # self.vel.view()
 

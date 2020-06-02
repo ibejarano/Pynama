@@ -1,9 +1,0 @@
-/home/ignacio/tesis/petsc/arch-linux2-c-debug/bin/mpiexec -n 2 python3 src/uniform.py -yaml src/cases/uniform.yaml
-[0] entity: 10 nodos: [0, 1]
-[0] entity: 11 nodos: [1, 2]
-[0] entity: 12 nodos: [0]
-[0] entity: 14 nodos: [2]
-[1] entity: 8 nodos: [3, 4]
-[1] entity: 9 nodos: [4, 5]
-[1] entity: 12 nodos: [3, 6]
-[1] entity: 14 nodos: [5, 8]

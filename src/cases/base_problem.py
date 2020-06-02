@@ -33,7 +33,7 @@ class BaseProblem(object):
 
     def createMesh(self):
         self.dom.computeFullCoordinates(self.elemType)
-        self.viewer = Paraviewer(self.comm)
+        self.viewer = Paraviewer(self.dim ,self.comm)
         self.viewer.saveMesh(self.dom.fullCoordVec)
 
     def setUpGeneral(self, inputData):
