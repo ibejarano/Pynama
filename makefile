@@ -1,7 +1,7 @@
 # *-* makefile -*-
-MPIEXEC=${HOME}/tesis/petsc/arch-linux2-c-debug/bin/mpiexec -n 1
+MPIEXEC=${HOME}/Tesis/petsc/arch-linux-c-debug/bin/mpiexec -n ${nproc} 
 PYTHON=python3
-CASE=uniform
+CASE=run_case
 
 $(CASE):
-	${MPIEXEC} ${PYTHON} src/${CASE}.py -yaml src/cases/${CASE}.yaml
+	${MPIEXEC} ${PYTHON} src/${CASE}.py
