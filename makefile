@@ -4,4 +4,4 @@ PYTHON=python3
 CASE=run_case
 
 $(CASE):
-	${MPIEXEC} ${PYTHON} src/${CASE}.py
+	${MPIEXEC} ${PYTHON} src/${CASE}.py -ksp_type preonly -pc_type lu

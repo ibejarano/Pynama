@@ -11,3 +11,4 @@ class KspSolver(KSP):
         self.create(comm)
         self.setFromOptions()
         self.setOperators(mat)
+        self.setUp()
