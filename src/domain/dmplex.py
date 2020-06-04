@@ -182,3 +182,11 @@ class DMPlexDom(PETSc.DMPlex):
     def getSrtIndex(self, nodes):
         indices = self.indicesManager.mapNodesToIndices(nodes, self.dim_s)
         return indices
+
+    def getAllNodes(self):
+        start, end = self.getChart()
+        globalNodes = list()
+        for entity in range(start, end):
+            globalNodes.extend(self.indicesManager.getGlobalNodes(entity)[0])
+
+        return globalNodes
