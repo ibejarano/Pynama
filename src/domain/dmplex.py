@@ -1,21 +1,19 @@
-from common.baseclass import Base
 from petsc4py import PETSc
 from domain.indices import IndicesManager
 import numpy as np
+import logging
+from mpi4py import MPI
 
-class DMPlexDom(Base):
-    def __init__(self, dim):
-        """Aca dijimos que una clase madre le va a pasar esta data"""
-        super().__init__(dim)
-        self.dm = PETSc.DMPlex()
+class DMPlexDom(PETSc.DMPlex):
+    def __init__(self, lower, upper, faces):
+        comm = MPI.COMM_WORLD
+
+        self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
+        self.logger = logging.getLogger(f"[{self.comm.rank}] Class")
         self.logger.debug("Domain Instance Created")
-
-    def setUpDmPlex(self, lower, upper, faces):
-        self.dm.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=self.comm)
-
-        self.dm.createLabel('marco')
-        self.dm.markBoundaryFaces('marco',0)
-        self.dm.distribute()
+        self.createLabel('marco')
+        self.markBoundaryFaces('marco',0)
+        self.distribute()
 
         if not self.comm.rank:
             self.logger.debug("DM Plex Box Mesh created")
@@ -25,19 +23,19 @@ class DMPlexDom(Base):
         fields = 1
         componentsPerField = 1
         # cosas DM
-        self.dm.setNumFields(fields)
-
-        self.indicesManager = IndicesManager(self.dim, ngl ,self.comm)
+        self.setNumFields(fields)
+        dim = self.getDimension()
+        self.indicesManager = IndicesManager(dim, ngl ,self.comm)
         numComp, numDof = self.indicesManager.getNumCompAndNumDof(componentsPerField, fields)
         
-        indSec = self.dm.createSection(numComp, numDof)
+        indSec = self.createSection(numComp, numDof)
         indSec.setFieldName(0, 'FEM/SEM indexing')
         indSec.setUp()
         self.indicesManager.setLocalIndicesSection(indSec)
 
-        self.dm.setDefaultSection(indSec)
-        indGlobSec = self.dm.getDefaultGlobalSection()
-        self.cellStart, self.cellEnd = self.dm.getHeightStratum(0)
+        self.setDefaultSection(indSec)
+        indGlobSec = self.getDefaultGlobalSection()
+        self.cellStart, self.cellEnd = self.getHeightStratum(0)
         self.indicesManager.setGlobalIndicesSection(indGlobSec)
 
         if not self.comm.rank:
@@ -48,11 +46,11 @@ class DMPlexDom(Base):
         # self.logger = logging.getLogger("[{}] DomainMin Compute Coordinates".format(self.comm.rank))
         coordsComponents = self.dim
         numComp, numDof = self.indicesManager.getNumCompAndNumDof(coordsComponents, 1)
-        fullCoordSec = self.dm.createSection(numComp, numDof)
+        fullCoordSec = self.createSection(numComp, numDof)
         fullCoordSec.setFieldName(0, 'Vertexes')
         fullCoordSec.setUp()
-        self.dm.setDefaultSection(fullCoordSec)
-        self.fullCoordVec = self.dm.createGlobalVec()
+        self.setDefaultSection(fullCoordSec)
+        self.fullCoordVec = self.createGlobalVec()
         self.fullCoordVec.setName('NodeCoordinates')
         self.logger.debug("Full coord vec size %s", self.fullCoordVec.size)
 
@@ -62,7 +60,7 @@ class DMPlexDom(Base):
             coords.shape = (2**self.dim, coordsComponents)
             # self.logger.debug('coordenadas %s',coords)
             # nodosGlobales = self.getElemNodes(elem, "global")[0]
-            cellEntities, orientations = self.dm.getTransitiveClosure(cell)
+            cellEntities, orientations = self.getTransitiveClosure(cell)
             nodosGlobales = self.indicesManager.mapEntitiesToNodes(cellEntities, orientations)
             # self.logger.debug("Nodos Globales %s", nodosGlobales)
             
@@ -83,50 +81,48 @@ class DMPlexDom(Base):
         self.fullCoordVec.owner_range[1], coordsComponents)]
 
     def getCellCornersCoords(self, cell):
-        coordinates = self.dm.getCoordinatesLocal()
-        coordSection = self.dm.getCoordinateSection()
+        coordinates = self.getCoordinatesLocal()
+        coordSection = self.getCoordinateSection()
         if cell + self.cellStart >= self.cellEnd:
             raise Exception('elem parameter must be in local numbering!')
-        return self.dm.vecGetClosure(coordSection,
+        return self.vecGetClosure(coordSection,
                                          coordinates,
                                          cell+self.cellStart)
 
     def setLabelToBorders(self):
-
         label = 'cfgfileBC'
         self.dm.createLabel(label)
-        for faceNum in self.dm.getLabelIdIS("Face Sets").getIndices():
-            Faces= self.dm.getStratumIS("Face Sets", faceNum).getIndices()
+        for faceNum in self.getLabelIdIS("Face Sets").getIndices():
+            Faces= self.getStratumIS("Face Sets", faceNum).getIndices()
             borderNum = faceNum - 1
             for Face in Faces: 
-                entitiesToLabel=self.dm.getTransitiveClosure(Face)[0]
+                entitiesToLabel=self.getTransitiveClosure(Face)[0]
                 for entity in entitiesToLabel: 
-                    oldVal = self.dm.getLabelValue(label, entity)
+                    oldVal = self.getLabelValue(label, entity)
                     if oldVal >= 0:
-                        self.dm.clearLabelValue(label, entity, oldVal)
-                        self.dm.setLabelValue(label, entity,
+                        self.clearLabelValue(label, entity, oldVal)
+                        self.setLabelValue(label, entity,
                                             2**borderNum | oldVal)
                     else:
-                        self.dm.setLabelValue(label, entity,
+                        self.setLabelValue(label, entity,
                                             2**borderNum)
         if not self.comm.rank:
             self.logger.debug("Labels creados en borders")
 
     def getDMConectivityMat(self):
         localIndicesSection = self.indicesManager.getLocalIndicesSection()
-        self.dm.setDefaultSection(localIndicesSection)
-        return self.dm.createMat()
+        self.setDefaultSection(localIndicesSection)
+        return self.createMat()
 
     def getGlobalIndicesDirichlet(self):
         indicesDIR = self.indicesManager.getDirichletIndices()
         return indicesDIR
 
-
     def readBoundaryCondition(self, BCdict):
         tag2BCdict = dict()
         BCset = set()
         # Existing tag values in 'cfgfileBC' label
-        BClabelVals = self.dm.getLabelIdIS('cfgfileBC').getIndices()
+        BClabelVals = self.getLabelIdIS('cfgfileBC').getIndices()
         for val in BClabelVals:
             labelVal = val
             tag2BCdict[val] = list()
@@ -149,7 +145,7 @@ class DMPlexDom(Base):
         node2tagdict = dict()
         for tag in tag2BCdict:
             # DMPlex points with val tag value
-            tagDMpoints = self.dm.getStratumIS('cfgfileBC', tag).\
+            tagDMpoints = self.getStratumIS('cfgfileBC', tag).\
                             getIndices()
 
             for poi in tagDMpoints:
@@ -171,7 +167,7 @@ class DMPlexDom(Base):
 
 
     def getGlobalNodesFromCell(self, cell, shared):
-        entities, orientations = self.dm.getTransitiveClosure(cell)
+        entities, orientations = self.getTransitiveClosure(cell)
         nodes = self.indicesManager.mapEntitiesToNodes(entities, orientations, shared)
         return nodes
 
