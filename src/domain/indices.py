@@ -48,7 +48,7 @@ class IndicesManager:
         for nodes in self.BC2nodedict.values():
             localIndicesDIR |= nodes
 
-        for remoteIndices in self.comm.allgather(localIndicesDIR):
+        for remoteIndices in self.comm.tompi4py().allgather(localIndicesDIR):
             self.globalIndicesDIR |= remoteIndices
 
         return localIndicesDIR

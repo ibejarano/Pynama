@@ -15,6 +15,10 @@ class DMPlexDom(PETSc.DMPlex):
         self.markBoundaryFaces('marco',0)
         self.distribute()
 
+        self.dim = self.getDimension()
+        self.dim_w = 1 if self.dim == 2 else 3
+        self.dim_s = 3 if self.dim == 2 else 6
+
         if not self.comm.rank:
             self.logger.debug("DM Plex Box Mesh created")
 
@@ -44,7 +48,7 @@ class DMPlexDom(PETSc.DMPlex):
 
     def computeFullCoordinates(self, spElem):
         # self.logger = logging.getLogger("[{}] DomainMin Compute Coordinates".format(self.comm.rank))
-        coordsComponents = self.dim
+        coordsComponents = self.getDimension()
         numComp, numDof = self.indicesManager.getNumCompAndNumDof(coordsComponents, 1)
         fullCoordSec = self.createSection(numComp, numDof)
         fullCoordSec.setFieldName(0, 'Vertexes')
@@ -57,7 +61,7 @@ class DMPlexDom(PETSc.DMPlex):
         for cell in range(self.cellEnd - self.cellStart):
             coords = self.getCellCornersCoords(cell)
             elTotNodes = spElem.nnode
-            coords.shape = (2**self.dim, coordsComponents)
+            coords.shape = (2** coordsComponents , coordsComponents)
             # self.logger.debug('coordenadas %s',coords)
             # nodosGlobales = self.getElemNodes(elem, "global")[0]
             cellEntities, orientations = self.getTransitiveClosure(cell)
@@ -91,7 +95,7 @@ class DMPlexDom(PETSc.DMPlex):
 
     def setLabelToBorders(self):
         label = 'cfgfileBC'
-        self.dm.createLabel(label)
+        self.createLabel(label)
         for faceNum in self.getLabelIdIS("Face Sets").getIndices():
             Faces= self.getStratumIS("Face Sets", faceNum).getIndices()
             borderNum = faceNum - 1
@@ -119,6 +123,7 @@ class DMPlexDom(PETSc.DMPlex):
         return indicesDIR
 
     def readBoundaryCondition(self, BCdict):
+        dim = self.getDimension()
         tag2BCdict = dict()
         BCset = set()
         # Existing tag values in 'cfgfileBC' label
@@ -154,7 +159,7 @@ class DMPlexDom(PETSc.DMPlex):
                 if ownNodes:
                     for node in nodes:
                         # FIXME: node coordinates 2D or 3D
-                        ind = [node*self.dim + d for d in range(self.dim)]
+                        ind = [node*dim + d for d in range(dim)]
                         xyz = self.fullCoordVec.getValues(ind)
                         node2tagdict[node] = [tag, xyz]
 
@@ -184,9 +189,18 @@ class DMPlexDom(PETSc.DMPlex):
         return indices
 
     def getAllNodes(self):
+        # TODO: Needs to be tested in parallel
         start, end = self.getChart()
         globalNodes = list()
         for entity in range(start, end):
             globalNodes.extend(self.indicesManager.getGlobalNodes(entity)[0])
-
         return globalNodes
+
+    def getNodesCoordinates(self, nodes):
+        """
+        nodes: [Int]
+        """
+        dim = self.getDimension()
+        indices = self.indicesManager.mapNodesToIndices(nodes, dim)
+        arr = self.fullCoordVec.getValues(indices).reshape((len(nodes),dim))
+        return arr
