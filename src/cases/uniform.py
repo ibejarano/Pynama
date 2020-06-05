@@ -154,7 +154,7 @@ class UniformFlow(BaseProblem):
     def getBoundaryNodes(self):
         """ IS: Index Set """
         nodesSet = set()
-        IS =self.dom.dm.getStratumIS('marco', 0)
+        IS =self.dom.getStratumIS('marco', 0)
         entidades = IS.getIndices()
         for entity in entidades:
             nodes = self.dom.getGlobalNodesFromCell(entity, False)

@@ -14,8 +14,7 @@ class BaseProblem(object):
         self.logger = logging.getLogger("Setting Up Base Problem")
 
     def setUpDomain(self):
-        self.dom = DMPlexDom(self.dim)
-        self.dom.setUpDmPlex(self.lower, self.upper, self.nelem)
+        self.dom = DMPlexDom(self.lower, self.upper, self.nelem)
         self.logger.debug("DMPlex dom intialized")
 
     def setUpHighOrderIndexing(self):
@@ -26,6 +25,8 @@ class BaseProblem(object):
 
     def setUpWithInputData(self, inputData):
         self.dim = len(inputData['nelem'])
+        self.dim_w = 1 if self.dim == 2 else 3
+        self.dim_s = 3 if self.dim == 2 else 6
         self.ngl = inputData['ngl']
         self.lower = inputData['lower']
         self.upper = inputData['upper']
