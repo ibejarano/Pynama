@@ -203,7 +203,7 @@ class DMPlexDom(PETSc.DMPlex):
         coords = self.getNodesCoordinates(nodes)
         for i,coord in enumerate(coords):
             values = f_vec(coord)
-            indices = self.getVelocityIndex(i)
+            indices = self.getVelocityIndex([i])
             vec.setValues(indices, values, addv=None)
         return vec
 
