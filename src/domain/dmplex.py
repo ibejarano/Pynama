@@ -7,7 +7,6 @@ from mpi4py import MPI
 class DMPlexDom(PETSc.DMPlex):
     def __init__(self, lower, upper, faces):
         comm = MPI.COMM_WORLD
-
         self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
         self.logger = logging.getLogger(f"[{self.comm.rank}] Class")
         self.logger.debug("Domain Instance Created")
@@ -23,10 +22,8 @@ class DMPlexDom(PETSc.DMPlex):
             self.logger.debug("DM Plex Box Mesh created")
 
     def setFemIndexing(self, ngl):
-        # self._ngl = ngl
         fields = 1
         componentsPerField = 1
-        # cosas DM
         self.setNumFields(fields)
         dim = self.getDimension()
         self.indicesManager = IndicesManager(dim, ngl ,self.comm)
@@ -60,24 +57,17 @@ class DMPlexDom(PETSc.DMPlex):
 
         for cell in range(self.cellEnd - self.cellStart):
             coords = self.getCellCornersCoords(cell)
-            elTotNodes = spElem.nnode
             coords.shape = (2** coordsComponents , coordsComponents)
-            # self.logger.debug('coordenadas %s',coords)
-            # nodosGlobales = self.getElemNodes(elem, "global")[0]
             cellEntities, orientations = self.getTransitiveClosure(cell)
             nodosGlobales = self.indicesManager.mapEntitiesToNodes(cellEntities, orientations)
-            # self.logger.debug("Nodos Globales %s", nodosGlobales)
-            
-            # indicesGlobales = self.getElemIndices(elem, 'global', coordsComponents)
             indicesGlobales = self.indicesManager.mapNodesToIndices(nodosGlobales, coordsComponents)
+
+            elTotNodes = spElem.nnode
             totCoord = np.mat(np.zeros((coordsComponents*elTotNodes, 1)))
 
             for idx, gp in enumerate(spElem.gpsOp):
                 totCoord[[coordsComponents * idx + d for d in range(coordsComponents)]] = \
                     (spElem.HCooOp[idx] * coords).T
-            
-            # self.logger.debug("total coords %s", totCoord)
-            # self.logger.debug("indices %s", indicesGlobales)
             self.fullCoordVec.setValues(indicesGlobales, totCoord)
 
         self.fullCoordVec.assemble()
@@ -204,3 +194,43 @@ class DMPlexDom(PETSc.DMPlex):
         indices = self.indicesManager.mapNodesToIndices(nodes, dim)
         arr = self.fullCoordVec.getValues(indices).reshape((len(nodes),dim))
         return arr
+
+    def applyFunctionVecToVec(self, nodes, f_vec, vec):
+        """
+        f_vec: function: returns a tuple with len = dim
+        summary; this method needs to map nodes to indices
+        """
+        coords = self.getNodesCoordinates(nodes)
+        for i,coord in enumerate(coords):
+            values = f_vec(coord)
+            indices = self.getVelocityIndex(i)
+            vec.setValues(indices, values, addv=None)
+        return vec
+
+    def applyFunctionScalarToVec(self, nodes, f_scalar, vec):
+        """
+        f_scalar: function: returns an unique value
+        summary: this nodes = indices
+        """
+        coords = self.getNodesCoordinates(nodes)
+        for i,coord in enumerate(coords):
+            value = f_scalar(coord)
+            vec.setValues(nodes, value, addv=None)
+        return vec
+
+    def applyValuesToVec(self, nodes, values, vec):
+        # with nodes -> indices
+        # TODO in applyFunctionToVec it requests very coordenate
+        # the function are coords independent in this case.
+        dof = len(values)
+        assert dof <= self.dim # Not implemented for single value
+        if dof == 1: #apply a scalar for every node in vec
+            vec.set(values[0])
+        elif dof == 2:
+            f = lambda x: values[0], values[1]
+            vec = self.applyFunctionVecToVec(nodes, f, vec)        
+        elif dof == 3:
+            f = lambda x: values[0], values[1], values[2]
+            vec = self.applyFunctionVecToVec(nodes, f, vec)
+
+        return vec
