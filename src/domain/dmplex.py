@@ -203,7 +203,7 @@ class DMPlexDom(PETSc.DMPlex):
         coords = self.getNodesCoordinates(nodes)
         for i,coord in enumerate(coords):
             values = f_vec(coord)
-            indices = self.getVelocityIndex([i])
+            indices = self.getVelocityIndex([nodes[i]])
             vec.setValues(indices, values, addv=None)
         return vec
 
@@ -215,7 +215,7 @@ class DMPlexDom(PETSc.DMPlex):
         coords = self.getNodesCoordinates(nodes)
         for i,coord in enumerate(coords):
             value = f_scalar(coord)
-            vec.setValues(nodes, value, addv=None)
+            vec.setValues(nodes[i], value, addv=None)
         return vec
 
     def applyValuesToVec(self, nodes, values, vec):
@@ -226,11 +226,8 @@ class DMPlexDom(PETSc.DMPlex):
         assert dof <= self.dim # Not implemented for single value
         if dof == 1: #apply a scalar for every node in vec
             vec.set(values[0])
-        elif dof == 2:
-            f = lambda x: values[0], values[1]
-            vec = self.applyFunctionVecToVec(nodes, f, vec)        
-        elif dof == 3:
-            f = lambda x: values[0], values[1], values[2]
-            vec = self.applyFunctionVecToVec(nodes, f, vec)
-
+        else:
+            valuesToSet = np.array(values * len(nodes))
+            indices = self.getVelocityIndex(nodes)
+            vec.setValues(indices, valuesToSet, addv=False)     
         return vec
