@@ -49,7 +49,7 @@ class XmlGenerator(object):
         timestamp = SubElement(meshElem, "Time")
         timestamp.set("Value", str(t))
 
-    def setAttribute(self, name, step, meshGrid):
+    def setVectorAttribute(self, name, step, meshGrid):
         attr = SubElement(meshGrid, "Attribute")
         attr.set("Name", name)
         attr.set("AttributeType", "Vector")
@@ -63,6 +63,18 @@ class XmlGenerator(object):
         for i in range(self.dim):
             self.setDataToAttribute(attrData, step, name, i)
 
+    def setScalarAttribute(self, name, step, meshGrid):
+        attr = SubElement(meshGrid, "Attribute")
+        attr.set("Name", name)
+        attr.set("AttributeType", "Scalar")
+        attr.set("Center", "Node")
+
+        attrData = SubElement(attr, "DataItem")
+        attrData.set("Dimensions", "{}".format(self.dimensions))
+        attrData.set("NumberType", "Float")
+        attrData.set("Format", "HDF")
+        stepFormat = self.formatStep(step)
+        attrData.text = "{}-{}.h5:/fields/{}".format(name, stepFormat, name) 
 
     def setDataToAttribute(self, attrData, step, name, dof):
         dofs = ['X', 'Y', 'Z']
