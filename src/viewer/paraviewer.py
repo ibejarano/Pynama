@@ -43,11 +43,13 @@ class Paraviewer:
         dataGrid = self.xmlWriter.generateMeshData("mesh1")
         self.xmlWriter.setTimeStamp(time, dataGrid)
         try:
-            self.xmlWriter.setAttribute(vec.getName(), step, dataGrid)
+            self.xmlWriter.setVectorAttribute(vec.getName(), step, dataGrid)
         except:
             for vec in vecs:
-                self.xmlWriter.setAttribute(vec.getName(), step, dataGrid)
-
+                if vec.getSize() == self.xmlWriter.dimensions:
+                    self.xmlWriter.setScalarAttribute(vec.getName(), step, dataGrid)
+                else:
+                    self.xmlWriter.setVectorAttribute(vec.getName(), step, dataGrid)
 
     def writeXmf(self, name):
         self.xmlWriter.writeFile(name)
