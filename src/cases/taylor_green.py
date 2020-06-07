@@ -20,6 +20,7 @@ class TaylorGreen(BaseProblem):
             yamlData = yaml.load(f, Loader=yaml.Loader)
 
         self.setUp(yamlData)
+        self.caseName = "taylor-green"
 
     def setUpBoundaryConditions(self, inputData):
         self.dom.setLabelToBorders()
@@ -126,8 +127,8 @@ class TaylorGreen(BaseProblem):
     def generateExactVecs(self, time):
         exactVel = self.mat.K.createVecRight()
         exactVort = self.mat.Rw.createVecRight()
-        exactVel.setName("tg-exact-vel")
-        exactVort.setName("tg-exact-vort")
+        exactVel.setName(f"{self.caseName}-exact-vel")
+        exactVort.setName(f"{self.caseName}-exact-vort")
         allNodes = self.dom.getAllNodes()
         # generate a new function with t=constant and coords variable
         fvel_coords = lambda coords: self.taylorGreenVelVec(coords, t=time)
@@ -141,10 +142,7 @@ class TaylorGreen(BaseProblem):
         fvel_coords = lambda coords: self.taylorGreenVelVec(coords, t=time)
         self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel)
 
-    def solve(self):
-        startTime = 0.0
-        endTime = 0.03
-        steps = 100
+    def solveKLE(self, startTime=0.0, endTime=1.0, steps=10):
         times = np.arange(startTime, endTime, (endTime - startTime)/steps)
         boundaryNodes = self.getBoundaryNodes()
         for step,time in enumerate(times):
@@ -155,7 +153,23 @@ class TaylorGreen(BaseProblem):
             self.viewer.saveVec(exactVel, timeStep=step)
             self.viewer.saveVec(exactVort, timeStep=step)
             self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort, self.vel])
-        self.viewer.writeXmf("taylor-green")
+        self.viewer.writeXmf(self.caseName)
+
+    def getKLEError(self, times=None ,startTime=0.0, endTime=1.0, steps=10):
+        try:
+            assert times !=None
+        except:
+            times = np.arange(startTime, endTime, (endTime - startTime)/steps)
+
+        boundaryNodes = self.getBoundaryNodes()
+        errors = list()
+        for time in times:
+            exactVel, exactVort = self.generateExactVecs(time)
+            self.applyBoundaryConditions(time, boundaryNodes)
+            self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+            error = (exactVel - self.vel).norm(norm_type=2)
+            errors.append(error)
+        return errors
 
     @staticmethod
     def taylorGreenVelVec(coord, t=None):
