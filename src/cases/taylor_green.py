@@ -137,11 +137,16 @@ class TaylorGreen(BaseProblem):
         return exactVel, exactVort
 
     def solve(self):
-        exactVel, exactVort = self.generateExactVecs(0.01)
-        # self.solver( self.mat.Rw * self.vort + self.mat.Krhs * self.vel , self.vel)
-        self.viewer.saveVec(exactVel, timeStep=1)
-        self.viewer.saveVec(exactVort, timeStep=1)
-        self.viewer.saveStepInXML(1, 0.001, vecs=[exactVel, exactVort])
+        startTime = 0.0
+        endTime = 0.03
+        steps = 100
+        times = np.arange(startTime, endTime, (endTime - startTime)/steps)
+        for step,time in enumerate(times):
+            exactVel, exactVort = self.generateExactVecs(time)
+            # self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+            self.viewer.saveVec(exactVel, timeStep=step)
+            self.viewer.saveVec(exactVort, timeStep=step)
+            self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort])
         self.viewer.writeXmf("taylor-green")
 
     @staticmethod
