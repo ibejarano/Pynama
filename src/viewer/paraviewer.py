@@ -39,10 +39,15 @@ class Paraviewer:
         ViewHDF5.view(obj=vec)   # Put PETSc object into the viewer
         ViewHDF5.destroy()            # Destroy Viewer
 
-    def saveStepInXML(self, vec, step, time):
+    def saveStepInXML(self, step, time, vec=None ,vecs=None):
         dataGrid = self.xmlWriter.generateMeshData("mesh1")
         self.xmlWriter.setTimeStamp(time, dataGrid)
-        self.xmlWriter.setAttribute(vec.getName(), step, dataGrid)
+        try:
+            self.xmlWriter.setAttribute(vec.getName(), step, dataGrid)
+        except:
+            for vec in vecs:
+                self.xmlWriter.setAttribute(vec.getName(), step, dataGrid)
+
 
     def writeXmf(self, name):
         self.xmlWriter.writeFile(name)

@@ -176,7 +176,7 @@ class UniformFlow(BaseProblem):
     def solve(self):
         self.solver( self.mat.Rw * self.vort + self.mat.Krhs * self.vel , self.vel)
         self.viewer.saveVec(self.vel, timeStep=1)
-        self.viewer.saveStepInXML(self.vel, 1, 0.001)
+        self.viewer.saveStepInXML(1, 0.001, vec=self.vel)
         self.viewer.writeXmf("uniform-flow")
 
         # self.vel.view()

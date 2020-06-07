@@ -141,8 +141,7 @@ class TaylorGreen(BaseProblem):
         # self.solver( self.mat.Rw * self.vort + self.mat.Krhs * self.vel , self.vel)
         self.viewer.saveVec(exactVel, timeStep=1)
         self.viewer.saveVec(exactVort, timeStep=1)
-        self.viewer.saveStepInXML(exactVel, 1, 0.001)
-        self.viewer.saveStepInXML(exactVort, 1, 0.001)
+        self.viewer.saveStepInXML(1, 0.001, vecs=[exactVel, exactVort])
         self.viewer.writeXmf("taylor-green")
 
     @staticmethod
