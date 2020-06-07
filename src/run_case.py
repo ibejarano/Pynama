@@ -1,6 +1,6 @@
-from cases.uniform import UniformFlow
+from cases.taylor_green import TaylorGreen
 
 
-fem = UniformFlow()
+fem = TaylorGreen()
 fem.setUpSolver()
 fem.solve()
