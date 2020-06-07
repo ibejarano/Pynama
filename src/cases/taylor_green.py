@@ -18,10 +18,8 @@ class TaylorGreen(BaseProblem):
 
         with open('src/cases/taylor-green.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
-            # TODO: Aqui se puede sobreescribir con comando externo
 
         for key in kwargs.keys():
-            print(key)
             try:
                 assert  yamlData['domain'][key]
                 yamlData['domain'][key] = kwargs[key]
