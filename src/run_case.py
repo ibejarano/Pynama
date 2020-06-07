@@ -1,6 +1,6 @@
 from cases.taylor_green import TaylorGreen
 
 
-fem = TaylorGreen()
+fem = TaylorGreen(ngl=3)
 fem.setUpSolver()
-fem.solve()
+fem.solveKLE()

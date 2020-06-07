@@ -13,11 +13,20 @@ from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
 
 class TaylorGreen(BaseProblem):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
 
         with open('src/cases/taylor-green.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
+            # TODO: Aqui se puede sobreescribir con comando externo
+
+        for key in kwargs.keys():
+            print(key)
+            try:
+                assert  yamlData['domain'][key]
+                yamlData['domain'][key] = kwargs[key]
+            except:
+                print(f"Key >> {key} << not defined in yaml")
 
         self.setUp(yamlData)
         self.caseName = "taylor-green"
