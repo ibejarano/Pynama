@@ -136,17 +136,25 @@ class TaylorGreen(BaseProblem):
         exactVort = self.dom.applyFunctionScalarToVec(allNodes, fvort_coords, exactVort)
         return exactVel, exactVort
 
+    def applyBoundaryConditions(self, time, bcNodes):
+        self.vel.set(0.0)
+        fvel_coords = lambda coords: self.taylorGreenVelVec(coords, t=time)
+        self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel)
+
     def solve(self):
         startTime = 0.0
         endTime = 0.03
         steps = 100
         times = np.arange(startTime, endTime, (endTime - startTime)/steps)
+        boundaryNodes = self.getBoundaryNodes()
         for step,time in enumerate(times):
             exactVel, exactVort = self.generateExactVecs(time)
-            # self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+            self.applyBoundaryConditions(time, boundaryNodes)
+            self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+            self.viewer.saveVec(self.vel, timeStep=step)
             self.viewer.saveVec(exactVel, timeStep=step)
             self.viewer.saveVec(exactVort, timeStep=step)
-            self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort])
+            self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort, self.vel])
         self.viewer.writeXmf("taylor-green")
 
     @staticmethod
