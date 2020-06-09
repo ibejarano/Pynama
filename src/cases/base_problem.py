@@ -4,6 +4,7 @@ import logging
 from domain.dmplex import DMPlexDom
 from elements.spectral import Spectral2D
 from viewer.paraviewer import Paraviewer
+from solver.ts_solver import TsSolver
 
 class BaseProblem(object):
     def __init__(self, comm=MPI.COMM_WORLD):
@@ -43,3 +44,7 @@ class BaseProblem(object):
         self.setUpHighOrderIndexing()
         self.setUpElement()
         self.createMesh()
+
+    def getTS(self):
+        ts = TsSolver(self.comm)
+        return ts
