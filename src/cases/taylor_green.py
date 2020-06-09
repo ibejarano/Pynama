@@ -37,7 +37,7 @@ class TaylorGreen(BaseProblem):
         self.mat = Mat(self.dim, self.comm)
         fakeConectMat = self.dom.getDMConectivityMat()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
-        self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesDIR)
+        self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesDIR, createOperators=True)
 
     def buildKLEMats(self):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
@@ -101,11 +101,30 @@ class TaylorGreen(BaseProblem):
         self.mat.assembleAll()
         self.mat.setIndices2One(indices2one)
 
+    def buildOperators(self):
+        cornerCoords = self.dom.getCellCornersCoords(cell=0)
+        locSrT, locDivSrT, locCurl, locWei = self.elemType.getElemKLEOperators(cornerCoords)
+        for cell in range(self.dom.cellStart, self.dom.cellEnd):
+            nodes = self.dom.getGlobalNodesFromCell(cell, shared=False)
+            indicesVel = self.dom.getVelocityIndex(nodes)
+            indicesW = self.dom.getVorticityIndex(nodes)
+            indicesSrT = self.dom.getSrtIndex(nodes)
+            self.mat.SrT.setValues(indicesSrT, indicesVel, locSrT, True)
+            self.mat.DivSrT.setValues(indicesVel, indicesSrT, locDivSrT, True)
+            self.mat.Curl.setValues(indicesW, indicesVel, locCurl, True)
+
+            self.mat.weigSrT.setValues(indicesSrT, np.repeat(locWei, self.dim_s), True)
+            self.mat.weigDivSrT.setValues(indicesVel, np.repeat(locWei, self.dim), True)
+            self.mat.weigCurl.setValues(indicesW, np.repeat(locWei, self.dim_w), True)
+
+        self.mat.assembleOperators()
+
     def setUp(self, yamlInput):
         self.setUpGeneral(yamlInput['domain'])
         self.setUpBoundaryConditions(yamlInput)
         self.setUpEmptyMats()
         self.buildKLEMats()
+        self.buildOperators()
 
     def setUpSolver(self):
         self.solver = KspSolver()
@@ -120,6 +139,19 @@ class TaylorGreen(BaseProblem):
         boundaryVelocityValues = [1 , 0] * len(boundaryNodes)
         self.vel.setValues(boundaryVelocityIndex, boundaryVelocityValues , addv=False)
         self.vel.assemble()
+
+        sK, eK = self.mat.K.getOwnershipRange()
+        locRowsK = eK - sK
+
+        self._VtensV = PETSc.Vec().createMPI(
+            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
+        self._Aux1 = PETSc.Vec().createMPI(
+            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
+
+    def computeInitialCondition(self, startTime):
+        allNodes = self.dom.getAllNodes()
+        fvort_coords = lambda coords: self.taylorGreenVortScalar(coords, t=startTime)
+        self.vort = self.dom.applyFunctionScalarToVec(allNodes, fvort_coords, self.vort)
 
     def getBoundaryNodes(self):
         """ IS: Index Set """
@@ -149,18 +181,35 @@ class TaylorGreen(BaseProblem):
         fvel_coords = lambda coords: self.taylorGreenVelVec(coords, t=time)
         self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel)
 
-    def solveKLE(self, startTime=0.0, endTime=1.0, steps=10):
-        times = np.arange(startTime, endTime, (endTime - startTime)/steps)
+    def solveKLETests(self, startTime=0.0, endTime=1.0, steps=10):
+        times = np.linspace(startTime, endTime, steps)
         boundaryNodes = self.getBoundaryNodes()
         for step,time in enumerate(times):
             exactVel, exactVort = self.generateExactVecs(time)
             self.applyBoundaryConditions(time, boundaryNodes)
             self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+            self.mat.Curl.mult( exactVel , self.vort )
             self.viewer.saveVec(self.vel, timeStep=step)
+            self.viewer.saveVec(self.vort, timeStep=step)
             self.viewer.saveVec(exactVel, timeStep=step)
             self.viewer.saveVec(exactVort, timeStep=step)
-            self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort, self.vel])
+            self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort, self.vel, self.vort])
         self.viewer.writeXmf(self.caseName)
+
+    def solveKLE(self, time, vort):
+        boundaryNodes = self.getBoundaryNodes()
+        self.applyBoundaryConditions(time, boundaryNodes)
+        self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
+
+    def convergedStepFunction(self, ts):
+        time = ts.getTimeStep()
+        step = ts.getStepNumber()
+        vort = ts.getSolution()
+        print(f"convergi step: {step} ; time: {time} ")
+        # lo de abajo en otro lado
+        self.viewer.saveVec(self.vel, timeStep=step)
+        self.viewer.saveVec(vort, timeStep=step)
+        self.viewer.saveStepInXML(step, time, vecs=[self.vel, vort])
 
     def getKLEError(self, times=None ,startTime=0.0, endTime=1.0, steps=10):
         try:
@@ -177,6 +226,57 @@ class TaylorGreen(BaseProblem):
             error = (exactVel - self.vel).norm(norm_type=2)
             errors.append(error)
         return errors
+
+    def setUpTimeSolver(self):
+        self.ts = self.getTS()
+        self.ts.setUpTimes(sTime= 0.0, eTime= 1.0, steps=10)
+        self.ts.initSolver(self.RHSTaylorGreen, self.convergedStepFunction)
+        self.computeInitialCondition(startTime = 0.0)
+
+    def RHSTaylorGreen(self, ts, t, Vort, f):
+        """Evaluate the KLE right hand side."""
+        print("Computing RHS at time: %s" % t)
+        # KLE spatial solution with vorticity given
+        rho = 1
+        mu = 1
+        self.solveKLE(t, Vort)
+
+        # FIXME: Generalize for dim = 3 also
+        sK, eK = self.mat.K.getOwnershipRange()
+
+        for indN in range(sK, eK, self.dim):
+            indicesVV = [indN * self.dim_s / self.dim + d
+                         for d in range(self.dim_s)]
+            VelN = self.vel.getValues([indN + d for d in range(self.dim)])
+            if self.dim==2:
+                VValues = [VelN[0] ** 2, VelN[0] * VelN[1], VelN[1] ** 2]
+            elif self.dim==3:
+                VValues = [VelN[0] ** 2, VelN[0] * VelN[1] ,VelN[1] ** 2 , VelN[1] * VelN[2] , VelN[2] **2 , VelN[2] *VelN[0]]
+            else:
+                raise Exception("Wrong dim")
+
+            self._VtensV.setValues(indicesVV, VValues, False)
+
+        self._VtensV.assemble()
+
+        # self._Aux1 = self.SrT * self._Vel
+        self.mat.SrT.mult(self.vel, self._Aux1)
+
+        # _Aux1 = 2*Mu * S - rho * Vvec ^ VVec
+        self._Aux1 *= (2.0 * mu)
+        self._Aux1.axpy(-1.0 * rho, self._VtensV)
+
+        # FIXME: rhs should be created previously or not?
+        rhs = self.vel.duplicate()
+        # RHS = Curl * Div(SrT) * 2*Mu * S - rho * Vvec ^ VVec
+            # rhs = (self.DivSrT * self._Aux1) / self.rho
+        self.mat.DivSrT.mult(self._Aux1, rhs)
+        rhs.scale(1/rho)
+
+        self.mat.Curl.mult(rhs, f)
+
+    def startSolver(self):
+        self.ts.solve(self.vort)
 
     @staticmethod
     def taylorGreenVelVec(coord, t=None):

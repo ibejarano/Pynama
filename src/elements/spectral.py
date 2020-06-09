@@ -125,6 +125,73 @@ class Spectral(Element):
             elR_dMat += gp.w * detJ * alpha_d * Hxy.flatten('F').T * H
         return (elStiffMat, elR_wMat, elR_dMat)
 
+    def getElemKLEOperators(self, coords):
+        # TODO This method is functionally perfect, but its performance has to
+        # be seriously evaluated
+        # self.logger.debug("getElemKLEOperators")
+        coords.shape = (int(len(coords)/self.dim), self.dim)
+
+        elTotNodes = self.nnode
+
+        elSTensorMat = np.mat(np.zeros((self.dim_s*elTotNodes,
+                                        self.dim*elTotNodes)))
+        # The strain rate tensor is symmetric, thus we work with reduced
+        # number of components
+        elDivSTMat = np.mat(np.zeros((self.dim*elTotNodes,
+                                      self.dim_s*elTotNodes)))
+        elCurlMat = np.mat(np.zeros((self.dim_w*elTotNodes,
+                                     self.dim*elTotNodes)))
+        elWeigMat = np.mat(np.zeros((elTotNodes, elTotNodes)))
+
+        # Strain rate Tensor
+        B_srt = np.mat(np.zeros((self.dim_s, self.dim*elTotNodes)))
+        Hsrt = np.mat(np.zeros((self.dim_s, self.dim_s*elTotNodes)))
+        # Velocity gradient divergence
+        B_div = np.mat(np.zeros((self.dim, self.dim_s*elTotNodes)))
+        Hdiv = np.mat(np.zeros((self.dim, self.dim*elTotNodes)))
+        # Velocity curl
+        B_curl = np.mat(np.zeros((self.dim_w, self.dim*elTotNodes)))
+        Hcurl = np.mat(np.zeros((self.dim_w, self.dim_w*elTotNodes)))
+
+        for idx, gp in enumerate(self.gpsOp):
+            Hrs = self.HrsOp[idx]
+            H = self.HOp[idx]
+
+            J = self.HrsCooOp[idx].dot( coords )
+            Hxy = inv(J) * Hrs
+            detJ = det(J)
+
+            for nd_s in range(self.dim_s):
+                Hsrt[nd_s, nd_s::self.dim_s] = H
+
+            for i,ind in enumerate (self.indCurl):
+                B_curl[ind[0],ind[1]::self.dim]= (-1)**(i)*Hxy[ind[2]]
+                
+            for x in range(self.dim):
+                Hdiv[x, x::self.dim] = H
+                for i in range(self.dim):
+                    B_div[i,self.indBdiv[x][i]::self.dim_s]= Hxy[x]
+                    B_srt[self.indBdiv[x][i],i::self.dim]=Hxy[x]
+
+            B_srt[0, 1::self.dim] = -Hxy[1]
+            B_srt[2, 0::self.dim] = -Hxy[0]
+            for i in range(self.dim_s-4):
+                B_srt[4, i::self.dim] = -Hxy[i]
+                B_srt[2*i, 2::self.dim] = -Hxy[2]
+
+            B_srt *= 0.5
+            
+            for i in range(self.dim_w):
+                Hcurl[i,i::self.dim_w] = H
+
+            elSTensorMat += gp.w * detJ * Hsrt.T.dot( B_srt )
+            elDivSTMat += gp.w * detJ * Hdiv.T.dot( B_div )
+            elCurlMat += gp.w * detJ * Hcurl.T.dot( B_curl )
+            elWeigMat += gp.w * detJ * H.T.dot( H ) 
+
+        elWeigVec = elWeigMat.sum(1)
+        return (elSTensorMat, elDivSTMat, elCurlMat, elWeigVec)
+
     def computeMats(self, nodes1D, gps1D, gps1Dwei):
         """Interpolate functions in 2D."""
         (h1D, dh1D) = self.interpFun1D(nodes1D, gps1D)

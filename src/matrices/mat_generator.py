@@ -55,7 +55,7 @@ class Mat:
         self.Krhs.assemble()
         self.K.assemble()
 
-    def createEmptyKLEMats(self, conecMat, indicesDIR, indicesNS=set()):
+    def createEmptyKLEMats(self, conecMat, indicesDIR, indicesNS=set(), createOperators=False):
         self.globalIndicesNS =set() # TODO Implementar
         self.globalIndicesDIR =set()
 
@@ -134,6 +134,44 @@ class Mat:
         self.Rw = self.createEmptyMat(vel_dofs, vort_dofs, dw_nnz, ow_nnz)
         self.Rd = self.createEmptyMat(vel_dofs, locElRow, dd_nnz, od_nnz)
         self.Krhs = self.createEmptyMat(vel_dofs, vel_dofs, drhs_nnz, orhs_nnz)
+
+        if createOperators:
+            self.createEmptyOperators(d_nnz_ind, o_nnz_ind, locElRow)
+            
+    def createEmptyOperators(self, d_nnz_ind, o_nnz_ind, locElRow):
+      
+        ds_nnz = [x * self.dim for x in d_nnz_ind for d in range(self.dim_s)]
+        os_nnz = [x * self.dim for x in o_nnz_ind for d in range(self.dim_s)]
+
+        self.SrT = PETSc.Mat().createAIJ(
+            ((locElRow * self.dim_s, None), (locElRow * self.dim, None)),
+            nnz=(ds_nnz, os_nnz), comm=self.comm)
+        self.SrT.setUp()
+
+        # Create list of NNZ from d_nnz_ind and o_nnz_ind to create DivSrT
+        di_nnz = [x * self.dim_s for x in d_nnz_ind for d in range(self.dim)]
+        oi_nnz = [x * self.dim_s for x in o_nnz_ind for d in range(self.dim)]
+
+        self.DivSrT = PETSc.Mat().createAIJ(
+            ((locElRow * self.dim, None), (locElRow * self.dim_s, None)),
+            nnz=(di_nnz, oi_nnz), comm=self.comm)
+        self.DivSrT.setUp()
+
+        # Create list of NNZ from d_nnz_ind and o_nnz_ind to create Curl
+        dc_nnz = [x * self.dim for x in d_nnz_ind for d in range(self.dim_w)]
+        oc_nnz = [x * self.dim for x in o_nnz_ind for d in range(self.dim_w)]
+
+        self.Curl = PETSc.Mat().createAIJ(
+            ((locElRow * self.dim_w, None), (locElRow * self.dim, None)),
+            nnz=(dc_nnz, oc_nnz), comm=self.comm)
+        self.Curl.setUp()
+
+        self.weigSrT = PETSc.Vec().createMPI(((locElRow * self.dim_s, None)),
+                                        comm=self.comm)
+        self.weigDivSrT = PETSc.Vec().createMPI(((locElRow * self.dim, None)),
+                                           comm=self.comm)
+        self.weigCurl = PETSc.Vec().createMPI(((locElRow * self.dim_w, None)),
+                                         comm=self.comm)
 
     def createEmptyMatrices(self, rStart, rEnd):
         # definir como entran estos
@@ -310,3 +348,23 @@ class Mat:
         di_nnz = [x * dim1 for x in d_nnz for d in range(dim2)]
         oi_nnz = [x * dim1 for x in o_nnz for d in range(dim2)]
         return di_nnz, oi_nnz
+
+    def assembleOperators(self):
+        self.SrT.assemble()
+        self.weigSrT.assemble()
+        self.weigSrT.reciprocal()
+        self.SrT.diagonalScale(L=self.weigSrT)
+
+        self.DivSrT.assemble()
+        self.weigDivSrT.assemble()
+        self.weigDivSrT.reciprocal()
+        self.DivSrT.diagonalScale(L=self.weigDivSrT)
+
+        self.Curl.assemble()
+        self.weigCurl.assemble()
+        self.weigCurl.reciprocal()
+        self.Curl.diagonalScale(L=self.weigCurl)
+
+        self.weigSrT.destroy()
+        self.weigCurl.destroy()
+        self.weigDivSrT.destroy()
