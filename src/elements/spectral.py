@@ -333,7 +333,7 @@ class Spectral(Element):
             Hrs[ind][2, :] = [auxRow[y] for y in invPerm]
 
         # Gauss points
-        gps = generateGaussPoints3D(gps1D)
+        gps = generateGaussPoints3D(gps1D, gps1Dwei)
 
         H = [H[i] for i in invPerm2]
         Hrs = [Hrs[i] for i in invPerm2]
