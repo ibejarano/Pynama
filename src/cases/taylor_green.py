@@ -134,11 +134,6 @@ class TaylorGreen(BaseProblem):
         self.vort = self.mat.Rw.createVecRight()
         self.vort.setName("vorticity")
         self.vort.set(0.0)
-        boundaryNodes = self.getBoundaryNodes()
-        boundaryVelocityIndex = self.dom.getVelocityIndex(boundaryNodes)
-        boundaryVelocityValues = [1 , 0] * len(boundaryNodes)
-        self.vel.setValues(boundaryVelocityIndex, boundaryVelocityValues , addv=False)
-        self.vel.assemble()
 
         sK, eK = self.mat.K.getOwnershipRange()
         locRowsK = eK - sK
@@ -151,7 +146,7 @@ class TaylorGreen(BaseProblem):
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()
         fvort_coords = lambda coords: self.taylorGreenVortScalar(coords, t=startTime)
-        self.vort = self.dom.applyFunctionScalarToVec(allNodes, fvort_coords, self.vort)
+        self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort)
 
     def getBoundaryNodes(self):
         """ IS: Index Set """
@@ -173,7 +168,7 @@ class TaylorGreen(BaseProblem):
         fvel_coords = lambda coords: self.taylorGreenVelVec(coords, t=time)
         fvort_coords = lambda coords: self.taylorGreenVortScalar(coords, t=time)
         exactVel = self.dom.applyFunctionVecToVec(allNodes, fvel_coords, exactVel)
-        exactVort = self.dom.applyFunctionScalarToVec(allNodes, fvort_coords, exactVort)
+        exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort)
         return exactVel, exactVort
 
     def applyBoundaryConditions(self, time, bcNodes):
@@ -288,7 +283,7 @@ class TaylorGreen(BaseProblem):
         y_ = 2 * pi * coord[1] / Ly
         expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
         vel = [cos(x_) * sin(y_) * expon, -sin(x_) * cos(y_) * expon]
-        return vel
+        return [vel[0], vel[1], 0]
 
     @staticmethod
     def taylorGreenVortScalar(coord, t=None):
@@ -300,4 +295,4 @@ class TaylorGreen(BaseProblem):
         y_ = 2 * pi * coord[1] / Ly
         expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
         vort = -2 * pi * (1.0 / Lx + 1.0 / Ly) * cos(x_) * cos(y_) * expon
-        return vort
+        return [0,0,vort]

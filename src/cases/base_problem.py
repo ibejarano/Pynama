@@ -2,7 +2,7 @@ from mpi4py import MPI
 import logging
 # Local packages
 from domain.dmplex import DMPlexDom
-from elements.spectral import Spectral2D
+from elements.spectral import Spectral
 from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
 
@@ -22,7 +22,7 @@ class BaseProblem(object):
         self.dom.setFemIndexing(self.ngl)
 
     def setUpElement(self):
-        self.elemType = Spectral2D(self.ngl, self.dim)
+        self.elemType = Spectral(self.ngl, self.dim)
 
     def setUpWithInputData(self, inputData):
         self.dim = len(inputData['nelem'])
