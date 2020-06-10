@@ -231,3 +231,12 @@ class DMPlexDom(PETSc.DMPlex):
             indices = self.getVelocityIndex(nodes)
             vec.setValues(indices, valuesToSet, addv=False)     
         return vec
+
+
+class DomainElementInterface(object):
+    
+    def __init__(self, element):
+        self.elem = element
+
+    def getTotalNodes(self):   
+        return self.elem.nnode
