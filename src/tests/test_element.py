@@ -3,13 +3,13 @@ import numpy as np
 import math
 import numpy.testing as np_test
 from elements.utilities import gaussPoints, lobattoPoints, GaussPoint2D, generateGaussPoints3D ,GaussPoint3D ,generateGaussPoints2D
-from elements.elemutils import SpElem2D
-from elements.spectral import Spectral2D, Spectral3D
+from elements.elemutils import SpElem2D, SpElem3D
+from elements.spectral import Spectral
 
 class SpectralTest(unittest.TestCase):
     def setUp(self):
         self.spElem_ref = SpElem2D(3)
-        self.spElem_test = Spectral2D(3, 2)
+        self.spElem_test = Spectral(3, 2)
 
     def test_H(self):
         H_size = len(self.spElem_ref.H)
@@ -159,15 +159,15 @@ class UtilitiesElementTest(unittest.TestCase):
         for i_test in range(2,5):
             with self.subTest(i_test=i_test):
                 # my new gausspoint list generator func
-                gps_1D = gaussPoints(i_test)
-                gps_list = generateGaussPoints3D(gps_1D)
+                gps_1D, gps_wei = gaussPoints(i_test)
+                gps_list = generateGaussPoints3D(gps_1D, gps_wei)
                 # this implementation was made by Alejandro
                 legacy_list = list()
                 for i in range(len(gps_1D)):
                     for j in range(len(gps_1D)):
                         for k in range(len(gps_1D)):
                             legacy_list.append(GaussPoint3D(gps_1D[i], gps_1D[j],
-                            gps_1D[k], gps_1D[i]*gps_1D[j]*gps_1D[k]))
+                            gps_1D[k], gps_wei[i]*gps_wei[j]*gps_wei[k]))
                 
                 for i in range(len(gps_1D)**3):
                     with self.subTest(i=i):
@@ -233,8 +233,8 @@ class SpectralTestNodes(unittest.TestCase):
         self.spectral_elements_2d = list()
         self.spectral_elements_3d = list()
         for ngl in range(2,5):
-            self.spectral_elements_2d.append(Spectral2D(ngl,2))
-            self.spectral_elements_3d.append(Spectral3D(ngl,3))
+            self.spectral_elements_2d.append(Spectral(ngl,2))
+            self.spectral_elements_3d.append(Spectral(ngl,3))
 
     def test_nnodes(self):
         for i, spectral in enumerate(self.spectral_elements_2d):
@@ -267,15 +267,27 @@ class SpectralTestNodes(unittest.TestCase):
 
 class SpectralKLETest(unittest.TestCase):
     def setUp(self):
-        self.spElem_test = Spectral2D(2, 2)
-        self.K_ale , self.Rw_ale, self.Rd_ale = self.spElem_test.getElemKLEMatricesOld(np.array([1,1,0,1,0,0,1,0], dtype=float))
+        coords_3d = [ 1,1,1 ,0,1,1, 0,0,1, 1,0,1,      1,1,0 ,1,0,0, 0,0,0, 0,1,0 ]
+        self.spElem_test = Spectral(2, 2)
+        self.spElem_test_3d = Spectral(2, 3)
+        self.spElem_ref = SpElem2D(2)
+        self.spElem_ref3D = SpElem3D(2)
+        self.K_ale_2d , self.Rw_ale_2d, self.Rd_ale_2d = self.spElem_ref.getElemKLEMatrices(np.array([1,1,0,1,0,0,1,0], dtype=float))
+        self.K_ale_3d , self.Rw_ale_3d, self.Rd_ale_3d = self.spElem_ref3D.getElemKLEMatrices(np.array(coords_3d, dtype=float))
         self.K , self.Rw, self.Rd = self.spElem_test.getElemKLEMatrices(np.array([1,1,0,1,0,0,1,0], dtype=float))
+        self.K_3d , self.Rw_3d, self.Rd_3d = self.spElem_test_3d.getElemKLEMatrices(np.array(coords_3d, dtype=float))
+
 
     def test_K(self):
-        np_test.assert_array_almost_equal(self.K_ale, self.K , decimal=15)
+        np_test.assert_array_almost_equal(self.K_ale_2d, self.K , decimal=15)
+        np_test.assert_array_almost_equal(self.K_ale_3d, self.K_3d , decimal=15)
 
     def test_Rw(self):
-        np_test.assert_array_almost_equal(self.Rw_ale, self.Rw , decimal=15)
+        np_test.assert_array_almost_equal(self.Rw_ale_2d, self.Rw , decimal=15)
+        np_test.assert_array_almost_equal(self.Rw_ale_3d, self.Rw_3d , decimal=15)
 
     def test_Rd(self):
-        np_test.assert_array_almost_equal(self.Rd_ale, self.Rd , decimal=15)
+        np_test.assert_array_almost_equal(self.Rd_ale_2d, self.Rd , decimal=15)
+        np_test.assert_array_almost_equal(self.Rd_ale_3d, self.Rd_3d , decimal=15)
+
+
