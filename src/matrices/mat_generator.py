@@ -139,32 +139,13 @@ class Mat:
             self.createEmptyOperators(d_nnz_ind, o_nnz_ind, locElRow)
             
     def createEmptyOperators(self, d_nnz_ind, o_nnz_ind, locElRow):
-      
-        ds_nnz = [x * self.dim for x in d_nnz_ind for d in range(self.dim_s)]
-        os_nnz = [x * self.dim for x in o_nnz_ind for d in range(self.dim_s)]
 
-        self.SrT = PETSc.Mat().createAIJ(
-            ((locElRow * self.dim_s, None), (locElRow * self.dim, None)),
-            nnz=(ds_nnz, os_nnz), comm=self.comm)
-        self.SrT.setUp()
+        self.SrT = createEmptyOpe(self.dim, self.dim_s, d_nnz_ind, o_nnz_ind, locElRow)
+        
+        self.DivSrT = createEmptyOpe(self.dim_s,self.dim, d_nnz_ind, o_nnz_ind, locElRow)
 
-        # Create list of NNZ from d_nnz_ind and o_nnz_ind to create DivSrT
-        di_nnz = [x * self.dim_s for x in d_nnz_ind for d in range(self.dim)]
-        oi_nnz = [x * self.dim_s for x in o_nnz_ind for d in range(self.dim)]
+        self.Curl = createEmptyOpe(self.dim,self.dim_w, d_nnz_ind, o_nnz_ind, locElRow)
 
-        self.DivSrT = PETSc.Mat().createAIJ(
-            ((locElRow * self.dim, None), (locElRow * self.dim_s, None)),
-            nnz=(di_nnz, oi_nnz), comm=self.comm)
-        self.DivSrT.setUp()
-
-        # Create list of NNZ from d_nnz_ind and o_nnz_ind to create Curl
-        dc_nnz = [x * self.dim for x in d_nnz_ind for d in range(self.dim_w)]
-        oc_nnz = [x * self.dim for x in o_nnz_ind for d in range(self.dim_w)]
-
-        self.Curl = PETSc.Mat().createAIJ(
-            ((locElRow * self.dim_w, None), (locElRow * self.dim, None)),
-            nnz=(dc_nnz, oc_nnz), comm=self.comm)
-        self.Curl.setUp()
 
         self.weigSrT = PETSc.Vec().createMPI(((locElRow * self.dim_s, None)),
                                         comm=self.comm)
@@ -172,6 +153,12 @@ class Mat:
                                            comm=self.comm)
         self.weigCurl = PETSc.Vec().createMPI(((locElRow * self.dim_w, None)),
                                          comm=self.comm)
+
+    def createEmptyOpe(self,dim1,dim2, d_nnz_ind, o_nnz_ind, locElRow):
+
+        d_nnz = [x * dim1 for x in d_nnz_ind for d in range(dim2)]
+        o_nnz = [x * dim1 for x in o_nnz_ind for d in range(dim2)]
+        return createEmptyMat(locElRow * dim2 ,locElRow * dim1 ,ds_nnz, os_nnz)
 
     def createEmptyMatrices(self, rStart, rEnd):
         # definir como entran estos
