@@ -140,11 +140,11 @@ class Mat:
             
     def createEmptyOperators(self, d_nnz_ind, o_nnz_ind, locElRow):
 
-        self.SrT = createEmptyOpe(self.dim, self.dim_s, d_nnz_ind, o_nnz_ind, locElRow)
+        self.SrT = self.createEmptyOpe(self.dim, self.dim_s, d_nnz_ind, o_nnz_ind, locElRow)
         
-        self.DivSrT = createEmptyOpe(self.dim_s,self.dim, d_nnz_ind, o_nnz_ind, locElRow)
+        self.DivSrT = self.createEmptyOpe(self.dim_s,self.dim, d_nnz_ind, o_nnz_ind, locElRow)
 
-        self.Curl = createEmptyOpe(self.dim,self.dim_w, d_nnz_ind, o_nnz_ind, locElRow)
+        self.Curl = self.createEmptyOpe(self.dim,self.dim_w, d_nnz_ind, o_nnz_ind, locElRow)
 
 
         self.weigSrT = PETSc.Vec().createMPI(((locElRow * self.dim_s, None)),
@@ -158,7 +158,7 @@ class Mat:
 
         d_nnz = [x * dim1 for x in d_nnz_ind for d in range(dim2)]
         o_nnz = [x * dim1 for x in o_nnz_ind for d in range(dim2)]
-        return createEmptyMat(locElRow * dim2 ,locElRow * dim1 ,ds_nnz, os_nnz)
+        return self.createEmptyMat(locElRow * dim2 ,locElRow * dim1 ,ds_nnz, os_nnz)
 
     def createEmptyMatrices(self, rStart, rEnd):
         # definir como entran estos
