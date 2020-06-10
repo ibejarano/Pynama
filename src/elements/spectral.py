@@ -21,33 +21,69 @@ class Spectral(Element):
         self.nnodedge = ngl - 2
         self.nnodcell = (ngl - 2) ** dim
         self.elemType = 'Spectral{}D({})'.format(dim, ngl)
-        self.indWCurl=[[0,0,1],[1,0,0]]
-        self.indCurl=[[0,1,0],[0,0,1]]
-        self.indBdiv=[[0,1],[1,2]]
 
-    def setUpSpectralMats(self, ngl):
+        if dim == 2:
+            self.indWCurl=[[0,0,1],[1,0,0]]
+            self.indCurl=[[0,1,0],[0,0,1]]
+            self.indBdiv=[[0,1],[1,2]]
+            self.setUpSpectralMats2D(ngl)
+        elif dim == 3:
+            self.indWCurl=[[0,2,1],[0,1,2],[1,2,0],[1,0,2],[2,1,0],[2,0,1]]
+            self.indCurl=[[0,2,1],[0,1,2],[1,2,0],[1,0,2],[2,1,0],[2,0,1]]
+            self.indBdiv=[[0,1,5],[1,2,3],[5,3,4]]
+            self.nnodface = (ngl - 2)**2
+            self.setUpSpectralMats3D(ngl)
+        else:
+            raise Exception
+
+    def setUpSpectralMats2D(self, ngl):
         nodes1D, operWei = lobattoPoints(ngl)
         gps1D, fullWei = gaussPoints(ngl) if ngl <= 3 else \
             lobattoPoints(ngl)
         gps_red1D, redWei = gaussPoints(ngl - 1)
         cnodes1D, _ = lobattoPoints(2)
         (self.H, self.Hrs, self.gps) = \
-            self.computeMats(nodes1D, gps1D, fullWei)
+            self.computeMats2D(nodes1D, gps1D, fullWei)
 
         (self.HRed, self.HrsRed, self.gpsRed) = \
-            self.computeMats(nodes1D, gps_red1D, redWei)
+            self.computeMats2D(nodes1D, gps_red1D, redWei)
 
         (self.HOp, self.HrsOp, self.gpsOp) = \
-            self.computeMats(nodes1D, nodes1D, operWei)
+            self.computeMats2D(nodes1D, nodes1D, operWei)
 
         (self.HCoo, self.HrsCoo, self.gpsCoo) = \
-            self.computeMats(cnodes1D, gps1D, fullWei)
+            self.computeMats2D(cnodes1D, gps1D, fullWei)
 
         (self.HCooRed, self.HrsCooRed, self.gpsCooRed) = \
-            self.computeMats(cnodes1D, gps_red1D, redWei)
+            self.computeMats2D(cnodes1D, gps_red1D, redWei)
 
         (self.HCooOp, self.HrsCooOp, self.gpsCooOp) = \
-            self.computeMats(cnodes1D, nodes1D, operWei)
+            self.computeMats2D(cnodes1D, nodes1D, operWei)
+        (self.HCoo1D, _) = self.interpFun1D(cnodes1D, nodes1D)
+
+    def setUpSpectralMats3D(self, ngl):
+        nodes1D, operWei = lobattoPoints(ngl)
+        gps1D, fullWei = gaussPoints(ngl) if ngl <= 3 else \
+            lobattoPoints(ngl)
+        gps_red1D, redWei = gaussPoints(ngl - 1)
+        cnodes1D, _ = lobattoPoints(2)
+        (self.H, self.Hrs, self.gps) = \
+            self.computeMats3D(nodes1D, gps1D, fullWei)
+
+        (self.HRed, self.HrsRed, self.gpsRed) = \
+            self.computeMats3D(nodes1D, gps_red1D, redWei)
+
+        (self.HOp, self.HrsOp, self.gpsOp) = \
+            self.computeMats3D(nodes1D, nodes1D, operWei)
+
+        (self.HCoo, self.HrsCoo, self.gpsCoo) = \
+            self.computeMats3D(cnodes1D, gps1D, fullWei)
+
+        (self.HCooRed, self.HrsCooRed, self.gpsCooRed) = \
+            self.computeMats3D(cnodes1D, gps_red1D, redWei)
+
+        (self.HCooOp, self.HrsCooOp, self.gpsCooOp) = \
+            self.computeMats3D(cnodes1D, nodes1D, operWei)
         (self.HCoo1D, _) = self.interpFun1D(cnodes1D, nodes1D)
 
     def getElemKLEMatrices(self, coords):
@@ -78,9 +114,6 @@ class Spectral(Element):
         # Vorticty curl
         Bw_curl = np.mat(np.zeros((self.dim, self.dim_w*elTotNodes)))
 
-        # FIXME: this could be improved to be independent of the element type
-        # the code should know whether we are using all element nodes to
-        # describe its geometry or a reduced set, and compute J accordingly
         for idx, gp in enumerate(self.gps):
             Hrs = self.Hrs[idx]
             H = self.H[idx]
@@ -95,11 +128,10 @@ class Spectral(Element):
             for i,ind in enumerate (self.indWCurl):
                 Bw_curl[ind[0],ind[1]::self.dim_w]= (-1)**(i)*Hxy[ind[2]]
             
-            # print(elStiffMat)
             elStiffMat += gp.w * detJ * B_gr.T * B_gr
             elR_wMat += gp.w * detJ * Hvel.T * Bw_curl
             elR_dMat -= gp.w * detJ * Hvel.T * Hxy
-        # Velocity interpolation
+        
         Hvel = np.zeros((self.dim_w, self.dim_w*elTotNodes))
         # Reduced integration of penalizations
         for idx, gp in enumerate(self.gpsRed):
@@ -117,7 +149,6 @@ class Spectral(Element):
             for nd in range(self.dim_w):
                 Hvel[nd, nd::self.dim_w] = H
             
-
             elStiffMat += gp.w * detJ * (alpha_d * B_div.T * B_div +
                                          + alpha_w * B_curl.T * B_curl)
 
@@ -126,13 +157,8 @@ class Spectral(Element):
         return (elStiffMat, elR_wMat, elR_dMat)
 
     def getElemKLEOperators(self, coords):
-        # TODO This method is functionally perfect, but its performance has to
-        # be seriously evaluated
-        # self.logger.debug("getElemKLEOperators")
         coords.shape = (int(len(coords)/self.dim), self.dim)
-
         elTotNodes = self.nnode
-
         elSTensorMat = np.mat(np.zeros((self.dim_s*elTotNodes,
                                         self.dim*elTotNodes)))
         # The strain rate tensor is symmetric, thus we work with reduced
@@ -142,7 +168,6 @@ class Spectral(Element):
         elCurlMat = np.mat(np.zeros((self.dim_w*elTotNodes,
                                      self.dim*elTotNodes)))
         elWeigMat = np.mat(np.zeros((elTotNodes, elTotNodes)))
-
         # Strain rate Tensor
         B_srt = np.mat(np.zeros((self.dim_s, self.dim*elTotNodes)))
         Hsrt = np.mat(np.zeros((self.dim_s, self.dim_s*elTotNodes)))
@@ -192,8 +217,7 @@ class Spectral(Element):
         elWeigVec = elWeigMat.sum(1)
         return (elSTensorMat, elDivSTMat, elCurlMat, elWeigVec)
 
-    def computeMats(self, nodes1D, gps1D, gps1Dwei):
-        """Interpolate functions in 2D."""
+    def computeMats2D(self, nodes1D, gps1D, gps1Dwei):
         (h1D, dh1D) = self.interpFun1D(nodes1D, gps1D)
         nNodes = len(nodes1D)
         ngps = len(gps1D)
@@ -273,117 +297,7 @@ class Spectral(Element):
 
         return (H, Hrs, gps)
 
-
-    def getElemKLEMatricesOld(self, coords):
-        """Get the elementary matrices of the KLE Method."""
-        # self.logger.debug("getElemKLEMatrices")
-        coords.shape = (int(len(coords)/self.dim), self.dim)
-
-        alpha_w = 1e2
-        alpha_d = 1e3
-
-        # FIXME Parametrize in terms of total element nodes and for the
-        # geometry use a reduced set
-        elTotNodes = self.nnode
-
-        elStiffMat = np.mat(np.zeros((self.dim*elTotNodes,
-                                      self.dim*elTotNodes)))
-        elR_wMat = np.mat(np.zeros((self.dim*elTotNodes,
-                                    self.dim_w*elTotNodes)))
-        elR_dMat = np.mat(np.zeros((self.dim*elTotNodes, elTotNodes)))
-
-        # Velocity interpolation
-        Hvel = np.mat(np.zeros((self.dim, self.dim*elTotNodes)))
-        # Velocity gradient
-        B_gr = np.mat(np.zeros((self.dim**2, self.dim*elTotNodes)))
-        # Velocity divergence
-        B_div = np.mat(np.zeros((1, self.dim*elTotNodes)))
-        # Velocity curl
-        B_curl = np.mat(np.zeros((self.dim_w, self.dim*elTotNodes)))
-        # Vorticty curl
-        Bw_curl = np.mat(np.zeros((self.dim, self.dim_w*elTotNodes)))
-
-        # FIXME: this could be improved to be independent of the element type
-        # the code should know whether we are using all element nodes to
-        # describe its geometry or a reduced set, and compute J accordingly
-        for idx, gp in enumerate(self.gps):
-            Hrs = self.Hrs[idx]
-            H = self.H[idx]
-
-            J = self.HrsCoo[idx] * coords
-            Hxy = inv(J) * Hrs
-            detJ = det(J)
-
-            for nd in range(self.dim):
-                B_gr[self.dim*nd:self.dim*nd + self.dim, nd::self.dim] = Hxy
-                Hvel[nd, nd::self.dim] = H
-
-            if self.dim == 2:
-                Bw_curl[0, :] = Hxy[1]
-                Bw_curl[1, :] = -Hxy[0]
-            elif self.dim == 3:  # Check!
-                Bw_curl[0, 2::self.dim] = Hxy[1]
-                Bw_curl[0, 1::self.dim] = -Hxy[2]
-                Bw_curl[1, 0::self.dim] = Hxy[2]
-                Bw_curl[1, 2::self.dim] = -Hxy[0]
-                Bw_curl[2, 1::self.dim] = Hxy[0]
-                Bw_curl[2, 0::self.dim] = -Hxy[1]
-
-            elStiffMat += gp.w * detJ * B_gr.T * B_gr
-            elR_wMat += gp.w * detJ * Hvel.T * Bw_curl
-            elR_dMat -= gp.w * detJ * Hvel.T * Hxy
-
-        # Reduced integration of penalizations
-        for idx, gp in enumerate(self.gpsRed):
-            Hrs = self.HrsRed[idx]
-            H = self.HRed[idx]
-
-            J = self.HrsCooRed[idx] * coords
-            Hxy = inv(J) * Hrs
-            detJ = det(J)
-
-            for nd in range(self.dim):
-                B_div[0, nd::self.dim] = Hxy[nd]
-                Hvel[nd, ::self.dim] = H
-
-            if self.dim == 2:
-                B_curl[0, ::self.dim] = -Hxy[1]
-                B_curl[0, 1::self.dim] = Hxy[0]
-            elif self.dim == 3:  # FIXME Check!
-                B_curl[0, 2::self.dim] = Hxy[1]
-                B_curl[0, 1::self.dim] = -Hxy[2]
-                B_curl[1, 0::self.dim] = Hxy[2]
-                B_curl[1, 2::self.dim] = -Hxy[0]
-                B_curl[2, 1::self.dim] = Hxy[0]
-                B_curl[2, 0::self.dim] = -Hxy[1]
-
-            elStiffMat += gp.w * detJ * (alpha_d * B_div.T * B_div +
-                                         + alpha_w * B_curl.T * B_curl)
-            elR_wMat += gp.w * detJ * alpha_w * B_curl.T * H
-            elR_dMat += gp.w * detJ * alpha_d * Hxy.flatten('F').T * H
-        return (elStiffMat, elR_wMat, elR_dMat)
-
-class Spectral2D(Spectral):
-    """Spectral element in 2D."""
-    def __init__(self, ngl, dim):
-        super().__init__(ngl, dim)
-        self.setUpSpectralMats(ngl)
-
-class Spectral3D(Spectral):
-    """Spectral element in 3D.
-    """
-    def __init__(self, ngl, dim):
-        """Constructor of the SpElem3D class."""
-        super().__init__(ngl, dim)
-        self.nnodface = (ngl -2)**2
-        self.indWCurl=[[0,2,1],[0,1,2],[1,2,0],[1,0,2],[2,1,0],[2,0,1]]
-        self.indCurl=[[0,2,1],[0,1,2],[1,2,0],[1,0,2],[2,1,0],[2,0,1]]
-        self.indBdiv=[[0,1,5],[1,2,3],[5,3,4]]
-
-        self.setUpSpectralMats(ngl)
-
-
-    def computeMats(self, nodes1D, gps1D, gps1Dwei):
+    def computeMats3D(self, nodes1D, gps1D, gps1Dwei):
         """Interpolate functions in 3D."""
         (h1D, dh1D) = self.interpFun1D(nodes1D, gps1D)
         nNodes = len(nodes1D)
