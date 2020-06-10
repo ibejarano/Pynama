@@ -155,10 +155,9 @@ class Mat:
                                          comm=self.comm)
 
     def createEmptyOpe(self,dim1,dim2, d_nnz_ind, o_nnz_ind, locElRow):
-
         d_nnz = [x * dim1 for x in d_nnz_ind for d in range(dim2)]
         o_nnz = [x * dim1 for x in o_nnz_ind for d in range(dim2)]
-        return self.createEmptyMat(locElRow * dim2 ,locElRow * dim1 ,ds_nnz, os_nnz)
+        return self.createEmptyMat(locElRow * dim2 ,locElRow * dim1 ,d_nnz, o_nnz)
 
     def createEmptyMatrices(self, rStart, rEnd):
         # definir como entran estos
