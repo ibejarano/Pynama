@@ -1,6 +1,6 @@
 import unittest
 from domain.dmplex import DMPlexDom
-from elements.spectral import Spectral2D
+from elements.spectral import Spectral
 import numpy as np
 import numpy.testing as np_test
 from math import sqrt
@@ -64,7 +64,7 @@ class DomainModTests(unittest.TestCase):
         dim = 2
         self.dom2d = DMPlexDom([0]*dim, [1]*dim, [2]*dim)
         self.dom2d.setFemIndexing(2)
-        spectral2D = Spectral2D(2,2)
+        spectral2D = Spectral(2,2)
         self.dom2d.computeFullCoordinates(spectral2D)
 
         self.testVelVec = self.dom2d.createGlobalVec()
