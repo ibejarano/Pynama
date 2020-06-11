@@ -8,6 +8,7 @@ from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
 from matrices.mat_generator import Mat
 import logging
+import numpy as np
 
 class BaseProblem(object):
     def __init__(self, comm=MPI.COMM_WORLD, **kwargs):
@@ -53,9 +54,6 @@ class BaseProblem(object):
         fakeConectMat = self.dom.getDMConectivityMat()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
         self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesDIR, createOperators=True)
-
-    def buildKLEMats(self):
-        pass
 
     def setUpSolver(self):
         self.solver = KspSolver()
@@ -116,9 +114,6 @@ class BaseProblem(object):
         ts = TsSolver(self.comm)
         return ts
 
-    def computeInitialCondition(self, startTime):
-        pass
-
     def setUpTimeSolver(self):
         self.ts = self.getTS()
         self.ts.setUpTimes(sTime= 0.0, eTime= 1.0, steps=10)
@@ -129,7 +124,6 @@ class BaseProblem(object):
         time = ts.getTimeStep()
         step = ts.getStepNumber()
         vort = ts.getSolution()
-        print(f"convergi step: {step} ; time: {time} ")
         # lo de abajo en otro lado
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(vort, timeStep=step)
@@ -144,9 +138,6 @@ class BaseProblem(object):
             nodes = self.dom.getGlobalNodesFromCell(entity, False)
             nodesSet |= set(nodes)
         return list(nodesSet)
-
-    def solveKLE(self, time, vort):
-        pass
 
     def evalRHS(self, ts, t, Vort, f):
         """Evaluate the KLE right hand side."""
@@ -193,11 +184,27 @@ class BaseProblem(object):
     def startSolver(self):
         self.ts.solve(self.vort)
 
+    def solveKLE(self, time, vort):
+        pass
+
+    def buildKLEMats(self):
+        pass
+
+    def computeInitialCondition(self, startTime):
+        pass
+
+    def applyBoundaryConditions(self, time, bcNodes):
+        pass
+
 class NoSlip(BaseProblem):
     def buildMatrices(self):
         pass
 
 class FreeSlip(BaseProblem):
+
+    def generateExactVecs(self, time):
+        pass
+
     def buildMatrices(self):
         pass
 
@@ -205,6 +212,22 @@ class FreeSlip(BaseProblem):
         boundaryNodes = self.getBoundaryNodes()
         self.applyBoundaryConditions(time, boundaryNodes)
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
+
+    def getKLEError(self, times=None ,startTime=0.0, endTime=1.0, steps=10):
+        try:
+            assert times !=None
+        except:
+            times = np.arange(startTime, endTime, (endTime - startTime)/steps)
+
+        boundaryNodes = self.getBoundaryNodes()
+        errors = list()
+        for time in times:
+            exactVel, exactVort = self.generateExactVecs(time)
+            self.applyBoundaryConditions(time, boundaryNodes)
+            self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+            error = (exactVel - self.vel).norm(norm_type=2)
+            errors.append(error)
+        return errors
 
     def buildKLEMats(self):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
