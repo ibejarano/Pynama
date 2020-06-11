@@ -57,24 +57,6 @@ class TaylorGreen(BaseProblem):
             self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort, self.vel, self.vort])
         self.viewer.writeXmf(self.caseName)
 
-
-
-    def getKLEError(self, times=None ,startTime=0.0, endTime=1.0, steps=10):
-        try:
-            assert times !=None
-        except:
-            times = np.arange(startTime, endTime, (endTime - startTime)/steps)
-
-        boundaryNodes = self.getBoundaryNodes()
-        errors = list()
-        for time in times:
-            exactVel, exactVort = self.generateExactVecs(time)
-            self.applyBoundaryConditions(time, boundaryNodes)
-            self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
-            error = (exactVel - self.vel).norm(norm_type=2)
-            errors.append(error)
-        return errors
-
     @staticmethod
     def taylorGreenVelVec(coord, t=None):
         Lx= 1
