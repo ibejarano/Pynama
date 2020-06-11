@@ -1,13 +1,19 @@
 ---
-name: uniform-flow-yaml
+name: Taylor Green
 
 domain:
-  dim: 2 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [10,10]
-  ngl: 2
-  lower: [0,0]
-  upper: [1,1]
+  dim: 3 # no es necesario dim = 2, es implicito con nelem + lower + upper
+  nelem: [5,5,5]
+  ngl: 3
+  lower: [0,0,0]
+  upper: [1,1,1]
 
+time-solver:
+  max-steps: 100
+  start-time: 0
+  end-time: 1
+
+#not used
 boundary-conditions:
   border-name:
     0 :

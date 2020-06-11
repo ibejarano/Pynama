@@ -112,7 +112,7 @@ class DMPlexDom(PETSc.DMPlex):
         indicesDIR = self.indicesManager.getDirichletIndices()
         return indicesDIR
 
-    def readBoundaryCondition(self, BCdict):
+    def readBoundaryCondition(self):
         dim = self.getDimension()
         tag2BCdict = dict()
         BCset = set()
@@ -130,9 +130,6 @@ class DMPlexDom(PETSc.DMPlex):
                     BCset.add(secName)
                 labelVal = labelVal >> 1  # Shift 1 bit to delete first bit
                 bcNum += 1
-
-        # Keep only those entries in BCdict that are necessary
-        BCdict = {k: v for k, v in BCdict.items() if k in BCset}
 
         BC2nodedict = dict()
         for bc in BCset:
@@ -157,7 +154,6 @@ class DMPlexDom(PETSc.DMPlex):
                             BC2nodedict[bc].add(node)
 
         self.indicesManager.setDirichletIndices(BC2nodedict)
-        self._bcConditions = BCdict
         return tag2BCdict, node2tagdict
 
 

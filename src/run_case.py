@@ -1,14 +1,29 @@
-from cases.taylor_green import TaylorGreen
 import matplotlib.pyplot as plt
-from ast import literal_eval
 import numpy as np
+import sys
+import petsc4py
+petsc4py.init(sys.argv)
+import logging
+import yaml 
 
+OptDB = petsc4py.PETSc.Options()
+case = OptDB.getString('case', False)
+
+if case == 'taylor-green':
+    from cases.taylor_green import TaylorGreen as FemProblem
+elif case == 'uniform-flow':
+    from cases.uniform import UniformFlow as FemProblem
+elif case == 'custom-func':
+    raise Exception("class not found")
+else:
+    print("Case not defined unabled to import")
+    exit()
 
 def generateChart(viscousTime):
     hAx = list()
     vAx = list()
     for i, ngl in enumerate(range(2,6)):
-        fem = TaylorGreen(ngl=ngl)
+        fem = FemProblem(ngl=ngl)
         fem.setUpSolver()
         vAx.append(fem.getKLEError(times=viscousTime))
 
@@ -26,15 +41,41 @@ def generateChart(viscousTime):
     plt.show()
 
 def generateParaviewer():
-    fem = TaylorGreen(ngl=2)
+    fem = FemProblem(ngl=3)
     fem.setUpSolver()
     fem.solveKLETests()
 
 def timeSolving():
-    fem = TaylorGreen(ngl=4)
+    fem = FemProblem(ngl=3)
+    fem.setUp()
     fem.setUpSolver()
-    fem.setUpTimeSolver()
     fem.startSolver()
     fem.viewer.writeXmf('Taylor-Green')
 
-timeSolving()
+def main():
+    case = OptDB.getString('case', False)
+    log = OptDB.getString('log', 'INFO')
+    runTests = OptDB.getString('test', False)
+
+    logging.basicConfig(level=log.upper() )
+    logger = logging.getLogger("")
+
+    try:
+        with open(f'src/cases/{case}.yaml') as f:
+            yamlData = yaml.load(f, Loader=yaml.Loader)
+
+    except:
+        logger.info(f"Case '{case}' Not Found")
+
+    if runTests:
+        logger.info(f"Running {runTests} TESTS:  {yamlData['name']} ")
+        generateParaviewer()
+    else:
+        logger.info(f"Running problem:  {yamlData['name']}")
+        timeSolving()
+
+    # self.logger.info(yamlData)
+    # self.caseName = "taylor-green"
+
+if __name__ == "__main__":
+    main()
