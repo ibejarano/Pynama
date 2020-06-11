@@ -11,7 +11,9 @@ case = OptDB.getString('case', False)
 
 if case == 'taylor-green':
     from cases.taylor_green import TaylorGreen as FemProblem
-    print("imported")
+else:
+    print("Case not defined unabled to import")
+    exit()
 
 def generateChart(viscousTime):
     hAx = list()
