@@ -94,7 +94,7 @@ class DomainModTests(unittest.TestCase):
         result = np.sqrt(np_coords)
         allNodes = self.dom2d.getAllNodes()
         f = lambda coords : (sqrt(coords[0]),sqrt(coords[1]))
-        self.dom2d.applyFunctionVecToVec(allNodes, f, self.testVelVec)
+        self.dom2d.applyFunctionVecToVec(allNodes, f, self.testVelVec,self.dim)
         test_result = self.testVelVec.getArray().reshape(9,2)
         np_test.assert_array_almost_equal(result, test_result, decimal=12)
 
@@ -104,7 +104,7 @@ class DomainModTests(unittest.TestCase):
         self.testVelVec.set(0.0)
         someNodes = [0,3,7] 
         f = lambda coords : (sqrt(coords[0]),sqrt(coords[1]))
-        self.dom2d.applyFunctionVecToVec(someNodes, f, self.testVelVec)
+        self.dom2d.applyFunctionVecToVec(someNodes, f, self.testVelVec,self.dim)
         test_result = self.testVelVec.getArray().reshape(9,2)
         np_test.assert_array_almost_equal(result, test_result, decimal=12)
 
