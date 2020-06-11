@@ -3,15 +3,14 @@ import petsc4py
 from math import pi, sin, cos, exp
 petsc4py.init(sys.argv)
 
-from cases.base_problem import BaseProblem
-from solver.ksp_solver import KspSolver
+from cases.base_problem import FreeSlip
 import numpy as np
 import yaml
 from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
 
-class TaylorGreen(BaseProblem):
+class TaylorGreen(FreeSlip):
     def setUp(self):
         self.setUpGeneral()
         self.setUpBoundaryConditions()

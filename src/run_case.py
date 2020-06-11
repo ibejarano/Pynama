@@ -12,7 +12,7 @@ case = OptDB.getString('case', False)
 if case == 'taylor-green':
     from cases.taylor_green import TaylorGreen as FemProblem
     print("imported")
-    
+
 def generateChart(viscousTime):
     hAx = list()
     vAx = list()
@@ -41,6 +41,7 @@ def generateParaviewer():
 
 def timeSolving():
     fem = FemProblem(ngl=3)
+    fem.setUp()
     fem.setUpSolver()
     fem.setUpTimeSolver()
     fem.startSolver()
@@ -55,14 +56,11 @@ def main():
     logger = logging.getLogger("")
 
     try:
-
-
         with open(f'src/cases/{case}.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
 
     except:
         logger.info(f"Case '{case}' Not Found")
-        exit()
 
     if runTests:
         logger.info(f"Running {runTests} TESTS:  {yamlData['name']} ")
@@ -71,7 +69,6 @@ def main():
         logger.info(f"Running problem:  {yamlData['name']}")
         timeSolving()
 
-    exit()
     # self.logger.info(yamlData)
     # self.caseName = "taylor-green"
 
