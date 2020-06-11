@@ -11,6 +11,10 @@ case = OptDB.getString('case', False)
 
 if case == 'taylor-green':
     from cases.taylor_green import TaylorGreen as FemProblem
+elif case == 'uniform-flow':
+    from cases.uniform import UniformFlow as FemProblem
+elif case == 'custom-func':
+    raise Exception("class not found")
 else:
     print("Case not defined unabled to import")
     exit()
@@ -19,7 +23,7 @@ def generateChart(viscousTime):
     hAx = list()
     vAx = list()
     for i, ngl in enumerate(range(2,6)):
-        fem = TaylorGreen(ngl=ngl)
+        fem = FemProblem(ngl=ngl)
         fem.setUpSolver()
         vAx.append(fem.getKLEError(times=viscousTime))
 
@@ -45,7 +49,6 @@ def timeSolving():
     fem = FemProblem(ngl=3)
     fem.setUp()
     fem.setUpSolver()
-    fem.setUpTimeSolver()
     fem.startSolver()
     fem.viewer.writeXmf('Taylor-Green')
 

@@ -36,6 +36,9 @@ class BaseProblem(object):
         self.caseName = yamlData['name']
         self.readInputData(yamlData['domain'])
 
+        if 'time-solver' in yamlData:
+            self.setUpTimeSolver(yamlData['time-solver'])
+
     def setUpDomain(self):
         self.dom = DMPlexDom(self.lower, self.upper, self.nelem)
         self.logger.debug("DMPlex dom intialized")
@@ -115,11 +118,13 @@ class BaseProblem(object):
         ts = TsSolver(self.comm)
         return ts
 
-    def setUpTimeSolver(self):
+    def setUpTimeSolver(self, inputData):
         self.ts = self.getTS()
-        self.ts.setUpTimes(sTime= 0.0, eTime= 1.0, steps=10)
+        sTime = inputData['start-time']
+        eTime = inputData['end-time']
+        maxSteps = inputData['max-steps']
+        self.ts.setUpTimes(sTime, eTime, maxSteps)
         self.ts.initSolver(self.evalRHS, self.convergedStepFunction)
-        self.computeInitialCondition(startTime = 0.0)
 
     def convergedStepFunction(self, ts):
         time = ts.getTimeStep()
@@ -183,6 +188,7 @@ class BaseProblem(object):
         self.mat.Curl.mult(rhs, f)
 
     def startSolver(self):
+        self.computeInitialCondition(startTime = 0.0)
         self.ts.solve(self.vort)
 
     def solveKLE(self, time, vort):

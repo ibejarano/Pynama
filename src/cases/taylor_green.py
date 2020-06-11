@@ -13,6 +13,14 @@ from viewer.paraviewer import Paraviewer
 class TaylorGreen(FreeSlip):
     def setUp(self):
         self.setUpGeneral()
+
+        if self.dim == 2:
+            self.taylorGreenVelFunction = self.taylorGreenVel_2D
+            self.taylorGreenVortFunction = self.taylorGreenVort_2D
+        else:
+            self.taylorGreenVelFunction = self.taylorGreenVel_3D
+            self.taylorGreenVortFunction = self.taylorGreenVort_3D
+
         self.setUpBoundaryConditions()
         self.setUpEmptyMats()
         self.buildKLEMats()
@@ -20,8 +28,11 @@ class TaylorGreen(FreeSlip):
 
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()
-        fvort_coords = lambda coords: self.taylorGreenVortScalar(coords, t=startTime)
-        self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort)
+        fvort_coords = lambda coords: self.taylorGreenVortFunction(coords, t=startTime)
+        if self.dim == 3:
+            self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort)
+        else:
+            self.vort = self.dom.applyFunctionScalarToVec(allNodes, fvort_coords, self.vort)
 
     def generateExactVecs(self, time):
         exactVel = self.mat.K.createVecRight()
@@ -30,15 +41,15 @@ class TaylorGreen(FreeSlip):
         exactVort.setName(f"{self.caseName}-exact-vort")
         allNodes = self.dom.getAllNodes()
         # generate a new function with t=constant and coords variable
-        fvel_coords = lambda coords: self.taylorGreenVelVec(coords, t=time)
-        fvort_coords = lambda coords: self.taylorGreenVortScalar(coords, t=time)
+        fvel_coords = lambda coords: self.taylorGreenVelFunction(coords, t=time)
+        fvort_coords = lambda coords: self.taylorGreenVortFunction(coords, t=time)
         exactVel = self.dom.applyFunctionVecToVec(allNodes, fvel_coords, exactVel)
         exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort)
         return exactVel, exactVort
 
     def applyBoundaryConditions(self, time, bcNodes):
         self.vel.set(0.0)
-        fvel_coords = lambda coords: self.taylorGreenVelVec(coords, t=time)
+        fvel_coords = lambda coords: self.taylorGreenVelFunction(coords, t=time)
         self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel)
 
     def solveKLETests(self, startTime=0.0, endTime=1.0, steps=10):
@@ -57,7 +68,31 @@ class TaylorGreen(FreeSlip):
         self.viewer.writeXmf(self.caseName)
 
     @staticmethod
-    def taylorGreenVelVec(coord, t=None):
+    def taylorGreenVel_2D(coord, t=None):
+        Lx= 1
+        Ly= 1
+        nu = 1
+        Uref = 1
+        x_ = 2 * pi * coord[0] / Lx
+        y_ = 2 * pi * coord[1] / Ly
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
+        vel = [cos(x_) * sin(y_) * expon, -sin(x_) * cos(y_) * expon]
+        return [vel[0], vel[1]]
+
+    @staticmethod
+    def taylorGreenVort_2D(coord, t=None):
+        Lx= 1
+        Ly= 1
+        nu = 1
+        Uref = 1
+        x_ = 2 * pi * coord[0] / Lx
+        y_ = 2 * pi * coord[1] / Ly
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
+        vort = -2 * pi * (1.0 / Lx + 1.0 / Ly) * cos(x_) * cos(y_) * expon
+        return [vort]
+
+    @staticmethod
+    def taylorGreenVel_3D(coord, t=None):
         Lx= 1
         Ly= 1
         nu = 1
@@ -69,7 +104,7 @@ class TaylorGreen(FreeSlip):
         return [vel[0], vel[1], 0]
 
     @staticmethod
-    def taylorGreenVortScalar(coord, t=None):
+    def taylorGreenVort_3D(coord, t=None):
         Lx= 1
         Ly= 1
         nu = 1
