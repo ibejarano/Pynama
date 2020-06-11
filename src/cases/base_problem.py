@@ -7,6 +7,7 @@ from elements.spectral import Spectral
 from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
 from matrices.mat_generator import Mat
+from solver.ksp_solver import KspSolver
 import logging
 import numpy as np
 
@@ -117,7 +118,7 @@ class BaseProblem(object):
     def setUpTimeSolver(self):
         self.ts = self.getTS()
         self.ts.setUpTimes(sTime= 0.0, eTime= 1.0, steps=10)
-        self.ts.initSolver(self.RHSTaylorGreen, self.convergedStepFunction)
+        self.ts.initSolver(self.evalRHS, self.convergedStepFunction)
         self.computeInitialCondition(startTime = 0.0)
 
     def convergedStepFunction(self, ts):
@@ -203,7 +204,7 @@ class NoSlip(BaseProblem):
 class FreeSlip(BaseProblem):
 
     def generateExactVecs(self, time):
-        pass
+        return 0, 0
 
     def buildMatrices(self):
         pass
