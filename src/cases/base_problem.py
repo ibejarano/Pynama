@@ -44,6 +44,10 @@ class BaseProblem(object):
     def setUpElement(self):
         self.elemType = Spectral(self.ngl, self.dim)
 
+    def setUpBoundaryConditions(self):
+        self.dom.setLabelToBorders()
+        self.tag2BCdict, self.node2tagdict = self.dom.readBoundaryCondition()
+
     def setUpEmptyMats(self):
         self.mat = Mat(self.dim, self.comm)
         fakeConectMat = self.dom.getDMConectivityMat()
@@ -131,6 +135,19 @@ class BaseProblem(object):
         self.viewer.saveVec(vort, timeStep=step)
         self.viewer.saveStepInXML(step, time, vecs=[self.vel, vort])
 
+    def getBoundaryNodes(self):
+        """ IS: Index Set """
+        nodesSet = set()
+        IS =self.dom.getStratumIS('marco', 0)
+        entidades = IS.getIndices()
+        for entity in entidades:
+            nodes = self.dom.getGlobalNodesFromCell(entity, False)
+            nodesSet |= set(nodes)
+        return list(nodesSet)
+
+    def solveKLE(self, time, vort):
+        pass
+
     def evalRHS(self, ts, t, Vort, f):
         """Evaluate the KLE right hand side."""
         print("Computing RHS at time: %s" % t)
@@ -183,6 +200,11 @@ class NoSlip(BaseProblem):
 class FreeSlip(BaseProblem):
     def buildMatrices(self):
         pass
+
+    def solveKLE(self, time, vort):
+        boundaryNodes = self.getBoundaryNodes()
+        self.applyBoundaryConditions(time, boundaryNodes)
+        self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def buildKLEMats(self):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition

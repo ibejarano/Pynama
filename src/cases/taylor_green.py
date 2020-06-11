@@ -12,10 +12,6 @@ from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
 
 class TaylorGreen(BaseProblem):
-    def setUpBoundaryConditions(self):
-        self.dom.setLabelToBorders()
-        self.tag2BCdict, self.node2tagdict = self.dom.readBoundaryCondition()
-
     def setUp(self):
         self.setUpGeneral()
         self.setUpBoundaryConditions()
@@ -27,16 +23,6 @@ class TaylorGreen(BaseProblem):
         allNodes = self.dom.getAllNodes()
         fvort_coords = lambda coords: self.taylorGreenVortScalar(coords, t=startTime)
         self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort)
-
-    def getBoundaryNodes(self):
-        """ IS: Index Set """
-        nodesSet = set()
-        IS =self.dom.getStratumIS('marco', 0)
-        entidades = IS.getIndices()
-        for entity in entidades:
-            nodes = self.dom.getGlobalNodesFromCell(entity, False)
-            nodesSet |= set(nodes)
-        return list(nodesSet)
 
     def generateExactVecs(self, time):
         exactVel = self.mat.K.createVecRight()
@@ -71,10 +57,7 @@ class TaylorGreen(BaseProblem):
             self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort, self.vel, self.vort])
         self.viewer.writeXmf(self.caseName)
 
-    def solveKLE(self, time, vort):
-        boundaryNodes = self.getBoundaryNodes()
-        self.applyBoundaryConditions(time, boundaryNodes)
-        self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
+
 
     def getKLEError(self, times=None ,startTime=0.0, endTime=1.0, steps=10):
         try:
