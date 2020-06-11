@@ -191,7 +191,7 @@ class DMPlexDom(PETSc.DMPlex):
         arr = self.fullCoordVec.getValues(indices).reshape((len(nodes),dim))
         return arr
 
-    def applyFunctionVecToVec(self, nodes, f_vec, vec):
+    def applyFunctionVecToVec(self, nodes, f_vec, vec, dof):
         """
         f_vec: function: returns a tuple with len = dim
         summary; this method needs to map nodes to indices
@@ -199,7 +199,7 @@ class DMPlexDom(PETSc.DMPlex):
         coords = self.getNodesCoordinates(nodes)
         for i,coord in enumerate(coords):
             values = f_vec(coord)
-            indices = self.getVelocityIndex([nodes[i]])
+            indices = [nodes[i]*dof + pos for pos in range(dof)]
             vec.setValues(indices, values, addv=None)
         return vec
 
