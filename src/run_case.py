@@ -41,12 +41,12 @@ def generateChart(viscousTime):
     plt.show()
 
 def generateParaviewer():
-    fem = FemProblem(ngl=3)
+    fem = FemProblem()
     fem.setUpSolver()
     fem.solveKLETests()
 
 def timeSolving():
-    fem = FemProblem(ngl=3)
+    fem = FemProblem()
     fem.setUp()
     fem.setUpSolver()
     fem.startSolver()
