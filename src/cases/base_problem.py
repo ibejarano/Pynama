@@ -130,6 +130,7 @@ class BaseProblem(object):
         time = ts.getTimeStep()
         step = ts.getStepNumber()
         vort = ts.getSolution()
+        self.logger.info(f"Converged: Step {step} Time {time}")
         # lo de abajo en otro lado
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(vort, timeStep=step)
@@ -147,7 +148,6 @@ class BaseProblem(object):
 
     def evalRHS(self, ts, t, Vort, f):
         """Evaluate the KLE right hand side."""
-        print("Computing RHS at time: %s" % t)
         # KLE spatial solution with vorticity given
         rho = 1
         mu = 1
