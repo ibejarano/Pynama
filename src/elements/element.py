@@ -1,10 +1,18 @@
-from common.baseclass import Base
 import numpy as np
+import logging
+from mpi4py import MPI
 
-class Element(Base):
+class Element(object):
 
-    def __init__(self, dim):
-        super().__init__(dim)
+    def __init__(self, dim, comm=MPI.COMM_WORLD):
+        self.comm = comm
+        self.dim = dim
+        self.dim_w = 1 if dim == 2 else 3
+        self.dim_s = 3 if dim == 2 else 6
+        if comm != None:
+            self.logger = logging.getLogger(("[{}] Class".format(comm.rank)))
+        else:
+            self.logger = logging.getLogger(("Class"))
     
     def interpFun1D(self, Nodes, evalPoi):
         """Interpolate functions in 1D."""
