@@ -9,6 +9,7 @@ import yaml
 from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
+from matrices.mat_generator import Mat
 
 class TaylorGreen(FreeSlip):
     def setUp(self):
@@ -25,6 +26,12 @@ class TaylorGreen(FreeSlip):
         self.setUpEmptyMats()
         self.buildKLEMats()
         self.buildOperators()
+
+    def setUpEmptyMats(self):
+        self.mat = Mat(self.dim, self.comm)
+        fakeConectMat = self.dom.getDMConectivityMat()
+        globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
+        self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesDIR, createOperators=True)
 
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()

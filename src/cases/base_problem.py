@@ -53,11 +53,6 @@ class BaseProblem(object):
         self.dom.setLabelToBorders()
         self.tag2BCdict, self.node2tagdict = self.dom.readBoundaryCondition()
 
-    def setUpEmptyMats(self):
-        self.mat = Mat(self.dim, self.comm)
-        fakeConectMat = self.dom.getDMConectivityMat()
-        globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
-        self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesDIR, createOperators=True)
 
     def setUpSolver(self):
         self.solver = KspSolver()
@@ -204,8 +199,126 @@ class BaseProblem(object):
         pass
 
 class NoSlip(BaseProblem):
+
+    def solveKLE(self, time, vort):
+        boundaryNodes = self.getBoundaryNodes()
+        self.applyBoundaryConditions(time, boundaryNodes)
+        self.solver( self.mat.Rw * vort + self.mat.Rwfs * vort\
+             + self.mat.Krhs * self.vel , self.velFS)
+        vort= self.mat.Curl *self.velFS
+        self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
+
     def buildMatrices(self):
-        pass
+        indices2one = set()  # matrix indices to be set to 1 for BC imposition
+        boundaryNodes = set(self.node2tagdict.keys())
+        cornerCoords = self.dom.getCellCornersCoords(cell=0)
+        locK, locRw, locRd = self.elemType.getElemKLEMatrices(cornerCoords)
+
+        for cell in range(self.dom.cellStart, self.dom.cellEnd):
+            self.logger.debug("DMPlex cell: %s", cell)
+
+            nodes = self.dom.getGlobalNodesFromCell(cell, shared=False)
+            # Build velocity and vorticity DoF indices
+            indicesVel = self.dom.getVelocityIndex(nodes)
+            indicesW = self.dom.getVorticityIndex(nodes)
+           
+            nodeBCintersect = boundaryNodes & set(nodes)
+            # self.logger.debug("te intersecto: %s", nodeBCintersect)
+            
+            dofFreeFSSetNS = set()  # local dof list free at FS sol
+            dofSetFSNS = set()  # local dof list set at both solutions
+ 
+            for node in nodeBCintersect:
+                localBoundaryNode = nodes.index(node)
+                nsNorm = set()
+                coord=self.dom.getNodesCoordinates(node)
+                for i in range(self.dim):
+                    if (coord[i]==self.upper[i]) or (coord[i]==self.lower[i]):
+                        nsNorm.add(i)
+                dofSetFSNS.update([localBoundaryNode*self.dim + d
+                                       for d in nsNorm])
+                dofFreeFSSetNS.update([localBoundaryNode*self.dim + d
+                                        for d in (set(range(self.dim)) - nsNorm)])
+
+
+            dofFree = list(set(range(len(indicesVel)))
+                           - dofFreeFSSetNS - dofSetFSNS)
+            dof2beSet = list(dofFreeFSSetNS | dofSetFSNS)
+            dofFreeFSSetNS = list(dofFreeFSSetNS)
+            dofSetFSNS = list(dofSetFSNS)
+            gldofFreeFSSetNS = [indicesVel[ii] for ii in dofFreeFSSetNS]
+            gldofSetFSNS = [indicesVel[ii] for ii in dofSetFSNS]
+            gldof2beSet = [indicesVel[ii] for ii in dof2beSet]
+            gldofFree = [indicesVel[ii] for ii in dofFree]
+            
+
+            if nodeBCintersect:
+                self.mat.Krhs.setValues(
+                gldofFree, gldof2beSet,
+                -locK[np.ix_(dofFree, dof2beSet)], addv=True)
+                indices2one.update(gldof2beSet)
+
+                # FIXME: is the code below really necessary?
+                for indd in gldof2beSet:
+                    self.mat.Krhs.setValues(indd, indd, 0, addv=True)
+                self.mat.Kfs.setValues(gldofFreeFSSetNS, gldofFree,
+                                    locK[np.ix_(dofFreeFSSetNS, dofFree)],
+                                    addv=True)
+
+                self.mat.Kfs.setValues(gldofFree, gldofFreeFSSetNS,
+                                    locK[np.ix_(dofFree, dofFreeFSSetNS)],
+                                    addv=True)
+
+                self.mat.Kfs.setValues(
+                    gldofFreeFSSetNS, gldofFreeFSSetNS,
+                    locK[np.ix_(dofFreeFSSetNS, dofFreeFSSetNS)],
+                    addv=True)
+
+                # Indices where diagonal entries should be reduced by 1
+                indices2onefs.update(gldofFreeFSSetNS)
+
+                self.mat.Rwfs.setValues(gldofFreeFSSetNS, indicesW,
+                                    locRw[dofFreeFSSetNS, :], addv=True)
+
+                self.mat.Rdfs.setValues(gldofFreeFSSetNS, indices,
+                                    locRd[dofFreeFSSetNS, :], addv=True)
+                self.mat.Krhsfs.setValues(
+                        gldofFreeFSSetNS, gldofSetFSNS,
+                        - locK[np.ix_(dofFreeFSSetNS, dofSetFSNS)], addv=True)
+                self.mat.Krhsfs.setValues(
+                        gldofFree, gldofSetFSNS,
+                        - locK[np.ix_(dofFree, dofSetFSNS)], addv=True)
+                for indd in gldofSetFSNS:
+                        self.mat.Krhsfs.setValues(indd, indd, 0, addv=True)
+
+
+            self.mat.K.setValues(gldofFree, gldofFree,
+                             locK[np.ix_(dofFree, dofFree)], addv=True)
+
+            for indd in gldof2beSet:
+                self.mat.K.setValues(indd, indd, 0, addv=True)
+
+            self.mat.Rw.setValues(gldofFree, indicesW,
+                              locRw[np.ix_(dofFree, range(len(indicesW)))], addv=True)
+
+            self.mat.Rd.setValues(gldofFree, nodes,
+                              locRd[np.ix_(dofFree, range(len(nodes)))],
+                              addv=True)
+        
+        self.mat.assembleAll()
+        self.mat.setIndices2One(indices2one)
+
+        for indd in indices2onefs:
+            self.Kfs.setValues(indd, indd, -1, addv=True)
+
+        self.Kfs.assemble()
+        self.Rwfs.assemble()
+        self.Rdfs.assemble()
+        self.Krhsfs.assemble()
+
+        for indd in (indices2one - indices2onefs):
+            self.Krhsfs.setValues(indd, indd, 1, addv=False)
+        self.Krhsfs.assemble()
 
 class FreeSlip(BaseProblem):
 
