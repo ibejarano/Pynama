@@ -19,15 +19,17 @@ else:
     print("Case not defined unabled to import")
     exit()
 
-def generateChart(viscousTime):
+def generateChart(viscousTime=[0.001,0.002,0.01,0.02,0.03,0.09,0.5]):
     hAx = list()
     vAx = list()
-    for i, ngl in enumerate(range(2,6)):
+    totalNgl = 13
+    for i, ngl in enumerate(range(3,totalNgl,2)):
         fem = FemProblem(ngl=ngl)
+        fem.setUp()
         fem.setUpSolver()
         vAx.append(fem.getKLEError(times=viscousTime))
 
-    hAx = [2, 3, 4, 5]
+    hAx = list(range(3,totalNgl,2))
     marker = [',','v','>','<','1','2','3','4','s','p','*','h','+']
     vAxArray = np.array(vAx)
     plt.figure(figsize=(10,10))
@@ -42,8 +44,9 @@ def generateChart(viscousTime):
 
 def generateParaviewer():
     fem = FemProblem()
+    fem.setUp()
     fem.setUpSolver()
-    fem.solveKLETests()
+    fem.solveKLETests(steps=100, endTime=0.05)
 
 def timeSolving():
     fem = FemProblem()
@@ -51,6 +54,7 @@ def timeSolving():
     fem.setUpSolver()
     fem.startSolver()
     fem.viewer.writeXmf('Taylor-Green')
+    fem.logger.info(f"Converged? {fem.ts.converged}")
 
 def main():
     case = OptDB.getString('case', False)
@@ -67,9 +71,13 @@ def main():
     except:
         logger.info(f"Case '{case}' Not Found")
 
-    if runTests:
+    if runTests == 'kle':
         logger.info(f"Running {runTests} TESTS:  {yamlData['name']} ")
         generateParaviewer()
+
+    elif runTests == 'chart':
+        logger.info(f"Running {runTests} Error Chart:  {yamlData['name']} ")
+        generateChart()
     else:
         logger.info(f"Running problem:  {yamlData['name']}")
         timeSolving()
