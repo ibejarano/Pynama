@@ -11,7 +11,7 @@ case = OptDB.getString('case', False)
 
 if case == 'taylor-green':
     from cases.taylor_green import TaylorGreen as FemProblem
-elif case == 'uniform-flow':
+elif case == 'uniform':
     from cases.uniform import UniformFlow as FemProblem
 elif case == 'custom-func':
     raise Exception("class not found")
