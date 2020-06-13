@@ -277,6 +277,9 @@ class SpectralKLETest(unittest.TestCase):
         self.K , self.Rw, self.Rd = self.spElem_test.getElemKLEMatrices(np.array([1,1,0,1,0,0,1,0], dtype=float))
         self.K_3d , self.Rw_3d, self.Rd_3d = self.spElem_test_3d.getElemKLEMatrices(np.array(coords_3d, dtype=float))
 
+        self.operators_ale = self.spElem_ref.getElemKLEOperators(np.array([1,1,0,1,0,0,1,0], dtype=float))
+        self.operators_test = self.spElem_test.getElemKLEOperators(np.array([1,1,0,1,0,0,1,0], dtype=float))
+
 
     def test_K(self):
         np_test.assert_array_almost_equal(self.K_ale_2d, self.K , decimal=15)
@@ -291,3 +294,7 @@ class SpectralKLETest(unittest.TestCase):
         np_test.assert_array_almost_equal(self.Rd_ale_3d, self.Rd_3d , decimal=15)
 
 
+    def test_operators(self):
+        for i in range(4):
+            with self.subTest(operator=i):
+                np_test.assert_array_almost_equal( self.operators_ale[i] , self.operators_test[i], decimal=15 )
