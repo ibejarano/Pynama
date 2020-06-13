@@ -15,6 +15,8 @@ elif case == 'uniform-flow':
     from cases.uniform import UniformFlow as FemProblem
 elif case == 'custom-func':
     raise Exception("class not found")
+elif case == 'cavity':
+    from cases.cavity import Cavity as FemProblem
 else:
     print("Case not defined unabled to import")
     exit()
