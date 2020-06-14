@@ -41,7 +41,9 @@ class Cavity(NoSlip):
     def VelCavity(coord,t=None):
         for bc in self.applyBoundaryConditions:
             if coord[bc[1]] == bc[0][1]:
-                vel= bc[2] 
+                vel= bc[2]
+                return vel
+        vel=[0]*self.dim 
         return vel
 
     @staticmethod

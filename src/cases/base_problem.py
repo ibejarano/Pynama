@@ -56,23 +56,6 @@ class BaseProblem(object):
         self.tag2BCdict, self.node2tagdict = self.dom.setBoundaryCondition()
 
 
-    def setUpSolver(self):
-        self.solver = KspSolver()
-        self.solver.createSolver(self.mat.K, self.comm)
-        self.vel = self.mat.K.createVecRight()
-        self.vel.setName("velocity")
-        self.vort = self.mat.Rw.createVecRight()
-        self.vort.setName("vorticity")
-        self.vort.set(0.0)
-
-        sK, eK = self.mat.K.getOwnershipRange()
-        locRowsK = eK - sK
-
-        self._VtensV = PETSc.Vec().createMPI(
-            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
-        self._Aux1 = PETSc.Vec().createMPI(
-            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
-
     def readInputData(self, inputData):
         self.dim = len(inputData['nelem'])
         self.dim_w = 1 if self.dim == 2 else 3
@@ -201,6 +184,23 @@ class BaseProblem(object):
         pass
 
 class NoSlip(BaseProblem):
+
+    def setUpSolver(self):
+        self.solver = KspSolver()
+        self.solver.createSolver(self.mat.K + self.mat.Kfs, self.comm)
+        self.vel = self.mat.K.createVecRight()
+        self.vel.setName("velocity")
+        self.vort = self.mat.Rw.createVecRight()
+        self.vort.setName("vorticity")
+        self.vort.set(0.0)
+
+        sK, eK = self.mat.K.getOwnershipRange()
+        locRowsK = eK - sK
+
+        self._VtensV = PETSc.Vec().createMPI(
+            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
+        self._Aux1 = PETSc.Vec().createMPI(
+            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
 
     def solveKLE(self, time, vort):
         boundaryNodes = self.getBoundaryNodes()
@@ -340,6 +340,23 @@ class FreeSlip(BaseProblem):
 
     def buildMatrices(self):
         pass
+
+    def setUpSolver(self):
+        self.solver = KspSolver()
+        self.solver.createSolver(self.mat.K, self.comm)
+        self.vel = self.mat.K.createVecRight()
+        self.vel.setName("velocity")
+        self.vort = self.mat.Rw.createVecRight()
+        self.vort.setName("vorticity")
+        self.vort.set(0.0)
+
+        sK, eK = self.mat.K.getOwnershipRange()
+        locRowsK = eK - sK
+
+        self._VtensV = PETSc.Vec().createMPI(
+            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
+        self._Aux1 = PETSc.Vec().createMPI(
+            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
 
     def solveKLE(self, time, vort):
         boundaryNodes = self.getBoundaryNodes()
