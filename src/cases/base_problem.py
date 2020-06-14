@@ -38,6 +38,8 @@ class BaseProblem(object):
 
         if 'time-solver' in yamlData:
             self.setUpTimeSolver(yamlData['time-solver'])
+        if 'boundary-conditions' in yamlData:
+            self.readBoundaryCondition(yamlData['boundary-conditions'])
 
     def setUpDomain(self):
         self.dom = DMPlexDom(self.lower, self.upper, self.nelem)
@@ -51,7 +53,7 @@ class BaseProblem(object):
 
     def setUpBoundaryConditions(self):
         self.dom.setLabelToBorders()
-        self.tag2BCdict, self.node2tagdict = self.dom.readBoundaryCondition()
+        self.tag2BCdict, self.node2tagdict = self.dom.setBoundaryCondition()
 
 
     def setUpSolver(self):
@@ -208,9 +210,20 @@ class NoSlip(BaseProblem):
         vort= self.mat.Curl *self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
+    def readBoundaryCondition(self,inputData):
+        bcdict = inputData['border-name']
+        self.BoundaryCondition=[]
+        for bc in bcdict.keys():
+            if bc[:5]=="upper":
+                self.BoundaryCondition.append((self.upper,bcdict[bc]["coord"],bcdict[bc]["vel"]))
+            if bc[:5]=="lower":
+                self.BoundaryCondition.append((self.lower,bcdict[bc]["coord"],bcdict[bc]["vel"]))
+
+
+
     def buildMatrices(self):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
-        boundaryNodes = set(self.node2tagdict.keys())
+        boundaryNodes = set(self.getBoundaryNodes())
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
         locK, locRw, locRd = self.elemType.getElemKLEMatrices(cornerCoords)
 
@@ -348,6 +361,9 @@ class FreeSlip(BaseProblem):
             error = (exactVel - self.vel).norm(norm_type=2)
             errors.append(error)
         return errors
+
+    def readBoundaryCondition(self,inputData):
+        pass
 
     def buildKLEMats(self):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition

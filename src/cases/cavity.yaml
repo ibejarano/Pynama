@@ -10,15 +10,15 @@ domain:
 
 boundary-conditions:
   border-name:
-    0 :
-      vel: [ 2 , 'flatPlateVy' ]
-    1 :
-      vel: [ 1, 2]
-    2 :
-      vel: [ 1, 0]
-      vort: ['taylorGreenVort']
-    3 :
-      vel: [ 1, 0]
+    upperY:
+      coord: 1
+      vel: [ 1 , 0 ]
+    # (upper,0) :
+    #   vel: [ 1, 2]
+    # (lower,0) :
+    #   vel: [ 1, 0]
+    # (lower,1) :
+    #   vel: [ 1, 0]
   # no-slip-border:
   #   - 0
   #   - 3

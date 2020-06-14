@@ -112,7 +112,7 @@ class DMPlexDom(PETSc.DMPlex):
         indicesDIR = self.indicesManager.getDirichletIndices()
         return indicesDIR
 
-    def readBoundaryCondition(self):
+    def setBoundaryCondition(self):
         dim = self.getDimension()
         tag2BCdict = dict()
         BCset = set()

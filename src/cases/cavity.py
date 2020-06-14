@@ -26,21 +26,24 @@ class Cavity(NoSlip):
 
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()
-        fvort_coords = lambda coords: self.VortCavity_2D(coords, t=startTime)
+        fvort_coords = lambda coords: self.VortCavity(coords, t=startTime)
         self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort, self.dim_w)
 
 
 
     def applyBoundaryConditions(self, time, bcNodes):
         self.vel.set(0.0)
-        fvel_coords = lambda coords: self.VelCavity_2D(coords, t=time)
+        fvel_coords = lambda coords: self.VelCavity(coords, t=time)
         self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel, self.dim)
 
 
     @staticmethod
-    def VelCavity_2D(coord,t=None):
-        return [0, 0]
+    def VelCavity(coord,t=None):
+        for bc in self.applyBoundaryConditions:
+            if coord[bc[1]] == bc[0][1]:
+                vel= bc[2] 
+        return vel
 
     @staticmethod
     def VortCavity_2D(coord, t=None):
-        return [0]
+        return [0]*self.dim_w
