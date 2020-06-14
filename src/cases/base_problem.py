@@ -18,7 +18,7 @@ class BaseProblem(object):
         """
         self.comm = comm
         self.logger = logging.getLogger("")
-        case = PETSc.Options().getString('case')
+        case = PETSc.Options().getString('case', 'uniform' )
         try:
             with open(f'src/cases/{case}.yaml') as f:
                 yamlData = yaml.load(f, Loader=yaml.Loader)
@@ -127,14 +127,16 @@ class BaseProblem(object):
         self.ts.initSolver(self.evalRHS, self.convergedStepFunction)
 
     def convergedStepFunction(self, ts):
-        time = ts.getTimeStep()
-        step = ts.getStepNumber()
-        vort = ts.getSolution()
+        time = ts.time
+        step = ts.step_number
+        # vort = ts.getSolution()
         self.logger.info(f"Converged: Step {step} Time {time}")
         # lo de abajo en otro lado
+        # self.logger.info(f"Reason: {ts.reason}")
+        # self.logger.info(f"max vel: {self.vel.max()}")
         self.viewer.saveVec(self.vel, timeStep=step)
-        self.viewer.saveVec(vort, timeStep=step)
-        self.viewer.saveStepInXML(step, time, vecs=[self.vel, vort])
+        self.viewer.saveVec(self.vort, timeStep=step)
+        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
 
     def getBoundaryNodes(self):
         """ IS: Index Set """
