@@ -15,11 +15,7 @@ class UniformFlow(FreeSlip):
 
         self.cteValue = [1,0]
 
-        if self.dim == 2:
-            print("dim 2")
-        else:
-            print("unknown")
-            raise Exception("wrong dim 3 or another")
+        assert self.dim == 2
 
         self.setUpBoundaryConditions()
         self.setUpEmptyMats()
