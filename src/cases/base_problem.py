@@ -107,14 +107,14 @@ class BaseProblem(object):
         self.ts.initSolver(self.evalRHS, self.convergedStepFunction)
 
     def convergedStepFunction(self, ts):
-        time = ts.getTimeStep()
-        step = ts.getStepNumber()
-        vort = ts.getSolution()
+        time = ts.time
+        step = ts.step_number
+        #vort = ts.getSolution()
         self.logger.info(f"Converged: Step {step} Time {time}")
         # lo de abajo en otro lado
         self.viewer.saveVec(self.vel, timeStep=step)
-        self.viewer.saveVec(vort, timeStep=step)
-        self.viewer.saveStepInXML(step, time, vecs=[self.vel, vort])
+        self.viewer.saveVec(self.vort, timeStep=step)
+        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
 
     def getBoundaryNodes(self):
         """ IS: Index Set """
@@ -184,6 +184,12 @@ class BaseProblem(object):
         pass
 
 class NoSlip(BaseProblem):
+    
+    def setUpEmptyMats(self):
+        self.mat = Mat(self.dim, self.comm)
+        fakeConectMat = self.dom.getDMConectivityMat()
+        globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
+        self.mat.createEmptyKLEMatsNS(fakeConectMat, globalIndicesDIR, self.node2tagdict,createOperators=True)
 
     def setUpSolver(self):
         self.solver = KspSolver()
@@ -317,21 +323,21 @@ class NoSlip(BaseProblem):
             self.mat.Rd.setValues(gldofFree, nodes,
                               locRd[np.ix_(dofFree, range(len(nodes)))],
                               addv=True)
-        
+
         self.mat.assembleAll()
         self.mat.setIndices2One(indices2one)
 
         for indd in indices2onefs:
-            self.Kfs.setValues(indd, indd, -1, addv=True)
+            self.mat.Kfs.setValues(indd, indd, -1, addv=True)
 
-        self.Kfs.assemble()
-        self.Rwfs.assemble()
-        self.Rdfs.assemble()
-        self.Krhsfs.assemble()
+        self.mat.Kfs.assemble()
+        self.mat.Rwfs.assemble()
+        self.mat.Rdfs.assemble()
+        self.mat.Krhsfs.assemble()
 
         for indd in (indices2one - indices2onefs):
-            self.Krhsfs.setValues(indd, indd, 1, addv=False)
-        self.Krhsfs.assemble()
+            self.mat.Krhsfs.setValues(indd, indd, 1, addv=False)
+        self.mat.Krhsfs.assemble()
 
 class FreeSlip(BaseProblem):
 
@@ -357,6 +363,12 @@ class FreeSlip(BaseProblem):
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
         self._Aux1 = PETSc.Vec().createMPI(
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
+
+    def setUpEmptyMats(self):
+        self.mat = Mat(self.dim, self.comm)
+        fakeConectMat = self.dom.getDMConectivityMat()
+        globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
+        self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesDIR, createOperators=True)
 
     def solveKLE(self, time, vort):
         boundaryNodes = self.getBoundaryNodes()
