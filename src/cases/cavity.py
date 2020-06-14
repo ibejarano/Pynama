@@ -8,7 +8,7 @@ import yaml
 from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
-from matrices.mat_generator import Mat
+
 
 class Cavity(NoSlip):
     def setUp(self):
@@ -17,12 +17,6 @@ class Cavity(NoSlip):
         self.setUpEmptyMats()
         self.buildKLEMats()
         self.buildOperators()
-
-    def setUpEmptyMats(self):
-        self.mat = Mat(self.dim, self.comm)
-        fakeConectMat = self.dom.getDMConectivityMat()
-        globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
-        self.mat.createEmptyKLEMatsNS(fakeConectMat, globalIndicesDIR, self.node2tagdict,createOperators=True)
 
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()
