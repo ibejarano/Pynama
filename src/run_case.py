@@ -13,6 +13,8 @@ if case == 'taylor-green':
     from cases.taylor_green import TaylorGreen as FemProblem
 elif case == 'uniform':
     from cases.uniform import UniformFlow as FemProblem
+elif case == 'ibm-static':
+    from cases.immersed_boundary import ImmersedBoundaryStatic as FemProblem
 elif case == 'custom-func':
     raise Exception("class not found")
 else:
