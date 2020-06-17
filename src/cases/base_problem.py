@@ -100,13 +100,13 @@ class BaseProblem(object):
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
         locSrT, locDivSrT, locCurl, locWei = self.elemType.getElemKLEOperators(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
-            nodes = self.dom.getGlobalNodesFromCell(cell, shared=False)
+            nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             indicesVel = self.dom.getVelocityIndex(nodes)
             indicesW = self.dom.getVorticityIndex(nodes)
             indicesSrT = self.dom.getSrtIndex(nodes)
+            self.mat.Curl.setValues(indicesW, indicesVel, locCurl, True)
             self.mat.SrT.setValues(indicesSrT, indicesVel, locSrT, True)
             self.mat.DivSrT.setValues(indicesVel, indicesSrT, locDivSrT, True)
-            self.mat.Curl.setValues(indicesW, indicesVel, locCurl, True)
 
             self.mat.weigSrT.setValues(indicesSrT, np.repeat(locWei, self.dim_s), True)
             self.mat.weigDivSrT.setValues(indicesVel, np.repeat(locWei, self.dim), True)
