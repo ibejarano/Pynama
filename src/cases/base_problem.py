@@ -194,7 +194,10 @@ class NoSlip(BaseProblem):
     def setUpSolver(self):
         self.solver = KspSolver()
         self.solverFS = KspSolver()
+        self.mat.K.assemble()
+        self.mat.Kfs.assemble()
         self.solverFS.createSolver(self.mat.K + self.mat.Kfs, self.comm) # revisar setup
+        self.mat.K.assemble()
         self.solver.createSolver(self.mat.K , self.comm)
         self.vel = self.mat.K.createVecRight()
         self.vel.setName("velocity")
@@ -229,12 +232,12 @@ class NoSlip(BaseProblem):
 
 
 
-    def buildMatrices(self):
+    def buildKLEMats(self):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
         boundaryNodes = set(self.getBoundaryNodes())
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
         locK, locRw, locRd = self.elemType.getElemKLEMatrices(cornerCoords)
-
+        indices2onefs = set()
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             self.logger.debug("DMPlex cell: %s", cell)
 
@@ -252,7 +255,7 @@ class NoSlip(BaseProblem):
             for node in nodeBCintersect:
                 localBoundaryNode = nodes.index(node)
                 nsNorm = set()
-                coord=self.dom.getNodesCoordinates(node)
+                coord=self.dom.getNodesCoordinates([node])[0]
                 for i in range(self.dim):
                     if (coord[i]==self.upper[i]) or (coord[i]==self.lower[i]):
                         nsNorm.add(i)
@@ -301,7 +304,7 @@ class NoSlip(BaseProblem):
                 self.mat.Rwfs.setValues(gldofFreeFSSetNS, indicesW,
                                     locRw[dofFreeFSSetNS, :], addv=True)
 
-                self.mat.Rdfs.setValues(gldofFreeFSSetNS, indices,
+                self.mat.Rdfs.setValues(gldofFreeFSSetNS, nodes,
                                     locRd[dofFreeFSSetNS, :], addv=True)
                 self.mat.Krhsfs.setValues(
                         gldofFreeFSSetNS, gldofSetFSNS,

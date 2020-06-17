@@ -7,6 +7,11 @@ domain:
   ngl: 2
   lower: [0,0]
   upper: [1,1]
+  
+time-solver:
+  max-steps: 100
+  start-time: 0
+  end-time: 1
 
 boundary-conditions:
   border-name:
