@@ -216,6 +216,7 @@ class NoSlip(BaseProblem):
     def solveKLE(self, time, vort):
         boundaryNodes = self.getBoundaryNodes()
         self.applyBoundaryConditions(time, boundaryNodes)
+        self.velFS = self.vel.copy()
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
              + self.mat.Krhs * self.vel , self.velFS)
         vort= self.mat.Curl *self.velFS
