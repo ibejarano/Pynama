@@ -159,10 +159,11 @@ class Mat:
         o_nnz = [x * dim1 for x in o_nnz_ind for d in range(dim2)]
         return self.createEmptyMat(locElRow * dim2 ,locElRow * dim1 ,d_nnz, o_nnz)
     
-    def createEmptyKLEMatsNS(self, conecMat, indicesDIR,node2tagdict, indicesNS=set(), createOperators=False):
-        self.globalIndicesNS =set() # REVISAR
+    def createEmptyKLEMatsNS(self, conecMat, indicesNS, indicesDIR=set(), createOperators=False):
+        self.globalIndicesNS =set()
         self.globalIndicesDIR =set()
 
+        # global indices for DIR and NS BC are allgathered among processes
         collectIndices = self.comm.allgather([indicesDIR, indicesNS])
         for remoteIndices in collectIndices:
             self.globalIndicesDIR |= remoteIndices[0] 
@@ -194,24 +195,6 @@ class Mat:
         locElRow = rEnd - rStart
         d_nnz_ind = [x if x <= locElRow else locElRow for x in d_nnz_ind]
 
-        #indicesNS = set()
-        indicesDIR = set()
-
-        indicesNS = set(node2tagdict.keys()) #REVISAR
-
-
-        # global indices for DIR and NS BC are allgathered among processes
-        globIndices = self.comm.allgather([indicesDIR,
-                                                     indicesNS])
-
-        self.globIndicesDIR = set()
-        self.globIndicesNS = set()
-        for setList in globIndices:
-            self.globIndicesDIR |= setList[0]
-            self.globIndicesNS |= setList[1]
-
-        self.globalNSbc = bool(self.globIndicesNS)
-
         # Create matrices for the resolution of the KLE and vorticity transport
         # Create list of NNZ from d_nnz_ind and o_nnz_ind to create K
         d_nnz, o_nnz = self.createNonZeroIndex(d_nnz_ind, o_nnz_ind, self.dim, self.dim )
@@ -240,20 +223,20 @@ class Mat:
         dns_nnz_ind = [0] * (rEnd - rStart)
         ons_nnz_ind = [0] * (rEnd - rStart)
         for ind, indSet in enumerate(ind_d):
-            if (ind + rStart) not in (self.globIndicesNS |
-                                        self.globIndicesDIR):
-                dns_nnz_ind[ind] = len(indSet & self.globIndicesNS)
-            elif (ind + rStart) in self.globIndicesNS:
+            if (ind + rStart) not in (self.globalIndicesNS |
+                                        self.globalIndicesDIR):
+                dns_nnz_ind[ind] = len(indSet & self.globalIndicesNS)
+            elif (ind + rStart) in self.globalIndicesNS:
                 # FIXME: len() can be distributed on each set operation
-                dns_nnz_ind[ind] = len((indSet - self.globIndicesDIR) |
-                                        (indSet & self.globIndicesNS))
+                dns_nnz_ind[ind] = len((indSet - self.globalIndicesDIR) |
+                                        (indSet & self.globalIndicesNS))
         for ind, indSet in enumerate(ind_o):
-            if (ind + rStart) not in (self.globIndicesNS |
-                                        self.globIndicesDIR):
-                ons_nnz_ind[ind] = len(indSet & self.globIndicesNS)
-            elif (ind + rStart) in self.globIndicesNS:
-                ons_nnz_ind[ind] = len((indSet - self.globIndicesDIR) |
-                                        (indSet & self.globIndicesNS))
+            if (ind + rStart) not in (self.globalIndicesNS |
+                                        self.globalIndicesDIR):
+                ons_nnz_ind[ind] = len(indSet & self.globalIndicesNS)
+            elif (ind + rStart) in self.globalIndicesNS:
+                ons_nnz_ind[ind] = len((indSet - self.globalIndicesDIR) |
+                                        (indSet & self.globalIndicesNS))
 
         dns_nnz, ons_nnz =self.createNonZeroIndex (dns_nnz_ind, ons_nnz_ind, self.dim, self.dim)
 
@@ -266,15 +249,15 @@ class Mat:
         drhsns_nnz_ind = [0] * (rEnd - rStart)
         orhsns_nnz_ind = [0] * (rEnd - rStart)
         for indRow, indSet in enumerate(ind_d):
-            if (indRow + rStart) in (self.globIndicesDIR -
-                                        self.globIndicesNS):
+            if (indRow + rStart) in (self.globalIndicesDIR -
+                                        self.globalIndicesNS):
                 drhsns_nnz_ind[indRow] = 1
             else:
-                drhsns_nnz_ind[indRow] = len(indSet & (self.globIndicesDIR
-                                                | self.globIndicesNS))
+                drhsns_nnz_ind[indRow] = len(indSet & (self.globalIndicesDIR
+                                                | self.globalIndicesNS))
         for indRow, indSet in enumerate(ind_o):
-            orhsns_nnz_ind[indRow] = len(indSet & (self.globIndicesDIR
-                                            | self.globIndicesNS))
+            orhsns_nnz_ind[indRow] = len(indSet & (self.globalIndicesDIR
+                                            | self.globalIndicesNS))
 
         drhsns_nnz, orhsns_nnz = self.createNonZeroIndex(drhsns_nnz_ind,orhsns_nnz_ind, self.dim,self.dim)
 
@@ -318,9 +301,10 @@ class Mat:
         self.Rw = self.createEmptyMat(vel_dofs, vort_dofs, dw_nnz, ow_nnz)
         self.Rd = self.createEmptyMat(vel_dofs, locElRow, dd_nnz, od_nnz)
         self.Krhs = self.createEmptyMat(vel_dofs, vel_dofs, drhs_nnz, orhs_nnz)
-
+        
         if createOperators:
             self.createEmptyOperators(d_nnz_ind, o_nnz_ind, locElRow)
+            
 
     def createEmptyMatrices(self, rStart, rEnd):
         # definir como entran estos
