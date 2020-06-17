@@ -21,8 +21,6 @@ class Cavity(NoSlip):
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
 
-
-
     def applyBoundaryConditions(self, time, bcNodes):
         self.vel.set(0.0)
         fvel_coords = lambda coords: self.VelCavity(coords,self.BoundaryCondition,self.dim, t=time)
