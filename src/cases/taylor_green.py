@@ -30,7 +30,7 @@ class TaylorGreen(FreeSlip):
         allNodes = self.dom.getAllNodes()
         fvort_coords = lambda coords: self.taylorGreenVortFunction(coords, t=startTime)
         self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort, self.dim_w)
-
+        self.vort.assemble()
 
     def generateExactVecs(self, time):
         exactVel = self.mat.K.createVecRight()
@@ -49,6 +49,7 @@ class TaylorGreen(FreeSlip):
         self.vel.set(0.0)
         fvel_coords = lambda coords: self.taylorGreenVelFunction(coords, t=time)
         self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel, self.dim)
+        self.vel.assemble()
 
     def solveKLETests(self, startTime=0.0, endTime=1.0, steps=10):
         times = np.linspace(startTime, endTime, steps)
@@ -62,7 +63,7 @@ class TaylorGreen(FreeSlip):
             self.viewer.saveVec(self.vort, timeStep=step)
             self.viewer.saveVec(exactVel, timeStep=step)
             self.viewer.saveVec(exactVort, timeStep=step)
-            self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort, self.vel, self.vort])
+            self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort, self.vort, self.vel])
         self.viewer.writeXmf(self.caseName)
 
     @staticmethod
