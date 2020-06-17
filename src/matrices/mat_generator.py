@@ -22,39 +22,7 @@ class Mat:
         self.K.assemble()
         self.Rw.assemble()
         self.Rd.assemble()
-        self.Krhs.assemble()
-
-    def setfreeFSSetNS(self):
-        if dofFreeFSSetNS:  # bool(dof2NSfs):
-            self.Kfs.setValues(gldofFreeFSSetNS, gldofFree,
-                                locK[np.ix_(dofFreeFSSetNS, dofFree)],
-                                addv=True)
-
-            self.Kfs.setValues(gldofFree, gldofFreeFSSetNS,
-                                locK[np.ix_(dofFree, dofFreeFSSetNS)],
-                                addv=True)
-
-            self.Kfs.setValues(
-                gldofFreeFSSetNS, gldofFreeFSSetNS,
-                locK[np.ix_(dofFreeFSSetNS, dofFreeFSSetNS)],
-                addv=True)
-
-            # Indices where diagonal entries should be reduced by 1
-            indices2onefs.update(gldofFreeFSSetNS)
-
-            self.Rwfs.setValues(gldofFreeFSSetNS, indicesW,
-                                locRw[dofFreeFSSetNS, :], addv=True)
-
-            self.Rdfs.setValues(gldofFreeFSSetNS, indices,
-                                locRd[dofFreeFSSetNS, :], addv=True)
         
-    def setIndices2One(self, indices2one):
-        for indd in indices2one:
-            self.Krhs.setValues(indd, indd, 1, addv=False)
-            self.K.setValues(indd, indd, 1, addv=False)
-        self.Krhs.assemble()
-        self.K.assemble()
-
     def createEmptyKLEMats(self, conecMat, indicesDIR, indicesNS=set(), createOperators=False):
         self.globalIndicesNS =set() # TODO Implementar
         self.globalIndicesDIR =set()
