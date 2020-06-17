@@ -7,6 +7,7 @@ from elements.spectral import Spectral
 from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
 from matrices.mat_generator import Mat
+from matrices.mat_ns import MatNS
 from solver.ksp_solver import KspSolver
 import logging
 import numpy as np
@@ -186,7 +187,7 @@ class BaseProblem(object):
 class NoSlip(BaseProblem):
     
     def setUpEmptyMats(self):
-        self.mat = Mat(self.dim, self.comm)
+        self.mat = MatNS(self.dim, self.comm)
         fakeConectMat = self.dom.getDMConectivityMat()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
         self.mat.createEmptyKLEMatsNS(fakeConectMat, globalIndicesDIR,createOperators=True)
