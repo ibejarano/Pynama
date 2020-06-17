@@ -10,12 +10,15 @@ OptDB = petsc4py.PETSc.Options()
 case = OptDB.getString('case', False)
 
 if case == 'taylor-green':
+    name = 'taylor-green'
     from cases.taylor_green import TaylorGreen as FemProblem
 elif case == 'uniform-flow':
+    name = 'uniform-flow'
     from cases.uniform import UniformFlow as FemProblem
 elif case == 'custom-func':
     raise Exception("class not found")
 elif case == 'cavity':
+    name = 'cavity'
     from cases.cavity import Cavity as FemProblem
 else:
     print("Case not defined unabled to import")
@@ -50,12 +53,12 @@ def generateParaviewer():
     fem.setUpSolver()
     fem.solveKLETests(steps=100, endTime=0.05)
 
-def timeSolving():
+def timeSolving(name):
     fem = FemProblem()
     fem.setUp()
     fem.setUpSolver()
     fem.startSolver()
-    fem.viewer.writeXmf('Taylor-Green')
+    fem.viewer.writeXmf(name)
     fem.logger.info(f"Converged? {fem.ts.converged}")
 
 def main():
@@ -82,7 +85,7 @@ def main():
         generateChart()
     else:
         logger.info(f"Running problem:  {yamlData['name']}")
-        timeSolving()
+        timeSolving(name)
 
     # self.logger.info(yamlData)
     # self.caseName = "taylor-green"
