@@ -189,11 +189,13 @@ class NoSlip(BaseProblem):
         self.mat = Mat(self.dim, self.comm)
         fakeConectMat = self.dom.getDMConectivityMat()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
-        self.mat.createEmptyKLEMatsNS(fakeConectMat, globalIndicesDIR, self.node2tagdict,createOperators=True)
+        self.mat.createEmptyKLEMatsNS(fakeConectMat, globalIndicesDIR,createOperators=True)
 
     def setUpSolver(self):
         self.solver = KspSolver()
-        self.solver.createSolver(self.mat.K + self.mat.Kfs, self.comm)
+        self.solverFS = KspSolver()
+        self.solverFS.createSolver(self.mat.K + self.mat.Kfs, self.comm) # revisar setup
+        self.solver.createSolver(self.mat.K , self.comm)
         self.vel = self.mat.K.createVecRight()
         self.vel.setName("velocity")
         self.vort = self.mat.Rw.createVecRight()
@@ -211,7 +213,7 @@ class NoSlip(BaseProblem):
     def solveKLE(self, time, vort):
         boundaryNodes = self.getBoundaryNodes()
         self.applyBoundaryConditions(time, boundaryNodes)
-        self.solver( self.mat.Rw * vort + self.mat.Rwfs * vort\
+        self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
              + self.mat.Krhs * self.vel , self.velFS)
         vort= self.mat.Curl *self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
