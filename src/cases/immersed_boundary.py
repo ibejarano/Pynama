@@ -15,7 +15,7 @@ from math import sqrt, sin, pi
 class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
         self.setUpGeneral()
-        self.cteValue = [1,0]
+        self.cteValue = [37.5,0]
 
         radius = 0.5
         ndiv = 16
@@ -32,7 +32,6 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.buildOperators()
         self.createIBMMatrix()
 
-
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
 
@@ -48,7 +47,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         # use the velocity to get vorticity correction
         vorticity_corrected = self.getVorticityCorrection(time, finalStep=finalStep)
         # compute velocity again
-        self.solver( self.mat.Rw * (vorticity_corrected+vort) + self.mat.Krhs * self.vel , self.vel)
+        self.solver( self.mat.Rw * (vorticity_corrected) + self.mat.Krhs * self.vel , self.vel)
 
     def getVorticityCorrection(self, t,finalStep=False):
         """Main function to be called after a Converged Time Step"""
@@ -73,16 +72,13 @@ class ImmersedBoundaryStatic(FreeSlip):
         return vort
 
     def getVelocityCorrection(self):
-        velCorrection = self.computeVelocityCorrection(self.vel)
+        velCorrection = self.computeVelocityCorrection()
         return velCorrection
 
-    def computeVelocityCorrection(self, predictedVel):
-        predictedVel = self.vel
+    def computeVelocityCorrection(self):
         velCorrection = self.vel.duplicate()
-        rhs = self.D.createVecLeft()
         virtualFlux = self.Dds.createVecRight()
-        self.D.mult(-predictedVel*(self.h**2) , rhs)
-        self.ksp.solve(rhs, virtualFlux)
+        self.ksp.solve(- self.D * self.vel * (self.h**2) , virtualFlux)
         self.Dds.mult(virtualFlux, velCorrection)
         return velCorrection
 
@@ -94,7 +90,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         # lo de abajo en otro lado
         # self.logger.info(f"Reason: {ts.reason}")
         # self.logger.info(f"max vel: {self.vel.max()}")
-        self.solveKLE(time,self.vort, finalStep=True)
+        # self.solveKLE(time,self.vort, finalStep=True)
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
         self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
@@ -250,25 +246,6 @@ class Body:
         return self.dom.vecGetClosure(
             self.coordSection, self.coordinates, node + self.firstNode
             ) + self._centerDisplacement
-
-    def createEmptyVecs(self):
-        print("Creating empty vecs")
-        self._VelCorrection = self.D.createVecRight()
-        self._BodyVelocity = self.Dds.createVecRight()
-        self._BodyVelocity.set(0.0)
-        self.rhs = self.D.createVecLeft()
-        self.virtualFlux = self.Dds.createVecRight()
-
-    def showMatInfo(self, mat):
-        print("Matriz size: ", mat.sizes)
-        print("Matriz information: ", mat.getInfo())
-   
-    def printVec(self,vec):
-        arr = vec.getArray()
-        print("x comp: ", arr[::2])
-        print("y comp: ", arr[1::2])
-        print("")
-
 
     # BODY MOVEMENTS FUNCTIONS
 
