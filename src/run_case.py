@@ -48,7 +48,7 @@ def generateParaviewer():
     fem = FemProblem()
     fem.setUp()
     fem.setUpSolver()
-    fem.solveKLETests(steps=100, endTime=0.05)
+    fem.solveKLETests()
 
 def timeSolving():
     fem = FemProblem()
