@@ -36,7 +36,7 @@ class BaseProblem(object):
 
         self.caseName = yamlData['name']
         self.readInputData(yamlData['domain'])
-
+      
         if 'time-solver' in yamlData:
             self.setUpTimeSolver(yamlData['time-solver'])
         if 'boundary-conditions' in yamlData:
@@ -195,10 +195,7 @@ class NoSlip(BaseProblem):
     def setUpSolver(self):
         self.solver = KspSolver()
         self.solverFS = KspSolver()
-        self.mat.K.assemble()
-        self.mat.Kfs.assemble()
-        self.solverFS.createSolver(self.mat.K + self.mat.Kfs, self.comm) # revisar setup
-        self.mat.K.assemble()
+        self.solverFS.createSolver(self.mat.K + self.mat.Kfs, self.comm) 
         self.solver.createSolver(self.mat.K , self.comm)
         self.vel = self.mat.K.createVecRight()
         self.vel.setName("velocity")
