@@ -3,8 +3,8 @@ name: cavity-yaml
 
 domain:
   dim: 2 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [2,2]
-  ngl: 2
+  nelem: [12,12]
+  ngl: 3
   lower: [0,0]
   upper: [1,1]
   
