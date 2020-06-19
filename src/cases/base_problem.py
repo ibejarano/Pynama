@@ -189,8 +189,8 @@ class NoSlip(BaseProblem):
     def setUpEmptyMats(self):
         self.mat = MatNS(self.dim, self.comm)
         fakeConectMat = self.dom.getDMConectivityMat()
-        globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
-        self.mat.createEmptyKLEMatsNS(fakeConectMat, globalIndicesDIR,createOperators=True)
+        globalIndicesNS = self.dom.getGlobalIndicesDirichlet() # TODO Reuso todos los indices dirichlet, se podria cambiar el nombre
+        self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesNS, createOperators=True)
 
     def setUpSolver(self):
         self.solver = KspSolver()
@@ -231,7 +231,6 @@ class NoSlip(BaseProblem):
                 self.BoundaryCondition.append((self.upper,bcdict[bc]["coord"],bcdict[bc]["vel"]))
             if bc[:5]=="lower":
                 self.BoundaryCondition.append((self.lower,bcdict[bc]["coord"],bcdict[bc]["vel"]))
-
 
 
     def buildKLEMats(self):
