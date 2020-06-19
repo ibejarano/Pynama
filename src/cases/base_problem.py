@@ -220,6 +220,7 @@ class NoSlip(BaseProblem):
         self.velFS = self.vel.copy()
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
              + self.mat.Krhs * self.vel , self.velFS)
+        self.applyBoundaryConditionsFS(time, boundaryNodes)
         vort= self.mat.Curl *self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 

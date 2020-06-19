@@ -27,6 +27,12 @@ class Cavity(NoSlip):
         self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel, self.dim)
 
 
+    def applyBoundaryConditionsFS(self, time, bcNodes):
+        self.velFS.set(0.0)
+        fvel_coords = lambda coords: self.VelCavity(coords,self.BoundaryCondition,self.dim, t=time)
+        self.velFS = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.velFS, self.dim)
+    
+
     @staticmethod
     def VelCavity(coord,BoundaryConditions,dim,t=None):
         for bc in BoundaryConditions:
