@@ -83,6 +83,13 @@ class DMPlexDom(PETSc.DMPlex):
                                          coordinates,
                                          cell+self.cellStart)
 
+    def getFaceCoords(self, face):
+        coordinates = self.getCoordinatesLocal()
+        coordSection = self.getCoordinateSection()
+        return self.vecGetClosure(coordSection,
+                                         coordinates,
+                                         face)
+
     def setLabelToBorders(self):
         label = 'cfgfileBC'
         self.createLabel(label)
@@ -102,6 +109,17 @@ class DMPlexDom(PETSc.DMPlex):
                                             2**borderNum)
         if not self.comm.rank:
             self.logger.debug("Labels creados en borders")
+
+    def getBorderEntities(self, name):
+        faceNum = self.mapFaceNameToNum(name)
+        faces = self.getStratumIS("Face Sets", faceNum).getIndices()
+        return faces
+
+    def mapFaceNameToNum(self, name):
+        """This ordering corresponds to nproc = 1"""
+        namingConvention = ["down", "right" , "up", "left"]
+        num = namingConvention.index(name) + 1
+        return num
 
     def getDMConectivityMat(self):
         localIndicesSection = self.indicesManager.getLocalIndicesSection()
