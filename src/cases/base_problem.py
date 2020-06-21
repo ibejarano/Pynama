@@ -184,6 +184,9 @@ class BaseProblem(object):
     def applyBoundaryConditions(self, time, bcNodes):
         pass
 
+    def readBoundaryCondition(self,inputData):
+        pass
+
 class NoSlip(BaseProblem):
     
     def setUpEmptyMats(self):
@@ -220,16 +223,6 @@ class NoSlip(BaseProblem):
         self.applyBoundaryConditionsFS(time, boundaryNodes)
         vort= self.mat.Curl *self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
-
-    def readBoundaryCondition(self,inputData):
-        bcdict = inputData['border-name']
-        self.BoundaryCondition=[]
-        for bc in bcdict.keys():
-            if bc[:5]=="upper":
-                self.BoundaryCondition.append((self.upper,bcdict[bc]["coord"],bcdict[bc]["vel"]))
-            if bc[:5]=="lower":
-                self.BoundaryCondition.append((self.lower,bcdict[bc]["coord"],bcdict[bc]["vel"]))
-
 
     def buildKLEMats(self):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
@@ -394,9 +387,6 @@ class FreeSlip(BaseProblem):
             error = (exactVel - self.vel).norm(norm_type=2)
             errors.append(error)
         return errors
-
-    def readBoundaryCondition(self,inputData):
-        pass
 
     def buildKLEMats(self):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
