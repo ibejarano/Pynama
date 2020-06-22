@@ -9,7 +9,7 @@ domain:
   upper: [1,1]
   
 time-solver:
-  max-steps: 100
+  max-steps: 50
   start-time: 0
   end-time: 1
 
@@ -18,12 +18,5 @@ boundary-conditions:
     upperY:
       coord: 1
       vel: [ 1 , 0 ]
-    # (upper,0) :
-    #   vel: [ 1, 2]
-    # (lower,0) :
-    #   vel: [ 1, 0]
-    # (lower,1) :
-    #   vel: [ 1, 0]
-  # no-slip-border:
-  #   - 0
-  #   - 3
+  no-slip:
+    up: [1 ,0 ]
