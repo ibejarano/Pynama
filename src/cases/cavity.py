@@ -35,15 +35,10 @@ class Cavity(NoSlip):
 
         wallsWithVel = self.nsWalls.getWallsWithVelocity()
         for wallName in wallsWithVel:
-            entities = self.dom.getBorderEntities(wallName)
-            nodesSet = set()
-            for entity in entities:
-                nodes = self.dom.getGlobalNodesFromCell(entity, False)
-                nodesSet |= set(nodes)
-            nodesSet = list(nodesSet)
+            nodes = self.dom.getBorderNodes(wallName)
             vel, velDofs = self.nsWalls.getWallVelocity(wallName)
-            dofVelToSet = [node*self.dim + dof for node in nodesSet for dof in velDofs]
-            self.vel.setValues(dofVelToSet, np.repeat(vel, len(nodesSet)))
+            dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
+            self.vel.setValues(dofVelToSet, np.repeat(vel, len(nodes)))
 
         # fvel_coords = lambda coords: self.VelCavity(coords,self.BoundaryCondition,self.dim, t=time)
         # self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel, self.dim)
@@ -53,26 +48,16 @@ class Cavity(NoSlip):
         wallsWithVel = self.nsWalls.getWallsWithVelocity()
         staticWalls = self.nsWalls.getStaticWalls()
         for wallName in wallsWithVel:
-            entities = self.dom.getBorderEntities(wallName)
-            nodesSet = set()
-            for entity in entities:
-                nodes = self.dom.getGlobalNodesFromCell(entity, False)
-                nodesSet |= set(nodes)
-            nodesSet = list(nodesSet)
+            nodes = self.dom.getBorderNodes(wallName)
             vel, velDofs = self.nsWalls.getWallVelocity(wallName)
-            dofVelToSet = [node*self.dim + dof for node in nodesSet for dof in velDofs]
-            self.velFS.setValues(dofVelToSet, np.repeat(vel, len(nodesSet)))
+            dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
+            self.velFS.setValues(dofVelToSet, np.repeat(vel, len(nodes)))
 
         for staticWall in staticWalls:
-            entities = self.dom.getBorderEntities(staticWall)
-            nodesSet = set()
-            for entity in entities:
-                nodes = self.dom.getGlobalNodesFromCell(entity, False)
-                nodesSet |= set(nodes)
-            nodesSet = list(nodesSet)
+            nodes = self.dom.getBorderNodes(staticWall)
             velDofs = self.nsWalls.getStaticDofsByName(staticWall)
-            dofVelToSet = [node*self.dim + dof for node in nodesSet for dof in velDofs]
-            self.velFS.setValues(dofVelToSet, np.repeat(0, len(nodesSet)))
+            dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
+            self.velFS.setValues(dofVelToSet, np.repeat(0, len(nodes)))
 
         # # TODO Set the tang of walls without vel to 0
 
