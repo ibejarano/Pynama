@@ -115,6 +115,14 @@ class DMPlexDom(PETSc.DMPlex):
         faces = self.getStratumIS("Face Sets", faceNum).getIndices()
         return faces
 
+    def getBorderNodes(self, name):
+        entities = self.getBorderEntities(name)
+        nodesSet = set()
+        for entity in entities:
+            nodes = self.getGlobalNodesFromCell(entity, False)
+            nodesSet |= set(nodes)
+        return list(nodesSet)
+
     def mapFaceNameToNum(self, name):
         """This ordering corresponds to nproc = 1"""
         namingConvention = ["down", "right" , "up", "left"]
