@@ -26,8 +26,6 @@ class Cavity(NoSlip):
         for wallName, wallVelocity in wallsWithVelocity.items():
             self.nsWalls.setWallVelocity(wallName, wallVelocity)
 
-        print(self.nsWalls)
-        print(self.BoundaryCondition)
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
@@ -52,8 +50,8 @@ class Cavity(NoSlip):
 
 
     def applyBoundaryConditionsFS(self, time, bcNodes):
-
         wallsWithVel = self.nsWalls.getWallsWithVelocity()
+        staticWalls = self.nsWalls.getStaticWalls()
         for wallName in wallsWithVel:
             entities = self.dom.getBorderEntities(wallName)
             nodesSet = set()
@@ -63,9 +61,20 @@ class Cavity(NoSlip):
             nodesSet = list(nodesSet)
             vel, velDofs = self.nsWalls.getWallVelocity(wallName)
             dofVelToSet = [node*self.dim + dof for node in nodesSet for dof in velDofs]
-            self.vel.setValues(dofVelToSet, np.repeat(vel, len(nodesSet)))
+            self.velFS.setValues(dofVelToSet, np.repeat(vel, len(nodesSet)))
 
-        # TODO Set the tang of walls without vel to 0
+        for staticWall in staticWalls:
+            entities = self.dom.getBorderEntities(staticWall)
+            nodesSet = set()
+            for entity in entities:
+                nodes = self.dom.getGlobalNodesFromCell(entity, False)
+                nodesSet |= set(nodes)
+            nodesSet = list(nodesSet)
+            velDofs = self.nsWalls.getStaticDofsByName(staticWall)
+            dofVelToSet = [node*self.dim + dof for node in nodesSet for dof in velDofs]
+            self.velFS.setValues(dofVelToSet, np.repeat(0, len(nodesSet)))
+
+        # # TODO Set the tang of walls without vel to 0
 
         # fvel_coords = lambda coords: self.VelCavity(coords,self.BoundaryCondition,self.dim, t=time)
         # self.velFS = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.velFS, self.dim)
