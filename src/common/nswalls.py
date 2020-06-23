@@ -1,5 +1,6 @@
 import numpy as np
 from domain.dmplex import DMPlexDom
+import sys
 
 class NoSlipWalls:
     def __init__(self, lower, upper, sides=["left", "right", "up", "down"]):
@@ -50,6 +51,9 @@ class NoSlipWalls:
             side.view()
         return f"Walls defined: {len(self)} "
 
+    def getWallsNames(self):
+        return self.staticWalls
+
     def getWallsWithVelocity(self):
         return self.wallsWithVelocity
 
@@ -68,16 +72,19 @@ class NoSlipWalls:
             self.wallsWithVelocity.append(name)
             self.staticWalls.remove(name)
         except:
-            print("side not defined")
+            return None
 
     def getWallVelocity(self, name):
         try:
             wall = self.walls[name]
-            wallVel = wall.getWallVelocity()
-            wallVelDofs = wall.getVelDofs()
-            if wallVel == 0:
-                return [0] * len(self.lower)
-            return wallVel, wallVelDofs
+            return wall.getWallVelocity()
+        except:
+            print("side not defined")
+
+    def getStaticDofsByName(self, name):
+        try:
+            wall = self.walls[name]
+            return wall.getStaticDofs()
         except:
             print("side not defined")
 
@@ -136,6 +143,11 @@ class Wall:
             node.next = Vertex(pointCoords=vertex)
             node = node.next
 
+        normal = self.computeNormal()
+        velDofs = list(range(self.dim))
+        velDofs.pop(normal)
+        self.staticDofs = velDofs   
+
     def __repr__(self):
         node = self.head
         nodes = list()
@@ -153,18 +165,33 @@ class Wall:
             node = node.next
 
     def setWallVelocity(self, vel):
-        norm = self.computeNormal()
-        velDofs = list(range(self.dim))
-        velDofs.pop(norm)
-        vel.pop(norm)
-        cleanVel = list()
-        cleanDofs = list()
-        for dof, v in enumerate(vel):
-            if(v != 0):
-                cleanVel.append(v)
-                cleanDofs.append(velDofs[dof])
-        self.velocity = np.array(cleanVel)
-        self.velDofs = cleanDofs
+        # norm = self.computeNormal()
+        # velDofs = list(range(self.dim))
+        # velDofs.pop(norm)
+        # vel.pop(norm)
+        # cleanVel = list()
+        # cleanDofs = list()
+        # for dof, v in enumerate(vel):
+        #     if(v != 0):
+        #         cleanVel.append(v)
+        #         cleanDofs.append(velDofs[dof])
+        # self.velocity = np.array(cleanVel)
+        # self.velDofs = cleanDofs
+
+        velDofs = list()
+        vels = list()
+        staticDofs = list(self.staticDofs)
+        for dof in staticDofs:
+            if vel[dof] != 0:
+                vels.append(vel[dof])
+                velDofs.append(dof)
+                rmDof = self.staticDofs.index(dof)
+                self.staticDofs.pop(rmDof)
+        if len(velDofs) > 0:
+            self.velocity = np.array(vels)
+            self.velDofs = velDofs
+        else:
+            raise Exception("Velocity not valid")
 
     def setWallName(self, name):
         self.name = name
@@ -174,16 +201,13 @@ class Wall:
 
     def getWallVelocity(self):
         try:
-            vel = self.velocity
-            return vel
-        except: 
-            return []
-
-    def getVelDofs(self):
-        try:
-            return self.velDofs
+            return self.velocity, self.velDofs
         except:
-            return []
+            vel = [0] * len(self.staticDofs)
+            return vel, self.staticDofs
+
+    def getStaticDofs(self):
+        return self.staticDofs
 
     def getWallNum(self):
         return self.num
@@ -192,7 +216,7 @@ class Wall:
         print(f"\nNo-Slip Wall Side {self.name} defined by {self.totalVecs} vector(s)")
         try:
             directions = ["X", "Y", "Z"]
-            directions = [ directions[dof] for dof in self.getVelDofs() ]
+            directions = [ directions[dof] for dof in self.getWallVelocity()[1] ]
             assert len(self.getWallVelocity() > 0)
             print(f"Wall Velocity {self.getWallVelocity()} in {directions} direction(s) ")
         except:
@@ -242,6 +266,5 @@ if __name__ == "__main__":
     dim = 2
     nodesSet = [3, 5 , 9]
     dofVelToSet = [node*dim + dof for node in nodesSet for dof in velDofs]
-    print(dofVelToSet)
     # print(ns)
     # plex.getFaceEntities("left")
