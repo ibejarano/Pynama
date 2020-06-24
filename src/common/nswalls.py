@@ -5,6 +5,8 @@ import sys
 class NoSlipWalls:
     def __init__(self, lower, upper, sides=["left", "right", "up", "down"]):
         dim = len(lower)
+        self.dim = dim
+
         self.lower = lower
         self.upper = upper
         #           up
@@ -15,10 +17,6 @@ class NoSlipWalls:
         #  -->x    down
         #
         # wallNumbering = [0, 1, 2, 3]
-        # if dim == 3:
-        #     wallNaming.extend(["front", "back"])
-        #     wallNumbering.extend([4,5])
-        assert dim == 2
         self.walls = dict()
 
         for num, side in enumerate(sides):
@@ -35,8 +33,18 @@ class NoSlipWalls:
             self.walls[side] = Wall(num=num, vertexs=vertexs)
             self.walls[side].setWallName(side)
 
+        if self.dim == 3:
+            walls_3d = ["front", "back"]
+            for num, side in enumerate(walls_3d):
+                if side == "front":
+                    vertexs = self.front()
+                else:
+                    vertexs = self.back()
+                self.walls[side] = Wall(num=num+4, vertexs=vertexs)
+                self.walls[side].setWallName(side)
+
+        self.staticWalls = self.walls.keys()
         self.wallsWithVelocity = list()
-        self.staticWalls = ["left", "right", "up", "down"]
         self.computeWallsNormals()
 
     def __iter__(self):
@@ -52,7 +60,7 @@ class NoSlipWalls:
         return f"Walls defined: {len(self)} "
 
     def getWallsNames(self):
-        return self.staticWalls
+        return self.walls.keys()
 
     def getWallsWithVelocity(self):
         return self.wallsWithVelocity
@@ -108,6 +116,9 @@ class NoSlipWalls:
         x_constant = self.lower[0]
         vertexs.append([x_constant, self.lower[1]])
         vertexs.append([x_constant, self.upper[1]])
+        if self.dim == 3:
+            vertexs[0].append(0)
+            vertexs[1].append(0)
         return vertexs
 
     def right(self):
@@ -115,6 +126,9 @@ class NoSlipWalls:
         x_constant = self.upper[0]
         vertexs.append([x_constant, self.lower[1]])
         vertexs.append([x_constant, self.upper[1]])
+        if self.dim == 3:
+            vertexs[0].append(0)
+            vertexs[1].append(0)
         return vertexs
 
     def up(self):
@@ -122,6 +136,9 @@ class NoSlipWalls:
         y_constant = self.upper[1]
         vertexs.append([self.lower[0], y_constant])
         vertexs.append([self.upper[0], y_constant])
+        if self.dim == 3:
+            vertexs[0].append(0)
+            vertexs[1].append(0)
         return vertexs
 
     def down(self):
@@ -129,6 +146,23 @@ class NoSlipWalls:
         y_constant = self.lower[1]
         vertexs.append([self.lower[0], y_constant])
         vertexs.append([self.upper[0], y_constant])
+        if self.dim == 3:
+            vertexs[0].append(0)
+            vertexs[1].append(0)
+        return vertexs
+
+    def front(self):
+        vertexs = list()
+        z_constant = self.upper[2]
+        vertexs.append([self.lower[0], z_constant, 0])
+        vertexs.append([self.upper[0], z_constant, 0])
+        return vertexs
+    
+    def back(self):
+        vertexs = list()
+        z_constant = self.lower[2]
+        vertexs.append([self.lower[0], z_constant, 0])
+        vertexs.append([self.upper[0], z_constant, 0])
         return vertexs
 
 class Wall:
@@ -165,22 +199,10 @@ class Wall:
             node = node.next
 
     def setWallVelocity(self, vel):
-        # norm = self.computeNormal()
-        # velDofs = list(range(self.dim))
-        # velDofs.pop(norm)
-        # vel.pop(norm)
-        # cleanVel = list()
-        # cleanDofs = list()
-        # for dof, v in enumerate(vel):
-        #     if(v != 0):
-        #         cleanVel.append(v)
-        #         cleanDofs.append(velDofs[dof])
-        # self.velocity = np.array(cleanVel)
-        # self.velDofs = cleanDofs
-
         velDofs = list()
         vels = list()
         staticDofs = list(self.staticDofs)
+        print(staticDofs)
         for dof in staticDofs:
             if vel[dof] != 0:
                 vels.append(vel[dof])
@@ -232,16 +254,19 @@ class Wall:
         2: z normal
         """
         # TODO Valid for 2-D only!
-        z_direction = [ 0, 0, 1]
-        for vertex in self:
-            vectorTail = vertex[0].getCoordinates() 
-            vectorHead = vertex[1].getCoordinates()
-            vec = np.abs(vectorHead - vectorTail)
-            vec = vec / np.linalg.norm(vec)
-            vec = np.cross(vec, z_direction)
-            vec = list(np.abs(vec))
-            norm = vec.index(1.0)
-        return norm
+        if self.num in [0, 1, 2, 3]:
+            z_direction = [ 0, 0, 1]
+            for vertex in self:
+                vectorTail = vertex[0].getCoordinates() 
+                vectorHead = vertex[1].getCoordinates()
+                vec = np.abs(vectorHead - vectorTail)
+                vec = vec / np.linalg.norm(vec)
+                vec = np.cross(vec, z_direction)
+                vec = list(np.abs(vec))
+                norm = vec.index(1.0)
+            return norm
+        else:
+            return 2
 
 class Vertex:
     def __init__(self, pointCoords):
