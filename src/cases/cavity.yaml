@@ -2,11 +2,11 @@
 name: cavity-yaml
 
 domain:
-  dim: 2 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [12,12]
+  dim: 3 # no es necesario dim = 2, es implicito con nelem + lower + upper
+  nelem: [6,6,6]
   ngl: 3
-  lower: [0,0]
-  upper: [1,1]
+  lower: [0,0,0]
+  upper: [1,1,1]
   
 time-solver:
   max-steps: 50
@@ -17,6 +17,6 @@ boundary-conditions:
   border-name:
     upperY:
       coord: 1
-      vel: [ 1 , 0 ]
+      vel: [ 1 , 0 , 0]
   no-slip:
-    up: [1 ,0 ]
+    up: [1 ,0,0 ]

@@ -57,7 +57,7 @@ class Cavity(NoSlip):
             nodes = self.dom.getBorderNodes(staticWall)
             velDofs = self.nsWalls.getStaticDofsByName(staticWall)
             dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
-            self.velFS.setValues(dofVelToSet, np.repeat(0, len(nodes)))
+            self.velFS.setValues(dofVelToSet, np.repeat(0, len(nodes)*len(velDofs)))
 
         # # TODO Set the tang of walls without vel to 0
 

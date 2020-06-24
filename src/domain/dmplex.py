@@ -21,6 +21,11 @@ class DMPlexDom(PETSc.DMPlex):
         if not self.comm.rank:
             self.logger.debug("DM Plex Box Mesh created")
 
+        if self.dim == 2:
+            self.namingConvention = ["down", "right" , "up", "left"]
+        elif self.dim == 3:
+            self.namingConvention = ["back", "front", "down", "up", "right", "left"]
+
     def setFemIndexing(self, ngl):
         fields = 1
         componentsPerField = 1
@@ -125,8 +130,7 @@ class DMPlexDom(PETSc.DMPlex):
 
     def mapFaceNameToNum(self, name):
         """This ordering corresponds to nproc = 1"""
-        namingConvention = ["down", "right" , "up", "left"]
-        num = namingConvention.index(name) + 1
+        num = self.namingConvention.index(name) + 1
         return num
 
     def getDMConectivityMat(self):
@@ -262,3 +266,17 @@ class DomainElementInterface(object):
 
     def getTotalNodes(self):   
         return self.elem.nnode
+
+
+if __name__ == "__main__":
+    lower = [0,0]
+    upper = [1,1]
+    faces = [3,3]
+    dm = DMPlexDom(lower, upper, faces)
+    for i in ["left", "right", "up", "down"]:
+        cara = dm.getBorderEntities(i)
+        print(i)
+        for car in cara:
+            coords = dm.getFaceCoords(car).reshape(2,2)
+            print(coords)
+    # dm.view()
