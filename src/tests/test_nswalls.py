@@ -298,41 +298,6 @@ class Test3DWalls(unittest.TestCase):
         assert len(ns_lr.getWallsWithVelocity()) == 0
         assert len(ns_fb.getWallsWithVelocity()) == 0
 
-    # def test_velocities_x_and_dof(self):
-    #     ns_lr = NoSlipWalls(lower=self.lower, upper=self.upper)
-    #     vel_test = 4
-    #     dof_setting = 1
-    #     ns_lr.setWallVelocity(name="right", vel=[0,vel_test])
-    #     vel, velDofs = ns_lr.getWallVelocity("right")
-
-    #     self.assertEqual(vel_test, vel[0])
-    #     self.assertEqual(vel_test, vel[0])
-    #     self.assertEqual(1, len(vel))
-    #     self.assertEqual(dof_setting, velDofs[0])
-
-    #     vel_test = 8
-    #     ns_lr.setWallVelocity(name="left", vel=[0,vel_test])
-    #     vel, velDofs = ns_lr.getWallVelocity("left")
-    #     self.assertEqual(vel_test, vel[0])
-    #     self.assertEqual(1, len(vel))
-    #     self.assertEqual(dof_setting, velDofs[0])
-
-    # def test_velocities_y_and_dof(self):
-    #     ns_ud = NoSlipWalls(lower=self.lower, upper=self.upper)
-
-    #     vel_test = 3
-    #     dof_setting = 0
-    #     ns_ud.setWallVelocity(name="up", vel=[vel_test, 0])
-    #     vel, velDofs = ns_ud.getWallVelocity("up")
-    #     self.assertEqual(vel_test, vel[dof_setting])
-    #     self.assertEqual(dof_setting, velDofs[0])
-
-    #     vel_test = 9
-    #     ns_ud.setWallVelocity(name="down", vel=[vel_test, 0])
-    #     vel, velDofs = ns_ud.getWallVelocity("down")
-    #     self.assertEqual(vel_test, vel[dof_setting])
-    #     self.assertEqual(dof_setting, velDofs[0])
-
     def test_normal_computing(self):
         ns = NoSlipWalls(lower=self.lower, upper=self.upper)
         
@@ -348,37 +313,58 @@ class Test3DWalls(unittest.TestCase):
             normal = 2 # y-direction = 0
             self.assertEqual(normal, ns.getWalletNormalBySideName(wall))
 
-    # def test_zero_velocities_dofs(self):
-    #     """
-    #         Test the functionality of retrieveng which vel dofs are zero
-    #         for each wall defined
-    #     """
-    #     ns = NoSlipWalls(lower=self.lower, upper=self.upper)
+    def test_zero_velocities_dofs(self):
+        """
+            Test the functionality of retrieveng which vel dofs are zero
+            for each wall defined
+        """
+        ns = NoSlipWalls(lower=self.lower, upper=self.upper)
 
-    #     dofStatic = ns.getStaticDofsByName("left")
-    #     self.assertEqual(1 , len(dofStatic))
-    #     self.assertEqual(dofStatic[0], 1)
+        dofStatic = ns.getStaticDofsByName("left")
+        self.assertEqual(2 , len(dofStatic))
+        self.assertEqual(dofStatic[0], 1)
+        self.assertEqual(dofStatic[1], 2)
 
-    #     dofStatic = ns.getStaticDofsByName("right")
-    #     self.assertEqual(1 , len(dofStatic))
-    #     self.assertEqual(dofStatic[0], 1)
+        dofStatic = ns.getStaticDofsByName("right")
+        self.assertEqual(2 , len(dofStatic))
+        self.assertEqual(dofStatic[0], 1)
+        self.assertEqual(dofStatic[1], 2)
 
-    #     dofStatic = ns.getStaticDofsByName("up")
-    #     self.assertEqual(1 , len(dofStatic))
-    #     self.assertEqual(dofStatic[0], 0)
+        dofStatic = ns.getStaticDofsByName("up")
+        self.assertEqual(2 , len(dofStatic))
+        self.assertEqual(dofStatic[0], 0)
+        self.assertEqual(dofStatic[1], 2)
 
-    #     dofStatic = ns.getStaticDofsByName("down")
-    #     self.assertEqual(1 , len(dofStatic))
-    #     self.assertEqual(dofStatic[0], 0)
+        dofStatic = ns.getStaticDofsByName("down")
+        self.assertEqual(2 , len(dofStatic))
+        self.assertEqual(dofStatic[0], 0)
+        self.assertEqual(dofStatic[1], 2)
 
-    #     dofStatic = ns.getStaticDofsByName("up")
-    #     ns.setWallVelocity("up", [5,0])
-    #     self.assertEqual(0 , len(dofStatic))
+        dofStatic = ns.getStaticDofsByName("front")
+        self.assertEqual(2 , len(dofStatic))
+        self.assertEqual(dofStatic[0], 0)
+        self.assertEqual(dofStatic[1], 1)
 
-    #     dofStatic = ns.getStaticDofsByName("right")
-    #     ns.setWallVelocity("right", [0,3])
-    #     self.assertEqual(0 , len(dofStatic))
-        
+        dofStatic = ns.getStaticDofsByName("back")
+        self.assertEqual(2 , len(dofStatic))
+        self.assertEqual(dofStatic[0], 0)
+        self.assertEqual(dofStatic[1], 1)
+
+        dofStatic = ns.getStaticDofsByName("up")
+        ns.setWallVelocity("up", [5,0,0])
+        self.assertEqual(1 , len(dofStatic))
+        self.assertEqual(dofStatic[0], 2)
+
+        dofStatic = ns.getStaticDofsByName("right")
+        ns.setWallVelocity("right", [0,3,0])
+        self.assertEqual(1 , len(dofStatic))
+        self.assertEqual(dofStatic[0], 2)
+
+        dofStatic = ns.getStaticDofsByName("front")
+        ns.setWallVelocity("front", [0,3,0])
+        self.assertEqual(1 , len(dofStatic))
+        self.assertEqual(dofStatic[0], 0)
+
     def test_all_walls_names(self):
         ns = NoSlipWalls(lower=self.lower, upper=self.upper)
         all_walls_names = ns.getWallsNames()
