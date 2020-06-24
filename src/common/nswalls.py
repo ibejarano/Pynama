@@ -202,7 +202,6 @@ class Wall:
         velDofs = list()
         vels = list()
         staticDofs = list(self.staticDofs)
-        print(staticDofs)
         for dof in staticDofs:
             if vel[dof] != 0:
                 vels.append(vel[dof])
