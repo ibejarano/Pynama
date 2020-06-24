@@ -68,6 +68,7 @@ class DomainModTests(unittest.TestCase):
         self.dom2d.computeFullCoordinates(spectral2D)
 
         self.testVelVec = self.dom2d.createGlobalVec()
+        self.dim = dim
 
     def test_get_all_global_nodes_2D(self):
         allNodes = self.dom2d.getAllNodes()
