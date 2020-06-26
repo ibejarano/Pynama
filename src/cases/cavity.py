@@ -25,6 +25,8 @@ class Cavity(NoSlip):
         cornerNodes = list(cornerNodes)
         self.cornerDofs = [self.dim * node + dof for node in cornerNodes for dof in range(self.dim)]
 
+        self.logger.info("Corner Nodes collected")
+
     def readBoundaryCondition(self,inputData):
         bcdict = inputData['border-name']
         wallsWithVelocity = inputData['no-slip']
