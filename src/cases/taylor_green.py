@@ -10,6 +10,7 @@ from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
 
+
 class TaylorGreen(FreeSlip):
     def setUp(self):
         self.setUpGeneral()
@@ -25,6 +26,8 @@ class TaylorGreen(FreeSlip):
         self.setUpEmptyMats()
         self.buildKLEMats()
         self.buildOperators()
+
+
 
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()

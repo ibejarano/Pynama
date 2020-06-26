@@ -21,6 +21,11 @@ class DMPlexDom(PETSc.DMPlex):
         if not self.comm.rank:
             self.logger.debug("DM Plex Box Mesh created")
 
+        if self.dim == 2:
+            self.namingConvention = ["down", "right" , "up", "left"]
+        elif self.dim == 3:
+            self.namingConvention = ["back", "front", "down", "up", "right", "left"]
+
     def setFemIndexing(self, ngl):
         fields = 1
         componentsPerField = 1
@@ -83,6 +88,13 @@ class DMPlexDom(PETSc.DMPlex):
                                          coordinates,
                                          cell+self.cellStart)
 
+    def getFaceCoords(self, face):
+        coordinates = self.getCoordinatesLocal()
+        coordSection = self.getCoordinateSection()
+        return self.vecGetClosure(coordSection,
+                                         coordinates,
+                                         face)
+
     def setLabelToBorders(self):
         label = 'cfgfileBC'
         self.createLabel(label)
@@ -103,6 +115,24 @@ class DMPlexDom(PETSc.DMPlex):
         if not self.comm.rank:
             self.logger.debug("Labels creados en borders")
 
+    def getBorderEntities(self, name):
+        faceNum = self.mapFaceNameToNum(name)
+        faces = self.getStratumIS("Face Sets", faceNum).getIndices()
+        return faces
+
+    def getBorderNodes(self, name):
+        entities = self.getBorderEntities(name)
+        nodesSet = set()
+        for entity in entities:
+            nodes = self.getGlobalNodesFromCell(entity, False)
+            nodesSet |= set(nodes)
+        return list(nodesSet)
+
+    def mapFaceNameToNum(self, name):
+        """This ordering corresponds to nproc = 1"""
+        num = self.namingConvention.index(name) + 1
+        return num
+
     def getDMConectivityMat(self):
         localIndicesSection = self.indicesManager.getLocalIndicesSection()
         self.setDefaultSection(localIndicesSection)
@@ -112,7 +142,7 @@ class DMPlexDom(PETSc.DMPlex):
         indicesDIR = self.indicesManager.getDirichletIndices()
         return indicesDIR
 
-    def readBoundaryCondition(self):
+    def setBoundaryCondition(self):
         dim = self.getDimension()
         tag2BCdict = dict()
         BCset = set()
@@ -236,3 +266,17 @@ class DomainElementInterface(object):
 
     def getTotalNodes(self):   
         return self.elem.nnode
+
+
+if __name__ == "__main__":
+    lower = [0,0]
+    upper = [1,1]
+    faces = [3,3]
+    dm = DMPlexDom(lower, upper, faces)
+    for i in ["left", "right", "up", "down"]:
+        cara = dm.getBorderEntities(i)
+        print(i)
+        for car in cara:
+            coords = dm.getFaceCoords(car).reshape(2,2)
+            print(coords)
+    # dm.view()

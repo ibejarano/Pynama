@@ -22,39 +22,7 @@ class Mat:
         self.K.assemble()
         self.Rw.assemble()
         self.Rd.assemble()
-        self.Krhs.assemble()
-
-    def setfreeFSSetNS(self):
-        if dofFreeFSSetNS:  # bool(dof2NSfs):
-            self.Kfs.setValues(gldofFreeFSSetNS, gldofFree,
-                                locK[np.ix_(dofFreeFSSetNS, dofFree)],
-                                addv=True)
-
-            self.Kfs.setValues(gldofFree, gldofFreeFSSetNS,
-                                locK[np.ix_(dofFree, dofFreeFSSetNS)],
-                                addv=True)
-
-            self.Kfs.setValues(
-                gldofFreeFSSetNS, gldofFreeFSSetNS,
-                locK[np.ix_(dofFreeFSSetNS, dofFreeFSSetNS)],
-                addv=True)
-
-            # Indices where diagonal entries should be reduced by 1
-            indices2onefs.update(gldofFreeFSSetNS)
-
-            self.Rwfs.setValues(gldofFreeFSSetNS, indicesW,
-                                locRw[dofFreeFSSetNS, :], addv=True)
-
-            self.Rdfs.setValues(gldofFreeFSSetNS, indices,
-                                locRd[dofFreeFSSetNS, :], addv=True)
         
-    def setIndices2One(self, indices2one):
-        for indd in indices2one:
-            self.Krhs.setValues(indd, indd, 1, addv=False)
-            self.K.setValues(indd, indd, 1, addv=False)
-        self.Krhs.assemble()
-        self.K.assemble()
-
     def createEmptyKLEMats(self, conecMat, indicesDIR, indicesNS=set(), createOperators=False):
         self.globalIndicesNS =set() # TODO Implementar
         self.globalIndicesDIR =set()
@@ -158,7 +126,7 @@ class Mat:
         d_nnz = [x * dim1 for x in d_nnz_ind for d in range(dim2)]
         o_nnz = [x * dim1 for x in o_nnz_ind for d in range(dim2)]
         return self.createEmptyMat(locElRow * dim2 ,locElRow * dim1 ,d_nnz, o_nnz)
-
+    
     def createEmptyMatrices(self, rStart, rEnd):
         # definir como entran estos
         # -----
@@ -258,10 +226,7 @@ class Mat:
                 orhsns_nnz_ind[indRow] = len(indSet & (self.globalIndicesDIR
                                              | self.globalIndicesNS))
 
-            drhsns_nnz = [x * self.dim for x in drhsns_nnz_ind
-                          for d in range(self.dim)]
-            orhsns_nnz = [x * self.dim for x in orhsns_nnz_ind
-                          for d in range(self.dim)]
+            drhsns_nnz,orhsns_nnz =  createNonZeroIndex(drhsns_nnz_ind,orhsns_nnz_ind,self.dim,self.dim)
 
             # k numbers nodes
             for k in set(range(rStart, rEnd)) & set(indicesNS):
