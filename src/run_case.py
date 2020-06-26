@@ -61,7 +61,7 @@ def timeSolving(name):
     fem.setUpSolver()
     fem.startSolver()
     fem.viewer.writeXmf(name)
-    fem.logger.info(f"Converged? {fem.ts.converged}")
+    fem.logger.info(f"Solver Finished")
 
 def main():
     case = OptDB.getString('case', False)
