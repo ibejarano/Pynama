@@ -215,12 +215,13 @@ class NoSlip(BaseProblem):
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
         self._Aux1 = PETSc.Vec().createMPI(
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
+        self.velFS = self.vel.copy()
 
     def solveKLE(self, time, vort):
         self.applyBoundaryConditions()
-        self.velFS = self.vel.copy()
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
              + self.mat.Krhs * self.vel , self.velFS)
+        self.applyBoundaryConditionsFS()
         vort= self.mat.Curl *self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
