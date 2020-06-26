@@ -18,8 +18,8 @@ class BaseProblem(object):
         comm: MPI Communicator
         """
         self.comm = comm
-        self.logger = logging.getLogger("")
         case = PETSc.Options().getString('case', 'uniform' )
+        self.logger = logging.getLogger(case)
         try:
             with open(f'src/cases/{case}.yaml') as f:
                 yamlData = yaml.load(f, Loader=yaml.Loader)
@@ -110,7 +110,8 @@ class BaseProblem(object):
     def convergedStepFunction(self, ts):
         time = ts.time
         step = ts.step_number
-        self.logger.info(f"Converged: Step {step} Time {time}")
+        incr = ts.getTimeStep()
+        self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
         # lo de abajo en otro lado
         # self.logger.info(f"Reason: {ts.reason}")
         # self.logger.info(f"max vel: {self.vel.max()}")
