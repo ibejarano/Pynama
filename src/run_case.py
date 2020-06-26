@@ -15,6 +15,8 @@ if case == 'taylor-green':
 elif case == 'uniform-flow':
     name = 'uniform-flow'
     from cases.uniform import UniformFlow as FemProblem
+elif case == 'ibm-static':
+    from cases.immersed_boundary import ImmersedBoundaryStatic as FemProblem
 elif case == 'custom-func':
     raise Exception("class not found")
 elif case == 'cavity':
@@ -51,7 +53,7 @@ def generateParaviewer():
     fem = FemProblem()
     fem.setUp()
     fem.setUpSolver()
-    fem.solveKLETests(steps=100, endTime=0.05)
+    fem.solveKLETests()
 
 def timeSolving(name):
     fem = FemProblem()

@@ -19,7 +19,7 @@ class BaseProblem(object):
         """
         self.comm = comm
         self.logger = logging.getLogger("")
-        case = PETSc.Options().getString('case')
+        case = PETSc.Options().getString('case', 'uniform' )
         try:
             with open(f'src/cases/{case}.yaml') as f:
                 yamlData = yaml.load(f, Loader=yaml.Loader)
@@ -81,13 +81,13 @@ class BaseProblem(object):
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
         locSrT, locDivSrT, locCurl, locWei = self.elemType.getElemKLEOperators(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
-            nodes = self.dom.getGlobalNodesFromCell(cell, shared=False)
+            nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             indicesVel = self.dom.getVelocityIndex(nodes)
             indicesW = self.dom.getVorticityIndex(nodes)
             indicesSrT = self.dom.getSrtIndex(nodes)
+            self.mat.Curl.setValues(indicesW, indicesVel, locCurl, True)
             self.mat.SrT.setValues(indicesSrT, indicesVel, locSrT, True)
             self.mat.DivSrT.setValues(indicesVel, indicesSrT, locDivSrT, True)
-            self.mat.Curl.setValues(indicesW, indicesVel, locCurl, True)
 
             self.mat.weigSrT.setValues(indicesSrT, np.repeat(locWei, self.dim_s), True)
             self.mat.weigDivSrT.setValues(indicesVel, np.repeat(locWei, self.dim), True)
@@ -110,9 +110,10 @@ class BaseProblem(object):
     def convergedStepFunction(self, ts):
         time = ts.time
         step = ts.step_number
-        #vort = ts.getSolution()
         self.logger.info(f"Converged: Step {step} Time {time}")
         # lo de abajo en otro lado
+        # self.logger.info(f"Reason: {ts.reason}")
+        # self.logger.info(f"max vel: {self.vel.max()}")
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
         self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])

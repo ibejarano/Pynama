@@ -3,13 +3,10 @@ from petsc4py.PETSc import TS
 class TsSolver(TS):
     def __init__(self, comm):
         self.create(comm=comm)
-        self.setTSType()
-
-    def setTSType(self):
         self.setProblemType(self.ProblemType.NONLINEAR)  # Should we use LINEAR?
         # ts.setEquationType(ts.EquationType.ODE_EXPLICIT)
         self.setType(self.Type.RK)
-        self.setRKType(self.RKType.RK5F)
+        # self.setRKType(self.RKType.RK5F)
 
     def setUpTimes(self, sTime, eTime, steps):
         self.setTime(sTime)
