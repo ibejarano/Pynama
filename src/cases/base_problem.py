@@ -9,6 +9,7 @@ from solver.ts_solver import TsSolver
 from matrices.mat_generator import Mat
 from matrices.mat_ns import MatNS
 from solver.ksp_solver import KspSolver
+from common.timer import Timer
 import logging
 import numpy as np
 
@@ -18,6 +19,7 @@ class BaseProblem(object):
         comm: MPI Communicator
         """
         self.comm = comm
+        self.timer = Timer()
         case = PETSc.Options().getString('case', 'uniform' )
         self.logger = logging.getLogger(case)
         try:
@@ -43,19 +45,22 @@ class BaseProblem(object):
             self.readBoundaryCondition(yamlData['boundary-conditions'])
 
     def setUpDomain(self):
+        self.logger.info("Creating DMPlex dom ...")
+        self.timer.tic()
         self.dom = DMPlexDom(self.lower, self.upper, self.nelem)
-        self.logger.debug("DMPlex dom intialized")
-
-    def setUpHighOrderIndexing(self):
         self.dom.setFemIndexing(self.ngl)
+        self.logger.info(f"DMPlex dom created in {self.timer.toc()} seconds")
 
     def setUpElement(self):
+        self.logger.info(f"Creating {self.dim}-D ngl:{self.ngl} Spectral element...")
+        self.timer.tic()
         self.elemType = Spectral(self.ngl, self.dim)
+        self.logger.info(f"{self.dim}-D ngl:{self.ngl} Spectral element created in {self.timer.toc()} seconds")
 
     def setUpBoundaryConditions(self):
         self.dom.setLabelToBorders()
         self.tag2BCdict, self.node2tagdict = self.dom.setBoundaryCondition()
-
+        self.logger.info("Boundary Conditions setted up")
 
     def readInputData(self, inputData):
         self.dim = len(inputData['nelem'])
@@ -67,17 +72,24 @@ class BaseProblem(object):
         self.nelem = inputData['nelem']
 
     def createMesh(self):
-        self.dom.computeFullCoordinates(self.elemType)
+        self.logger.info("Creating mesh...")
+        self.logger.info("Computing coordinates...")
+        self.timer.tic()
         self.viewer = Paraviewer(self.dim ,self.comm)
+        self.dom.computeFullCoordinates(self.elemType)
+        self.logger.info(f"Coordinates computed in {self.timer.toc()}")
+        self.timer.tic()
         self.viewer.saveMesh(self.dom.fullCoordVec)
+        self.logger.info(f"Mesh created in {self.timer.toc()}")
 
     def setUpGeneral(self):
         self.setUpDomain()
-        self.setUpHighOrderIndexing()
         self.setUpElement()
         self.createMesh()
 
     def buildOperators(self):
+        self.logger.info("Building Operators Matrices...")
+        self.timer.tic()
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
         locSrT, locDivSrT, locCurl, locWei = self.elemType.getElemKLEOperators(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
@@ -94,6 +106,8 @@ class BaseProblem(object):
             self.mat.weigCurl.setValues(indicesW, np.repeat(locWei, self.dim_w), True)
 
         self.mat.assembleOperators()
+
+        self.logger.info(f"Operators Matrices builded in {self.timer.toc()}")
 
     def getTS(self):
         ts = TsSolver(self.comm)
@@ -192,10 +206,13 @@ class BaseProblem(object):
 class NoSlip(BaseProblem):
     
     def setUpEmptyMats(self):
+        self.logger.info("Creating Empty Matrices...")
+        self.timer.tic()
         self.mat = MatNS(self.dim, self.comm)
         fakeConectMat = self.dom.getDMConectivityMat()
         globalIndicesNS = self.dom.getGlobalIndicesDirichlet() # TODO Reuso todos los indices dirichlet, se podria cambiar el nombre
         self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesNS, createOperators=True)
+        self.logger.info(f"Empty Matrices Created in {self.timer.toc()} seconds")
 
     def setUpSolver(self):
         self.solver = KspSolver()
@@ -226,6 +243,8 @@ class NoSlip(BaseProblem):
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def buildKLEMats(self):
+        self.logger.info("Building KLE Matrices...")
+        self.timer.tic()
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
         boundaryNodes = set(self.getBoundaryNodes())
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
@@ -336,6 +355,8 @@ class NoSlip(BaseProblem):
         for indd in (indices2one - indices2onefs):
             self.mat.Krhsfs.setValues(indd, indd, 1, addv=False)
         self.mat.Krhsfs.assemble()
+
+        self.logger.info(f"KLE Matrices builded in {self.timer.toc()} seconds")
 
 class FreeSlip(BaseProblem):
 

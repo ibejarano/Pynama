@@ -7,7 +7,6 @@ class MatNS(Mat):
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
         self.comm = comm
-        print('noslip!')
 
     def buildMatrices(self):
         self.buildKLEMatrices()

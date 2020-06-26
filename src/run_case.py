@@ -59,9 +59,11 @@ def timeSolving(name):
     fem = FemProblem()
     fem.setUp()
     fem.setUpSolver()
+    fem.logger.info("Solving problem...")
+    fem.timer.tic()
     fem.startSolver()
     fem.viewer.writeXmf(name)
-    fem.logger.info(f"Solver Finished")
+    fem.logger.info(f"Solver Finished in {fem.timer.toc()} seconds")
 
 def main():
     case = OptDB.getString('case', False)
