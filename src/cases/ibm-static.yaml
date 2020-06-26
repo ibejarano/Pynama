@@ -3,13 +3,13 @@ name: UniformFlow
 
 domain:
   dim: 2 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [5,5]
+  nelem: [50,25]
   ngl: 3
-  lower: [0,0]
-  upper: [1,1]
+  lower: [-20,-20]
+  upper: [60,20]
 
 time-solver:
-  max-steps: 20
+  max-steps: 250
   start-time: 0
   end-time: 100
 

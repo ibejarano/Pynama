@@ -313,6 +313,83 @@ class SpElem(Element):
             elR_dMat += gp.w * detJ * alpha_d * Hxy.flatten('F').T * H
         return (elStiffMat, elR_wMat, elR_dMat)
 
+
+    def getElemKLEOperators(self, coords):
+        """Get the elementery operators for the KLE method."""
+        # TODO This method is functionally perfect, but its performance has to
+        # be seriously evaluated
+        # self.logger.debug("getElemKLEOperators")
+        coords.shape = (int(len(coords)/self.dim), self.dim)
+
+        elTotNodes = self.nnode
+
+        elSTensorMat = np.mat(np.zeros((self.dim_s*elTotNodes,
+                                        self.dim*elTotNodes)))
+        # The strain rate tensor is symmetric, thus we work with reduced
+        # number of components
+        elDivSTMat = np.mat(np.zeros((self.dim*elTotNodes,
+                                      self.dim_s*elTotNodes)))
+        elCurlMat = np.mat(np.zeros((self.dim_w*elTotNodes,
+                                     self.dim*elTotNodes)))
+        elWeigMat = np.mat(np.zeros((elTotNodes, elTotNodes)))
+
+        # Strain rate Tensor
+        B_srt = np.mat(np.zeros((self.dim_s, self.dim*elTotNodes)))
+        Hsrt = np.mat(np.zeros((self.dim_s, self.dim_s*elTotNodes)))
+        # Velocity gradient divergence
+        B_div = np.mat(np.zeros((self.dim, self.dim_s*elTotNodes)))
+        Hdiv = np.mat(np.zeros((self.dim, self.dim*elTotNodes)))
+        # Velocity curl
+        B_curl = np.mat(np.zeros((self.dim_w, self.dim*elTotNodes)))
+        Hcurl = np.mat(np.zeros((self.dim_w, self.dim_w*elTotNodes)))
+
+        for idx, gp in enumerate(self.gpsOp):
+            Hrs = self.HrsOp[idx]
+            H = self.HOp[idx]
+
+            J = self.HrsCooOp[idx] * coords
+            Hxy = inv(J) * Hrs
+            detJ = det(J)
+
+            # Compute interp & derivative matrices
+            if self.dim == 2:
+                for nd in range(self.dim):
+                    B_srt[nd:nd + self.dim, nd::self.dim] = Hxy
+                    B_div[nd, nd::self.dim_s] = Hxy[0]
+                    B_div[nd, nd+1::self.dim_s] = Hxy[1]
+                    Hdiv[nd, nd::self.dim] = H
+
+                B_srt[0, 1::self.dim] = -Hxy[1]
+                B_srt[2, 0::self.dim] = -Hxy[0]
+                B_srt *= 0.5
+
+                B_curl[0, ::self.dim] = -Hxy[1]
+                B_curl[0, 1::self.dim] = Hxy[0]
+
+                for nd_s in range(self.dim_s):
+                    Hsrt[nd_s, nd_s::self.dim_s] = H
+
+                Hcurl = H
+                # B_srt[int(self.dim / 2), :] *= 0.5
+
+            elif self.dim == 3:
+
+                # Check!
+                B_curl[0, 2::self.dim] = Hxy[1]
+                B_curl[0, 1::self.dim] = -Hxy[2]
+                B_curl[1, 0::self.dim] = Hxy[2]
+                B_curl[1, 2::self.dim] = -Hxy[0]
+                B_curl[2, 1::self.dim] = Hxy[0]
+                B_curl[2, 0::self.dim] = -Hxy[1]
+
+            elSTensorMat += gp.w * detJ * Hsrt.T * B_srt
+            elDivSTMat += gp.w * detJ * Hdiv.T * B_div
+            elCurlMat += gp.w * detJ * Hcurl.T * B_curl
+            elWeigMat += gp.w * detJ * H.T * H
+
+        elWeigVec = elWeigMat.sum(1)
+        return (elSTensorMat, elDivSTMat, elCurlMat, elWeigVec)
+
 class SpElem2D(SpElem):
     """Spectral element in 2D.
 

@@ -209,7 +209,7 @@ class DMPlexDom(PETSc.DMPlex):
         start, end = self.getChart()
         globalNodes = list()
         for entity in range(start, end):
-            globalNodes.extend(self.indicesManager.getGlobalNodes(entity)[0])
+            globalNodes.extend(self.indicesManager.getGlobalNodes(entity, shared=False)[0])
         return globalNodes
 
     def getNodesCoordinates(self, nodes):

@@ -101,9 +101,13 @@ class IndicesManager:
         localNodes, _ = self.getSectionOffset(self._indSection, entity)
         return localNodes
 
-    def getGlobalNodes(self, entity):
+    def getGlobalNodes(self, entity, shared=True):
         globalNodes, ownNodes = self.getSectionOffset(self._globalIndicesSection, entity)
-        # self.logger.debug("entity  %s", entity)
+        if not shared:
+            if ownNodes:
+                return globalNodes, ownNodes
+            else:
+                return [],[]
         return globalNodes, ownNodes
 
     def getSectionOffset(self, section, poi):
