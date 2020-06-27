@@ -22,6 +22,7 @@ class Mat:
         self.K.assemble()
         self.Rw.assemble()
         self.Rd.assemble()
+        self.Krhs.assemble()
         
     def createEmptyKLEMats(self, conecMat, indicesDIR, indicesNS=set(), createOperators=False):
         self.globalIndicesNS =set() # TODO Implementar
@@ -319,3 +320,10 @@ class Mat:
         self.weigSrT.destroy()
         self.weigCurl.destroy()
         self.weigDivSrT.destroy()
+
+    def setIndices2One(self, indices2one):
+        for indd in indices2one:
+            self.Krhs.setValues(indd, indd, 1, addv=False)
+            self.K.setValues(indd, indd, 1, addv=False)
+        self.Krhs.assemble()
+        self.K.assemble()
