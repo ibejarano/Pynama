@@ -49,18 +49,19 @@ class BaseProblem(object):
         self.timer.tic()
         self.dom = DMPlexDom(self.lower, self.upper, self.nelem)
         self.dom.setFemIndexing(self.ngl)
-        self.logger.info(f"DMPlex dom created in {self.timer.toc()} seconds")
+        self.logger.info(f"{[self.comm.rank]} DMPlex dom created in {self.timer.toc()} seconds")
+
 
     def setUpElement(self):
         self.logger.info(f"Creating {self.dim}-D ngl:{self.ngl} Spectral element...")
         self.timer.tic()
         self.elemType = Spectral(self.ngl, self.dim)
-        self.logger.info(f"{self.dim}-D ngl:{self.ngl} Spectral element created in {self.timer.toc()} seconds")
+        self.logger.info(f"{[self.comm.rank]}:: {self.dim}-D ngl:{self.ngl} Spectral element created in {self.timer.toc()} seconds")
 
     def setUpBoundaryConditions(self):
         self.dom.setLabelToBorders()
         self.tag2BCdict, self.node2tagdict = self.dom.setBoundaryCondition()
-        self.logger.info("Boundary Conditions setted up")
+        self.logger.info(f"{[self.comm.rank]}:: Boundary Conditions setted up")
 
     def readInputData(self, inputData):
         self.dim = len(inputData['nelem'])
@@ -80,7 +81,7 @@ class BaseProblem(object):
         self.logger.info(f"Coordinates computed in {self.timer.toc()}")
         self.timer.tic()
         self.viewer.saveMesh(self.dom.fullCoordVec)
-        self.logger.info(f"Mesh created in {self.timer.toc()}")
+        self.logger.info(f"{[self.comm.rank]}:: Mesh created in {self.timer.toc()}")
 
     def setUpGeneral(self):
         self.setUpDomain()
@@ -149,7 +150,6 @@ class BaseProblem(object):
         rho = 1
         mu = 1
         self.solveKLE(t, Vort)
-
         # FIXME: Generalize for dim = 3 also
         sK, eK = self.mat.K.getOwnershipRange()
 
@@ -384,10 +384,14 @@ class FreeSlip(BaseProblem):
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
 
     def setUpEmptyMats(self):
+        self.logger.info("Creating Empty Matrices...")
+        self.timer.tic()
         self.mat = Mat(self.dim, self.comm)
         fakeConectMat = self.dom.getDMConectivityMat()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
         self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesDIR, createOperators=True)
+        self.logger.info(f"[{self.comm.rank}] Creating Empty Matrices created in {self.timer.toc()} seconds")
+
 
     def solveKLE(self, time, vort):
         boundaryNodes = self.getBoundaryNodes()

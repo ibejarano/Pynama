@@ -24,13 +24,6 @@ class MatNS(Mat):
         self.Rw.assemble()
         self.Rd.assemble()
         self.Krhs.assemble()
-        
-    def setIndices2One(self, indices2one):
-        for indd in indices2one:
-            self.Krhs.setValues(indd, indd, 1, addv=False)
-            self.K.setValues(indd, indd, 1, addv=False)
-        self.Krhs.assemble()
-        self.K.assemble()
 
     def createEmptyKLEMats(self, conecMat, indicesNS, createOperators=False):
         self.globalIndicesNS =set()

@@ -27,8 +27,6 @@ class TaylorGreen(FreeSlip):
         self.buildKLEMats()
         self.buildOperators()
 
-
-
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()
         fvort_coords = lambda coords: self.taylorGreenVortFunction(coords, t=startTime)
