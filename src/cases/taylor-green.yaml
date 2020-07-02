@@ -1,15 +1,19 @@
 ---
 name: Taylor Green
 
+material-properties:
+  rho: 0.5
+  mu: 0.01
+
 domain:
   dim: 3 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [5,5,5]
+  nelem: [10,10]
   ngl: 3
-  lower: [0,0,0]
-  upper: [1,1,1]
+  lower: [0,0]
+  upper: [1,1]
 
 time-solver:
-  max-steps: 100
+  max-steps: 10
   start-time: 0
   end-time: 1
 

@@ -1,15 +1,19 @@
 ---
-name: cavity-yaml
+name: Cavity
+
+material-properties:
+  rho: 0.5
+  mu: 0.01
 
 domain:
   dim: 2 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [20,20]
+  nelem: [30,30]
   ngl: 3
   lower: [0,0]
   upper: [1,1]
   
 time-solver:
-  max-steps: 100
+  max-steps: 150
   start-time: 0
   end-time: 1
 

@@ -21,11 +21,11 @@ class BaseProblem(object):
         self.comm = comm
         self.timer = Timer()
         case = PETSc.Options().getString('case', 'uniform' )
-        self.logger = logging.getLogger(case)
         try:
             with open(f'src/cases/{case}.yaml') as f:
                 yamlData = yaml.load(f, Loader=yaml.Loader)
-            self.logger.info(f"Initializing problem: {yamlData['name']}")
+            self.logger = logging.getLogger(yamlData['name'])
+            self.logger.info("Initializing problem...")
         except:
             self.logger.info(f"Case '{case}' Not Found")
 
@@ -37,8 +37,9 @@ class BaseProblem(object):
                 print(f"Key >> {key} << not defined in yaml")
 
         self.caseName = yamlData['name']
-        self.readInputData(yamlData['domain'])
-      
+        self.readDomainData(yamlData['domain'])
+        self.readMaterialData(yamlData['material-properties'])
+        
         if 'time-solver' in yamlData:
             self.setUpTimeSolver(yamlData['time-solver'])
         if 'boundary-conditions' in yamlData:
@@ -69,7 +70,11 @@ class BaseProblem(object):
         self.tag2BCdict, self.node2tagdict = self.dom.setBoundaryCondition()
         self.logger.info(f"{[self.comm.rank]}:: Boundary Conditions setted up")
 
-    def readInputData(self, inputData):
+    def readMaterialData(self, inputData):
+        self.rho = inputData['rho']
+        self.mu = inputData['mu']
+
+    def readDomainData(self, inputData):
         self.dim = len(inputData['nelem'])
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
@@ -147,8 +152,6 @@ class BaseProblem(object):
     def evalRHS(self, ts, t, Vort, f):
         """Evaluate the KLE right hand side."""
         # KLE spatial solution with vorticity given
-        rho = 1
-        mu = 1
         self.solveKLE(t, Vort)
         # FIXME: Generalize for dim = 3 also
         sK, eK = self.mat.K.getOwnershipRange()
@@ -172,15 +175,15 @@ class BaseProblem(object):
         self.mat.SrT.mult(self.vel, self._Aux1)
 
         # _Aux1 = 2*Mu * S - rho * Vvec ^ VVec
-        self._Aux1 *= (2.0 * mu)
-        self._Aux1.axpy(-1.0 * rho, self._VtensV)
+        self._Aux1 *= (2.0 * self.mu)
+        self._Aux1.axpy(-1.0 * self.rho, self._VtensV)
 
         # FIXME: rhs should be created previously or not?
         rhs = self.vel.duplicate()
         # RHS = Curl * Div(SrT) * 2*Mu * S - rho * Vvec ^ VVec
             # rhs = (self.DivSrT * self._Aux1) / self.rho
         self.mat.DivSrT.mult(self._Aux1, rhs)
-        rhs.scale(1/rho)
+        rhs.scale(1/self.rho)
 
         self.mat.Curl.mult(rhs, f)
 
