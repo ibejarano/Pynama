@@ -44,13 +44,19 @@ class BaseProblem(object):
         if 'boundary-conditions' in yamlData:
             self.readBoundaryCondition(yamlData['boundary-conditions'])
 
+    def setUp(self):
+        self.setUpGeneral()
+        self.setUpBoundaryConditions()
+        self.setUpEmptyMats()
+        self.buildKLEMats()
+        self.buildOperators()
+
     def setUpDomain(self):
         self.logger.info("Creating DMPlex dom ...")
         self.timer.tic()
         self.dom = DMPlexDom(self.lower, self.upper, self.nelem)
         self.dom.setFemIndexing(self.ngl)
         self.logger.info(f"{[self.comm.rank]} DMPlex dom created in {self.timer.toc()} seconds")
-
 
     def setUpElement(self):
         self.logger.info(f"Creating {self.dim}-D ngl:{self.ngl} Spectral element...")
@@ -110,12 +116,8 @@ class BaseProblem(object):
 
         self.logger.info(f"Operators Matrices builded in {self.timer.toc()}")
 
-    def getTS(self):
-        ts = TsSolver(self.comm)
-        return ts
-
     def setUpTimeSolver(self, inputData):
-        self.ts = self.getTS()
+        self.ts = TsSolver(self.comm)
         sTime = inputData['start-time']
         eTime = inputData['end-time']
         maxSteps = inputData['max-steps']
@@ -127,9 +129,6 @@ class BaseProblem(object):
         step = ts.step_number
         incr = ts.getTimeStep()
         self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
-        # lo de abajo en otro lado
-        # self.logger.info(f"Reason: {ts.reason}")
-        # self.logger.info(f"max vel: {self.vel.max()}")
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
         self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
@@ -144,6 +143,7 @@ class BaseProblem(object):
             nodesSet |= set(nodes)
         return list(nodesSet)
 
+    # @profile
     def evalRHS(self, ts, t, Vort, f):
         """Evaluate the KLE right hand side."""
         # KLE spatial solution with vorticity given
@@ -203,8 +203,10 @@ class BaseProblem(object):
     def readBoundaryCondition(self,inputData):
         pass
 
+    def setUpEmptyMats(self):
+        pass
+
 class NoSlip(BaseProblem):
-    
     def setUpEmptyMats(self):
         self.logger.info("Creating Empty Matrices...")
         self.timer.tic()
@@ -359,7 +361,6 @@ class NoSlip(BaseProblem):
         self.logger.info(f"KLE Matrices builded in {self.timer.toc()} seconds")
 
 class FreeSlip(BaseProblem):
-
     def generateExactVecs(self, time):
         return 0, 0
 
@@ -391,7 +392,6 @@ class FreeSlip(BaseProblem):
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
         self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesDIR, createOperators=True)
         self.logger.info(f"[{self.comm.rank}] Creating Empty Matrices created in {self.timer.toc()} seconds")
-
 
     def solveKLE(self, time, vort):
         boundaryNodes = self.getBoundaryNodes()
@@ -467,10 +467,6 @@ class FreeSlip(BaseProblem):
 
             self.mat.Rw.setValues(gldofFree, indicesW,
                               locRw[np.ix_(dofFree, range(len(indicesW)))], addv=True)
-
-            self.mat.Rd.setValues(gldofFree, nodes,
-                              locRd[np.ix_(dofFree, range(len(nodes)))],
-                              addv=True)
         
         self.mat.assembleAll()
         self.mat.setIndices2One(indices2one)

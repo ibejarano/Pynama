@@ -4,11 +4,7 @@ import numpy as np
 
 class Cavity(NoSlip):
     def setUp(self):
-        self.setUpGeneral()
-        self.setUpBoundaryConditions()
-        self.setUpEmptyMats()
-        self.buildKLEMats()
-        self.buildOperators()
+        super().setUp()
         self.collectCornerNodes()
 
     def collectCornerNodes(self):
@@ -62,7 +58,6 @@ class Cavity(NoSlip):
 
         # fvel_coords = lambda coords: self.VelCavity(coords,self.BoundaryCondition,self.dim, t=time)
         # self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel, self.dim)
-
 
     def applyBoundaryConditionsFS(self):
         wallsWithVel = self.nsWalls.getWallsWithVelocity()

@@ -4,9 +4,9 @@ class TsSolver(TS):
     def __init__(self, comm):
         self.create(comm=comm)
         self.setProblemType(self.ProblemType.NONLINEAR)  # Should we use LINEAR?
-        # ts.setEquationType(ts.EquationType.ODE_EXPLICIT)
+        self.setEquationType(self.EquationType.ODE_EXPLICIT)
         self.setType(self.Type.RK)
-        # self.setRKType(self.RKType.RK5F)
+        self.setRKType(self.RKType.RK5F)
 
     def setUpTimes(self, sTime, eTime, steps):
         self.setTime(sTime)

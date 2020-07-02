@@ -12,10 +12,11 @@ case = OptDB.getString('case', False)
 if case == 'taylor-green':
     name = 'taylor-green'
     from cases.taylor_green import TaylorGreen as FemProblem
-elif case == 'uniform-flow':
-    name = 'uniform-flow'
+elif case == 'uniform':
+    name = 'uniform'
     from cases.uniform import UniformFlow as FemProblem
 elif case == 'ibm-static':
+    name = 'ibm-static'
     from cases.immersed_boundary import ImmersedBoundaryStatic as FemProblem
 elif case == 'custom-func':
     raise Exception("class not found")
