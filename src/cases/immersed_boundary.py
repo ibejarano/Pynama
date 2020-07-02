@@ -14,88 +14,83 @@ from math import sqrt, sin, pi
 
 class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
-        self.setUpGeneral()
-        self.cteValue = [37.5,0]
+        super().setUp()
 
-        radius = 0.5
-        ndiv = 16
+        self.boundaryNodes = self.getBoundaryNodes()
+        self.cteValue = [300,0]
+        ndiv = 4 * 7
         assert self.dim == 2
         dxMax = self.upper[0] - self.lower[0]
         rawNelem = self.nelem[0]
         nelem =float(rawNelem)
         self.h = dxMax / nelem
-
-        self.setUpBoundaryConditions()
-        self.body = Body(radius, ndiv)
-        self.setUpEmptyMats()
-        self.buildKLEMats()
-        self.buildOperators()
+        self.body = Body(ndiv)
         self.createIBMMatrix()
+        self.saveVTK()
+        # self.diracVec = self.mat.K.createVecRight()
+        # self.saveDiracVec()
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
+        self.solveKLE(startTime, self.vort)
+        self.vort = self.getVorticityCorrection()
 
-    def applyBoundaryConditions(self, time, bcNodes):
-        self.vel.set(0.0)
-        self.vel = self.dom.applyValuesToVec(bcNodes, self.cteValue, self.vel)
+    # def setDiracVec(self, nodes, d):
+    #     self.diracVec.setValues(nodes[::2], d, addv=True)
+    #     self.diracVec.setValues(nodes[1::2], d, addv=True)
 
-    def solveKLE(self, time, vort, finalStep=False):
-        boundaryNodes = self.getBoundaryNodes()
-        self.applyBoundaryConditions(time, boundaryNodes)
-        # compute velocity prediction
-        self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
-        # use the velocity to get vorticity correction
-        vorticity_corrected = self.getVorticityCorrection(time, finalStep=finalStep)
-        # compute velocity again
-        self.solver( self.mat.Rw * (vorticity_corrected) + self.mat.Krhs * self.vel , self.vel)
-
-    def getVorticityCorrection(self, t,finalStep=False):
-        """Main function to be called after a Converged Time Step"""
-        # TODO: body movement algos in a new subclass
-        # if self.bodyMovement:
-        #     self.D.destroy()
-        #     self.Dds.destroy()
-        #     self.ksp.destroy()
-        #     self.computeBodyVelocity(t)
-        #     self.updateBodyCoordinates(t)
-        #     self.buildMatrices()
-        #     print('Center Displacement' ,self._centerDisplacement)
-        #     print('Body Velocity' ,self._BodyVelocity.getArray())
-        #     # tomar tiempo -> computar vel # DONE
-        #     # vel * t -> Vec desplazamiento # DONE
-        #     # Computar nueva matriz D 
-        velocityCorrection = self.getVelocityCorrection()
-        vort = self.mat.Curl.createVecLeft()
-        if finalStep:
-            self.vel += velocityCorrection
-        self.mat.Curl(self.vel +  velocityCorrection , vort)
-        return vort
-
-    def getVelocityCorrection(self):
-        velCorrection = self.computeVelocityCorrection()
-        return velCorrection
-
-    def computeVelocityCorrection(self):
-        velCorrection = self.vel.duplicate()
-        virtualFlux = self.Dds.createVecRight()
-        self.ksp.solve(- self.D * self.vel * (self.h**2) , virtualFlux)
-        self.Dds.mult(virtualFlux, velCorrection)
-        return velCorrection
+    # def saveDiracVec(self):
+    #     self.diracVec.assemble()
+    #     self.diracVec.setName("dirac")
+        # self.viewer.saveVec(self.diracVec, timeStep=1)
 
     def convergedStepFunction(self, ts):
         time = ts.time
         step = ts.step_number
-        # vort = ts.getSolution()
-        self.logger.info(f"Converged: Step {step} Time {time}")
-        # lo de abajo en otro lado
-        # self.logger.info(f"Reason: {ts.reason}")
-        # self.logger.info(f"max vel: {self.vel.max()}")
-        # self.solveKLE(time,self.vort, finalStep=True)
+        incr = ts.getTimeStep()
+        self.vort = self.getVorticityCorrection()
+        self.solveKLE(time, self.vort)
+        self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
-        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+        self.viewer.saveVec(self.diracVec, timeStep=step)
+        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort, self.diracVec])
 
-    # Creating matrix
+    def saveVTK(self):
+        viewer = PETSc.Viewer()
+        viewer.createVTK('dom.vtk', mode=PETSc.Viewer.Mode.WRITE)
+        viewer.view(self.body.dom)
+        viewer.destroy()
+
+    def applyBoundaryConditions(self):
+        self.vel.set(0.0)
+        velDofs = [nodes*2 + dof for nodes in self.boundaryNodes for dof in range(2)]
+        self.vel.setValues(velDofs, np.tile(self.cteValue, len(self.boundaryNodes)))
+
+    def solveKLE(self, time, vort, finalStep=False):
+        self.applyBoundaryConditions()
+        self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
+        vorticity_corrected = self.getVorticityCorrection()
+        self.solver( self.mat.Rw * vorticity_corrected + self.mat.Krhs * self.vel , self.vel)
+
+    def getVorticityCorrection(self, finalStep=False):
+        velocityCorrection = self.computeVelocityCorrection()
+        vort = self.mat.Curl.createVecLeft()
+        vort.setName("vorticity")
+        if not finalStep:
+            self.vel += velocityCorrection
+        self.mat.Curl(self.vel , vort)
+        return vort
+
+    def computeVelocityCorrection(self):
+        velCorrection = self.vel.copy()
+        virtualFlux = self.Dds.createVecRight()
+        rhs = self.Dds.createVecRight()
+        self.D.mult(self.vel * (self.h**2), rhs)
+        self.ksp.solve( -rhs, virtualFlux)
+        self.Dds.mult(virtualFlux, velCorrection)
+        return velCorrection
+
     def createIBMMatrix(self):
         print("Creating ibm Matrices")
         """creates a PETSc Mat type
@@ -103,8 +98,6 @@ class ImmersedBoundaryStatic(FreeSlip):
         dim = self.dim
         nodesLagTot = self.body.getTotalNodes()
         nodesEultotal = len(self.dom.getAllNodes())
-        #d_nnz_Dds = [nodesLagTot*dim] * nodesEultotal * dim
-        #o_nnz_Dds = [0] * nodesEultotal * dim
         nodeLagWnodesEuler = dict()
         pre_d_nnz_D = list()
         cellsAffected = self.getAffectedCells()
@@ -154,7 +147,7 @@ class ImmersedBoundaryStatic(FreeSlip):
             cellCoords = self.dom.getCellCornersCoords(cell).reshape(( 2 ** self.dim, self.dim))
             cellCentroid = self.computeCentroid(cellCoords)
             dist = cellCentroid - circleCenter
-            if dist[0] < (radius + 3*self.h): #Solo tomo una porcion rectangular
+            if dist[0] < (radius + 3*self.body.dl): #Solo tomo una porcion rectangular
                 cells.append(cell)
         return cells
 
@@ -165,7 +158,7 @@ class ImmersedBoundaryStatic(FreeSlip):
             coords = self.dom.getCellCornersCoords(cell).reshape((2**self.dim, self.dim))
             cellCentroid = self.computeCentroid(coords)
             dist = coordsBodyNode - cellCentroid
-            if (abs(dist[0]) < self.h*2.5) & (abs(dist[1]) < self.h*2.5):
+            if (abs(dist[0]) < self.body.dl*2) & (abs(dist[1]) < self.body.dl*3):
                 listaux = self.dom.getGlobalNodesFromCell(cell, shared=False)
                 points2.update(listaux)
         return points2
@@ -174,6 +167,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         nodes = list(nodes)
         distanceClosest = list()
         pointsClosest = list()
+        nodesClose = list()
         coordBodyNode = self.body.getNodeCoordinates(nodeBody)
         nodeCoordinates = self.dom.getNodesCoordinates(nodes)
         for node_ind, coords in enumerate(nodeCoordinates):
@@ -182,16 +176,39 @@ class ImmersedBoundaryStatic(FreeSlip):
             for x in dist:
                 d *= self.body.dirac(x/self.h)
             d /= (self.h**2)
-            distanceClosest.append(d)
-            pointsClosest.extend(self.dom.getVelocityIndex([nodes[node_ind]]))
+            if d > 0:
+                distanceClosest.append(d)
+                nodesClose.append(nodes[node_ind])
+                pointsClosest.extend(self.dom.getVelocityIndex([nodes[node_ind]]))
+        # if nodeBody == 0:
+        #     self.setDiracVec(pointsClosest, distanceClosest)
+        #     print(f"{nodeBody =}")
+        #     print(f"{nodesClose =}")
+        #     print(f"{pointsClosest =}")
+        #     print(f"{distanceClosest =}")
         return distanceClosest, pointsClosest
 
     @staticmethod
     def computeCentroid(corners):
         return np.mean(corners, axis=0)
 
+class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
+    def getVorticityCorrection(self, t, finalStep=False):
+        """Main function to be called after a Converged Time Step"""
+        self.D.destroy()
+        self.Dds.destroy()
+        self.ksp.destroy()
+        self.body.computeVelocity(t)
+        self.body.updateCoordinates(t)
+        self.buildMatrices()
+        vort = self.mat.Curl.createVecLeft()
+        vort.setName("vorticity")
+        self.vel += self.computeVelocityCorrection()
+        self.mat.Curl(self.vel , vort)
+        return vort        
+
 class Body:
-    def __init__(self, radius, divisions):
+    def __init__(self, divisions):
         """Immersed boundary method class
         Arguments:
             domLag {string} -- it does indicates the location of .msh Gmsh File
@@ -199,12 +216,11 @@ class Body:
 
         # FIXME: i tried to create from gmsh but i cant
         # self.domLag = PETSc.DMPlex().createFromFile(domLag)
-
+        self.radius = 1
         self.bodyMovement = False  # FIXME dtype can be a PETSc Vec in a future
         # FIXME: getHeightStratum(1) is only valid for dim=2
-        self.dirac = threeGrid
-        self.dom , self.dl = generateCircleDMPlex(radius,divisions)
-        self.radius = radius
+        self.dirac = linear
+        self.dom , self.dl = generateCircleDMPlex(self.radius,divisions)
         self.setUpDimensions()
 
     def setUpDimensions(self):
@@ -229,9 +245,6 @@ class Body:
     def getTotalNodes(self):
         return self.lastNode - self.firstNode
 
-    def buildMatrices(self):
-        self.createEmptyVecs()
-
     def getNodeCoordinates(self, node):
         """Gets a List with all the coordinates from a node
         Arguments:
@@ -249,7 +262,7 @@ class Body:
 
     # BODY MOVEMENTS FUNCTIONS
 
-    def computeBodyVelocity(self, t):
+    def computeVelocity(self, t):
         velX = 0
         velY = sin(t/2)
         # print('Computed Vel Y' , velY)
@@ -259,16 +272,14 @@ class Body:
             # print('velocity ind', velIndex)
             vel =  [velX, velY]
             # print('Vel', vel)
-            self._BodyVelocity.setValues(velIndex, vel, False)
+            self._velocity.setValues(velIndex, vel, False)
         # print('Body vel size', self._BodyVelocity.getSize())
-        self._BodyVelocity.assemble()
+        self._velocity.assemble()
 
-    def updateBodyCoordinates(self, t):
+    def updateCoordinates(self, t):
         displX = 0
         displY = t * sin(t/2)
         self._centerDisplacement = np.array([displX , displY])
-
-
 
 def threeGrid(r):
     """supports only three cell grids"""
@@ -282,6 +293,26 @@ def threeGrid(r):
         return 0
     return accum
 
+def linear(r):
+    """Lineal Dirac discretization"""
+    accum = 1
+    r = abs(r)
+    if (r < 1):
+        accum *= (1 - r)
+    else:
+        return 0
+    return accum
+
+def fourGrid(r):
+    accum = 1
+    r = abs(r)
+    if r <=  1:
+        accum *= (3 - 2*r + sqrt(1 + 4*r - 4*r**2))/8
+    elif r <= 2:
+        accum *= (5 - 2*r - sqrt(-7+12*r-4*r**2))/8
+    else:
+        return 0
+    return accum
 
 def generateCircleDMPlex(radius,n):
     r= radius
