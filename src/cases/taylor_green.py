@@ -13,7 +13,7 @@ from viewer.paraviewer import Paraviewer
 
 class TaylorGreen(FreeSlip):
     def setUp(self):
-        self.setUpGeneral()
+        super().setUp()
 
         if self.dim == 2:
             self.taylorGreenVelFunction = self.taylorGreenVel_2D
@@ -21,11 +21,6 @@ class TaylorGreen(FreeSlip):
         else:
             self.taylorGreenVelFunction = self.taylorGreenVel_3D
             self.taylorGreenVortFunction = self.taylorGreenVort_3D
-
-        self.setUpBoundaryConditions()
-        self.setUpEmptyMats()
-        self.buildKLEMats()
-        self.buildOperators()
 
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()
