@@ -8,46 +8,22 @@ class MatNS(Mat):
         self.dim_s = 3 if self.dim == 2 else 6
         self.comm = comm
 
-    def buildMatrices(self):
-        self.buildKLEMatrices()
-        self.buildOperatorsMatrices()
-        pass
-
-    def buildKLEMatrices(self):
-        pass
-
-    def buildOperatorsMatrices(self):
-        pass
-
     def assembleAll(self):
         self.K.assemble()
         self.Rw.assemble()
         self.Rd.assemble()
         self.Krhs.assemble()
 
-    def createEmptyKLEMats(self, conecMat, indicesNS, createOperators=False):
+    def createEmptyKLEMats(self,rStart, rEnd ,  d_nnz_ind , o_nnz_ind, ind_d, ind_o, indicesNS):
         self.globalIndicesNS =set()
-        # global indices for DIR and NS BC are allgathered among processes
+
         collectIndices = self.comm.allgather([indicesNS])
         for remoteIndices in collectIndices:
             self.globalIndicesNS |= remoteIndices[0]
 
-        # -----
-        rStart, rEnd = conecMat.getOwnershipRange()
         locElRow = rEnd - rStart
         vel_dofs = locElRow * self.dim
         vort_dofs = locElRow * self.dim_w
-
-        ind_d = [0] * (rEnd - rStart)
-        ind_o = [0] * (rEnd - rStart)
-        for row in range(rStart, rEnd):
-            cols, vals = conecMat.getRow(row)
-            locRow = row - rStart
-            ind_d[locRow] = set([c for c in cols
-                                 if ((c >= rStart) and (c < rEnd))])
-            ind_o[locRow] = set([c for c in cols
-                                 if ((c < rStart) or (c >= rEnd))])
-        conecMat.destroy()
 
         d_nnz_ind = [len(indSet) for indSet in ind_d]
         o_nnz_ind = [len(indSet) for indSet in ind_o]
@@ -120,7 +96,6 @@ class MatNS(Mat):
             dd_nnz[minInd:maxInd] = [0] * self.dim
             od_nnz[minInd:maxInd] = [0] * self.dim
 
-        # print('dns_nnz: ', dns_nnz)
         self.Kfs = self.createEmptyMat(vel_dofs,vel_dofs,dns_nnz, ons_nnz)
         self.Rwfs =self.createEmptyMat(vel_dofs,vort_dofs, dwns_nnz, owns_nnz)
         self.Rdfs =self.createEmptyMat(vel_dofs,locElRow, ddns_nnz, odns_nnz)
@@ -131,5 +106,3 @@ class MatNS(Mat):
         self.Rd = self.createEmptyMat(vel_dofs, locElRow, dd_nnz, od_nnz)
         self.Krhs = self.createEmptyMat(vel_dofs, vel_dofs, drhs_nnz, orhs_nnz)
         
-        if createOperators:
-            self.createEmptyOperators(d_nnz_ind, o_nnz_ind, locElRow)
