@@ -6,7 +6,7 @@ from domain.dmplex import DMPlexDom
 from elements.spectral import Spectral
 from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
-from matrices.mat_generator import Mat
+from matrices.mat_generator import Mat, Operators
 from matrices.mat_ns import MatNS
 from solver.ksp_solver import KspSolver
 from common.timer import Timer
@@ -99,26 +99,16 @@ class BaseProblem(object):
         self.setUpElement()
         self.createMesh()
 
+    # @profile
     def buildOperators(self):
         self.logger.info("Building Operators Matrices...")
         self.timer.tic()
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
-        locSrT, locDivSrT, locCurl, locWei = self.elemType.getElemKLEOperators(cornerCoords)
+        localOperators = self.elemType.getElemKLEOperators(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
-            indicesVel = self.dom.getVelocityIndex(nodes)
-            indicesW = self.dom.getVorticityIndex(nodes)
-            indicesSrT = self.dom.getSrtIndex(nodes)
-            self.mat.Curl.setValues(indicesW, indicesVel, locCurl, True)
-            self.mat.SrT.setValues(indicesSrT, indicesVel, locSrT, True)
-            self.mat.DivSrT.setValues(indicesVel, indicesSrT, locDivSrT, True)
-
-            self.mat.weigSrT.setValues(indicesSrT, np.repeat(locWei, self.dim_s), True)
-            self.mat.weigDivSrT.setValues(indicesVel, np.repeat(locWei, self.dim), True)
-            self.mat.weigCurl.setValues(indicesW, np.repeat(locWei, self.dim_w), True)
-
-        self.mat.assembleOperators()
-
+            self.operator.setValues(localOperators, nodes)
+        self.operator.assembleAll()
         self.logger.info(f"Operators Matrices builded in {self.timer.toc()}")
 
     def setUpTimeSolver(self, inputData):
@@ -172,7 +162,7 @@ class BaseProblem(object):
         self._VtensV.assemble()
 
         # self._Aux1 = self.SrT * self._Vel
-        self.mat.SrT.mult(self.vel, self._Aux1)
+        self.operator.SrT.mult(self.vel, self._Aux1)
 
         # _Aux1 = 2*Mu * S - rho * Vvec ^ VVec
         self._Aux1 *= (2.0 * self.mu)
@@ -182,10 +172,10 @@ class BaseProblem(object):
         rhs = self.vel.duplicate()
         # RHS = Curl * Div(SrT) * 2*Mu * S - rho * Vvec ^ VVec
             # rhs = (self.DivSrT * self._Aux1) / self.rho
-        self.mat.DivSrT.mult(self._Aux1, rhs)
+        self.operator.DivSrT.mult(self._Aux1, rhs)
         rhs.scale(1/self.rho)
 
-        self.mat.Curl.mult(rhs, f)
+        self.operator.Curl.mult(rhs, f)
 
     def startSolver(self):
         self.computeInitialCondition(startTime = 0.0)
@@ -206,24 +196,9 @@ class BaseProblem(object):
     def readBoundaryCondition(self,inputData):
         pass
 
-    def setUpEmptyMats(self):
-        pass
-
-class NoSlip(BaseProblem):
-    def setUpEmptyMats(self):
-        self.logger.info("Creating Empty Matrices...")
-        self.timer.tic()
-        self.mat = MatNS(self.dim, self.comm)
-        fakeConectMat = self.dom.getDMConectivityMat()
-        globalIndicesNS = self.dom.getGlobalIndicesDirichlet() # TODO Reuso todos los indices dirichlet, se podria cambiar el nombre
-        self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesNS, createOperators=True)
-        self.logger.info(f"Empty Matrices Created in {self.timer.toc()} seconds")
-
     def setUpSolver(self):
         self.solver = KspSolver()
-        self.solverFS = KspSolver()
-        self.solverFS.createSolver(self.mat.K + self.mat.Kfs, self.comm) 
-        self.solver.createSolver(self.mat.K , self.comm)
+        self.solver.createSolver(self.mat.K, self.comm)
         self.vel = self.mat.K.createVecRight()
         self.vel.setName("velocity")
         self.vort = self.mat.Rw.createVecRight()
@@ -237,6 +212,32 @@ class NoSlip(BaseProblem):
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
         self._Aux1 = PETSc.Vec().createMPI(
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
+
+    def setUpEmptyMats(self):
+        self.mat = None
+        self.operator = None
+
+class NoSlip(BaseProblem):
+    def setUpEmptyMats(self):
+        self.logger.info("Creating Empty Matrices...")
+        self.mat = MatNS(self.dim, self.comm)
+        self.operator = Operators(self.dim, self.comm)
+        rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
+        globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
+        self.logger.info("Creating Empty KLE Matrices...")
+        self.timer.tic()
+        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)
+        self.logger.info(f"[{self.comm.rank}] Empty KLE Matrices created in {self.timer.toc()} seconds")
+
+        self.logger.info("Creating Empty Operators Matrices...")
+        self.timer.tic()
+        self.operator.createAll(rStart, rEnd, d_nnz_ind, o_nnz_ind)
+        self.logger.info(f"[{self.comm.rank}] Empty Operators created in {self.timer.toc()} seconds")
+
+    def setUpSolver(self):
+        super().setUpSolver()
+        self.solverFS = KspSolver()
+        self.solverFS.createSolver(self.mat.K + self.mat.Kfs, self.comm) 
         self.velFS = self.vel.copy()
 
     def solveKLE(self, time, vort):
@@ -244,7 +245,7 @@ class NoSlip(BaseProblem):
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
              + self.mat.Krhs * self.vel , self.velFS)
         self.applyBoundaryConditionsFS()
-        vort= self.mat.Curl *self.velFS
+        vort= self.operator.Curl *self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def buildKLEMats(self):
@@ -370,31 +371,21 @@ class FreeSlip(BaseProblem):
     def buildMatrices(self):
         pass
 
-    def setUpSolver(self):
-        self.solver = KspSolver()
-        self.solver.createSolver(self.mat.K, self.comm)
-        self.vel = self.mat.K.createVecRight()
-        self.vel.setName("velocity")
-        self.vort = self.mat.Rw.createVecRight()
-        self.vort.setName("vorticity")
-        self.vort.set(0.0)
-
-        sK, eK = self.mat.K.getOwnershipRange()
-        locRowsK = eK - sK
-
-        self._VtensV = PETSc.Vec().createMPI(
-            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
-        self._Aux1 = PETSc.Vec().createMPI(
-            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
-
     def setUpEmptyMats(self):
         self.logger.info("Creating Empty Matrices...")
-        self.timer.tic()
         self.mat = Mat(self.dim, self.comm)
-        fakeConectMat = self.dom.getDMConectivityMat()
+        self.operator = Operators(self.dim, self.comm)
+        rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
-        self.mat.createEmptyKLEMats(fakeConectMat, globalIndicesDIR, createOperators=True)
-        self.logger.info(f"[{self.comm.rank}] Creating Empty Matrices created in {self.timer.toc()} seconds")
+        self.logger.info("Creating Empty KLE Matrices...")
+        self.timer.tic()
+        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)
+        self.logger.info(f"[{self.comm.rank}] Empty KLE Matrices created in {self.timer.toc()} seconds")
+
+        self.logger.info("Creating Empty Operators Matrices...")
+        self.timer.tic()
+        self.operator.createAll(rStart, rEnd, d_nnz_ind, o_nnz_ind)
+        self.logger.info(f"[{self.comm.rank}] Empty Operators created in {self.timer.toc()} seconds")
 
     def solveKLE(self, time, vort):
         boundaryNodes = self.getBoundaryNodes()
@@ -421,7 +412,7 @@ class FreeSlip(BaseProblem):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
         boundaryNodes = set(self.node2tagdict.keys())
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
-        locK, locRw, locRd = self.elemType.getElemKLEMatrices(cornerCoords)
+        locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
 
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             self.logger.debug("DMPlex cell: %s", cell)
