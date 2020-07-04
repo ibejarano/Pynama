@@ -47,7 +47,6 @@ class DMPlexDom(PETSc.DMPlex):
         if not self.comm.rank:
             self.logger.debug("FEM/SEM Indexing SetUp")
 
-
     def computeFullCoordinates(self, spElem):
         # self.logger = logging.getLogger("[{}] DomainMin Compute Coordinates".format(self.comm.rank))
         coordsComponents = self.getDimension()
@@ -258,6 +257,30 @@ class DMPlexDom(PETSc.DMPlex):
             vec.setValues(indices, valuesToSet, addv=False)     
         return vec
 
+    ## Matrix build ind
+    def getMatIndices(self):
+        conecMat = self.getDMConectivityMat()
+        rStart, rEnd = conecMat.getOwnershipRange()
+        locElRow = rEnd - rStart
+        ind_d = [0] * (rEnd - rStart)
+        ind_o = [0] * (rEnd - rStart)
+        for row in range(rStart, rEnd):
+            cols, vals = conecMat.getRow(row)
+            locRow = row - rStart
+
+            ind_d[locRow] = set([c for c in cols
+                                 if ((c >= rStart) and (c < rEnd))])
+            ind_o[locRow] = set([c for c in cols
+                                 if ((c < rStart) or (c >= rEnd))])
+        conecMat.destroy()
+
+        d_nnz_ind = [len(indSet) for indSet in ind_d]
+        o_nnz_ind = [len(indSet) for indSet in ind_o]
+
+        # Limit nonzeros in diagonal block row to number of local rows
+        locElRow = rEnd - rStart
+        d_nnz_ind = [x if x <= locElRow else locElRow for x in d_nnz_ind]
+        return rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o
 
 class DomainElementInterface(object):
     
