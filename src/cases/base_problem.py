@@ -254,7 +254,7 @@ class NoSlip(BaseProblem):
         self.logger.info("Building KLE Matrices...")
         self.timer.tic()
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
-        boundaryNodes = set(self.getBoundaryNodes())
+        boundaryNodes = self.mat.globalIndicesNS
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
         locK, locRw, locRd = self.elemType.getElemKLEMatrices(cornerCoords)
         indices2onefs = set()

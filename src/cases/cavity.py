@@ -55,7 +55,7 @@ class Cavity(NoSlip):
 
         # set vel to zero in corner nodes
         self.vel.setValues(self.cornerDofs, np.repeat(0, len(self.cornerDofs)) )
-
+        self.vel.assemble()
         # fvel_coords = lambda coords: self.VelCavity(coords,self.BoundaryCondition,self.dim, t=time)
         # self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel, self.dim)
 
@@ -75,7 +75,7 @@ class Cavity(NoSlip):
             self.velFS.setValues(dofVelToSet, np.repeat(0, len(nodes)*len(velDofs)))
 
             # # TODO Set the tang of walls without vel to 0
-
+        self.velFS.assemble()
         # fvel_coords = lambda coords: self.VelCavity(coords,self.BoundaryCondition,self.dim, t=time)
         # self.velFS = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.velFS, self.dim)
 
