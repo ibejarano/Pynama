@@ -39,19 +39,15 @@ class IndicesManager:
     def getGlobalIndicesSection(self):
         return self._globalIndicesSection
 
-    def setDirichletIndices(self, bcInput):
-        self.BC2nodedict = bcInput
+    def setDirichletIndices(self, bcInput: set):
+        self.__bcNodes = bcInput
 
     def getDirichletIndices(self):
         self.globalIndicesDIR = set()
-        localIndicesDIR = set()
-        for nodes in self.BC2nodedict.values():
-            localIndicesDIR |= nodes
-
-        for remoteIndices in self.comm.tompi4py().allgather(localIndicesDIR):
+        for remoteIndices in self.comm.tompi4py().allgather(self.__bcNodes):
             self.globalIndicesDIR |= remoteIndices
 
-        return localIndicesDIR
+        return self.__bcNodes
 
     def getNoSlipIndices(self, bcInput):
         indicesNS = set()
