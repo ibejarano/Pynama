@@ -67,7 +67,7 @@ class BaseProblem(object):
 
     def setUpBoundaryConditions(self):
         self.dom.setLabelToBorders()
-        self.tag2BCdict, self.node2tagdict = self.dom.setBoundaryCondition()
+        self.dom.setBoundaryCondition()
         self.logger.info(f"{[self.comm.rank]}:: Boundary Conditions setted up")
 
     def readMaterialData(self, inputData):
@@ -123,10 +123,12 @@ class BaseProblem(object):
         time = ts.time
         step = ts.step_number
         incr = ts.getTimeStep()
-        self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
         self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+
+        if not self.comm.rank:
+            self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
 
     def getBoundaryNodes(self):
         """ IS: Index Set """
@@ -245,7 +247,7 @@ class NoSlip(BaseProblem):
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
              + self.mat.Krhs * self.vel , self.velFS)
         self.applyBoundaryConditionsFS()
-        vort= self.operator.Curl *self.velFS
+        vort = self.operator.Curl * self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def buildKLEMats(self):
@@ -259,17 +261,16 @@ class NoSlip(BaseProblem):
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             self.logger.debug("DMPlex cell: %s", cell)
 
-            nodes = self.dom.getGlobalNodesFromCell(cell, shared=False)
+            nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             # Build velocity and vorticity DoF indices
             indicesVel = self.dom.getVelocityIndex(nodes)
             indicesW = self.dom.getVorticityIndex(nodes)
            
             nodeBCintersect = boundaryNodes & set(nodes)
             # self.logger.debug("te intersecto: %s", nodeBCintersect)
-            
+            # print(f"{[self.comm.rank]} : {nodeBCintersect = }")
             dofFreeFSSetNS = set()  # local dof list free at FS sol
             dofSetFSNS = set()  # local dof list set at both solutions
- 
             for node in nodeBCintersect:
                 localBoundaryNode = nodes.index(node)
                 nsNorm = set()
@@ -319,6 +320,9 @@ class NoSlip(BaseProblem):
                 # Indices where diagonal entries should be reduced by 1
                 indices2onefs.update(gldofFreeFSSetNS)
 
+                # print(f" {[self.comm.rank]} : {gldofFreeFSSetNS = } ")
+                # print(f"{[self.comm.rank]} : {locRw.shape = }")
+                # print(f"{[self.comm.rank]} : {indicesW = }")
                 self.mat.Rwfs.setValues(gldofFreeFSSetNS, indicesW,
                                     locRw[dofFreeFSSetNS, :], addv=True)
 
@@ -346,7 +350,6 @@ class NoSlip(BaseProblem):
             self.mat.Rd.setValues(gldofFree, nodes,
                               locRd[np.ix_(dofFree, range(len(nodes)))],
                               addv=True)
-
         self.mat.assembleAll()
         self.mat.setIndices2One(indices2one)
 
@@ -409,21 +412,20 @@ class FreeSlip(BaseProblem):
         return errors
 
     def buildKLEMats(self):
-        indices2one = set()  # matrix indices to be set to 1 for BC imposition
-        boundaryNodes = set(self.node2tagdict.keys())
+        indices2one = set() 
+        boundaryNodes = self.mat.globalIndicesDIR 
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
         locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
 
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             self.logger.debug("DMPlex cell: %s", cell)
 
-            nodes = self.dom.getGlobalNodesFromCell(cell, shared=False)
+            nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             # Build velocity and vorticity DoF indices
             indicesVel = self.dom.getVelocityIndex(nodes)
             indicesW = self.dom.getVorticityIndex(nodes)
            
             nodeBCintersect = boundaryNodes & set(nodes)
-            # self.logger.debug("te intersecto: %s", nodeBCintersect)
             
             dofFreeFSSetNS = set()  # local dof list free at FS sol
             dofSetFSNS = set()  # local dof list set at both solutions
@@ -442,7 +444,6 @@ class FreeSlip(BaseProblem):
             gldof2beSet = [indicesVel[ii] for ii in dof2beSet]
             gldofFree = [indicesVel[ii] for ii in dofFree]
             
-
             if nodeBCintersect:
                 self.mat.Krhs.setValues(
                 gldofFree, gldof2beSet,
@@ -461,6 +462,5 @@ class FreeSlip(BaseProblem):
 
             self.mat.Rw.setValues(gldofFree, indicesW,
                               locRw[np.ix_(dofFree, range(len(indicesW)))], addv=True)
-        
         self.mat.assembleAll()
         self.mat.setIndices2One(indices2one)
