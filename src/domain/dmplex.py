@@ -13,7 +13,6 @@ class DMPlexDom(PETSc.DMPlex):
         self.createLabel('marco')
         self.markBoundaryFaces('marco',0)
         self.distribute()
-
         self.dim = self.getDimension()
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
@@ -116,8 +115,17 @@ class DMPlexDom(PETSc.DMPlex):
 
     def getBorderEntities(self, name):
         faceNum = self.mapFaceNameToNum(name)
-        faces = self.getStratumIS("Face Sets", faceNum).getIndices()
+        try:
+            faces = self.getStratumIS("Face Sets", faceNum).getIndices()
+        except:
+            faces = []
         return faces
+
+    def getBordersNodes(self):
+        nodes = set()
+        for faceName in self.namingConvention:
+            nodes |= set(self.getBorderNodes(faceName))
+        return nodes
 
     def getBorderNodes(self, name):
         entities = self.getBorderEntities(name)
@@ -142,49 +150,8 @@ class DMPlexDom(PETSc.DMPlex):
         return indicesDIR
 
     def setBoundaryCondition(self):
-        dim = self.getDimension()
-        tag2BCdict = dict()
-        BCset = set()
-        # Existing tag values in 'cfgfileBC' label
-        BClabelVals = self.getLabelIdIS('cfgfileBC').getIndices()
-        for val in BClabelVals:
-            labelVal = val
-            tag2BCdict[val] = list()
-            bcNum = 0
-            while labelVal:
-                if labelVal & 1:
-                    secName = "bc-%02d" % bcNum
-                    # print(secName)
-                    tag2BCdict[val].append(secName)
-                    BCset.add(secName)
-                labelVal = labelVal >> 1  # Shift 1 bit to delete first bit
-                bcNum += 1
-
-        BC2nodedict = dict()
-        for bc in BCset:
-            BC2nodedict[bc] = set()
-        node2tagdict = dict()
-        for tag in tag2BCdict:
-            # DMPlex points with val tag value
-            tagDMpoints = self.getStratumIS('cfgfileBC', tag).\
-                            getIndices()
-
-            for poi in tagDMpoints:
-                # indPoi, ownPoi = self.getInd(poi, "global")
-                nodes, ownNodes = self.indicesManager.getGlobalNodes(poi)
-                if ownNodes:
-                    for node in nodes:
-                        # FIXME: node coordinates 2D or 3D
-                        ind = [node*dim + d for d in range(dim)]
-                        xyz = self.fullCoordVec.getValues(ind)
-                        node2tagdict[node] = [tag, xyz]
-
-                        for bc in tag2BCdict[tag]:
-                            BC2nodedict[bc].add(node)
-
-        self.indicesManager.setDirichletIndices(BC2nodedict)
-        return tag2BCdict, node2tagdict
-
+        allBorderNodes = self.getBordersNodes()
+        self.indicesManager.setDirichletIndices(allBorderNodes)
 
     def getGlobalNodesFromCell(self, cell, shared):
         entities, orientations = self.getTransitiveClosure(cell)
