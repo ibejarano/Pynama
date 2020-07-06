@@ -158,6 +158,14 @@ class DMPlexDom(PETSc.DMPlex):
         nodes = self.indicesManager.mapEntitiesToNodes(entities, orientations, shared)
         return nodes
 
+    def getGlobalNodesFromEntities(self, entities, shared):
+        nodes = set()
+        for entity in entities:
+            entities, orientations = self.getTransitiveClosure(entity)
+            current = self.indicesManager.mapEntitiesToNodes(entities, orientations, shared)
+            nodes |= set(current)
+        return nodes
+
     def getVelocityIndex(self, nodes):
         indices = self.indicesManager.mapNodesToIndices(nodes, self.dim)
         return indices
@@ -186,6 +194,22 @@ class DMPlexDom(PETSc.DMPlex):
         indices = self.indicesManager.mapNodesToIndices(nodes, dim)
         arr = self.fullCoordVec.getValues(indices).reshape((len(nodes),dim))
         return arr
+
+    def getBorderNodesWithNormal(self, cell):
+        nodes = list()
+        normals = list()
+        faces = set(self.getTransitiveClosure(cell)[0])
+        for faceName in self.namingConvention:
+            entities = set(self.getBorderEntities(faceName))
+            borderFace = entities & faces
+            if borderFace:
+                borderFace = list(borderFace)
+                borderNodes = self.getGlobalNodesFromEntities(borderFace, shared=True)
+                normal = self.computeCellGeometryFVM(borderFace[0])[2]
+                indexNormal = list(np.abs(normal)).index(1)
+                normals.append(indexNormal)
+                nodes.append(borderNodes)
+        return nodes, normals
 
     def applyFunctionVecToVec(self, nodes, f_vec, vec, dof):
         """
