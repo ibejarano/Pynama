@@ -65,6 +65,8 @@ class Senoidal(FreeSlip):
         self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
         convectivo = self.getconvectivo(exactVel, exactConv)
         convectivo.setName("convectivo")
+        difusivo = self.getDifusivo(exactVel, exactDiff)
+        difusivo.setName("difusivo")
         self.operator.Curl.mult(exactVel, self.vort)
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
@@ -73,8 +75,8 @@ class Senoidal(FreeSlip):
         self.viewer.saveVec(exactVort, timeStep=step)
         self.viewer.saveVec(exactConv, timeStep=step)
         self.viewer.saveVec(exactDiff, timeStep=step)
-
-        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, exactDiff, self.vort, self.vel, convectivo])
+        self.viewer.saveVec(difusivo, timeStep=step)
+        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, exactDiff, self.vort, self.vel, convectivo, difusivo])
         self.viewer.writeXmf(self.caseName)
         self.logger.info("Operatores Tests")
 
@@ -94,6 +96,16 @@ class Senoidal(FreeSlip):
         self.operator.DivSrT.mult(self._VtensV, aux)
         self.operator.Curl.mult(aux,convectivo)
         return convectivo
+
+    def getDifusivo(self,exactVel, exactDiff):
+        difusivo = exactDiff.copy()
+        self.operator.SrT.mult(exactVel, self._Aux1)
+        aux=self.vel.copy()
+        self._Aux1 *= (2.0 * self.mu)
+        self.operator.DivSrT.mult(self._Aux1, aux)
+        aux.scale(1/self.rho)
+        self.operator.Curl.mult(aux,difusivo)
+        return difusivo
 
     @staticmethod
     def taylorGreenVel_2D(coord, nu,t=None):
