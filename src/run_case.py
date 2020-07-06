@@ -60,11 +60,13 @@ def timeSolving(name):
     fem = FemProblem()
     fem.setUp()
     fem.setUpSolver()
-    fem.logger.info("Solving problem...")
+    if not fem.comm.rank:
+        fem.logger.info("Solving problem...")
     fem.timer.tic()
     fem.startSolver()
     fem.viewer.writeXmf(name)
-    fem.logger.info(f"Solver Finished in {fem.timer.toc()} seconds")
+    if not fem.comm.rank:
+        fem.logger.info(f"Solver Finished in {fem.timer.toc()} seconds")
 
 def main():
     case = OptDB.getString('case', False)
@@ -82,14 +84,10 @@ def main():
         logger.info(f"Case '{case}' Not Found")
 
     if runTests == 'kle':
-        logger.info(f"Running {runTests} TESTS:  {yamlData['name']} ")
         generateParaviewer()
-
     elif runTests == 'chart':
-        logger.info(f"Running {runTests} Error Chart:  {yamlData['name']} ")
         generateChart()
     else:
-        logger.info(f"Running problem:  {yamlData['name']}")
         timeSolving(name)
 
     # self.logger.info(yamlData)

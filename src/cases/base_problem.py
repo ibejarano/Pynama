@@ -25,7 +25,8 @@ class BaseProblem(object):
             with open(f'src/cases/{case}.yaml') as f:
                 yamlData = yaml.load(f, Loader=yaml.Loader)
             self.logger = logging.getLogger(yamlData['name'])
-            self.logger.info("Initializing problem...")
+            if not self.comm.rank:
+                self.logger.info("Initializing problem...")
         except:
             self.logger.info(f"Case '{case}' Not Found")
 
@@ -53,22 +54,21 @@ class BaseProblem(object):
         self.buildOperators()
 
     def setUpDomain(self):
-        self.logger.info("Creating DMPlex dom ...")
-        self.timer.tic()
         self.dom = DMPlexDom(self.lower, self.upper, self.nelem)
         self.dom.setFemIndexing(self.ngl)
-        self.logger.info(f"{[self.comm.rank]} DMPlex dom created in {self.timer.toc()} seconds")
+        if not self.comm.rank:
+            self.logger.info(f"DMPlex dom created")
 
     def setUpElement(self):
-        self.logger.info(f"Creating {self.dim}-D ngl:{self.ngl} Spectral element...")
-        self.timer.tic()
         self.elemType = Spectral(self.ngl, self.dim)
-        self.logger.info(f"{[self.comm.rank]}:: {self.dim}-D ngl:{self.ngl} Spectral element created in {self.timer.toc()} seconds")
+        if not self.comm.rank:
+            self.logger.info(f"{self.dim}-D ngl:{self.ngl} Spectral element created")
 
     def setUpBoundaryConditions(self):
         self.dom.setLabelToBorders()
         self.dom.setBoundaryCondition()
-        self.logger.info(f"{[self.comm.rank]}:: Boundary Conditions setted up")
+        if not self.comm.rank:
+            self.logger.info(f"Boundary Conditions setted up")
 
     def readMaterialData(self, inputData):
         self.rho = inputData['rho']
@@ -84,15 +84,11 @@ class BaseProblem(object):
         self.nelem = inputData['nelem']
 
     def createMesh(self):
-        self.logger.info("Creating mesh...")
-        self.logger.info("Computing coordinates...")
-        self.timer.tic()
         self.viewer = Paraviewer(self.dim ,self.comm)
         self.dom.computeFullCoordinates(self.elemType)
-        self.logger.info(f"Coordinates computed in {self.timer.toc()}")
-        self.timer.tic()
         self.viewer.saveMesh(self.dom.fullCoordVec)
-        self.logger.info(f"{[self.comm.rank]}:: Mesh created in {self.timer.toc()}")
+        if not self.comm.rank:
+            self.logger.info(f"Mesh of {self.nelem} created")
 
     def setUpGeneral(self):
         self.setUpDomain()
@@ -101,15 +97,14 @@ class BaseProblem(object):
 
     # @profile
     def buildOperators(self):
-        self.logger.info("Building Operators Matrices...")
-        self.timer.tic()
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
         localOperators = self.elemType.getElemKLEOperators(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             self.operator.setValues(localOperators, nodes)
         self.operator.assembleAll()
-        self.logger.info(f"Operators Matrices builded in {self.timer.toc()}")
+        if not self.comm.rank:
+            self.logger.info(f"Operators Matrices builded")
 
     def setUpTimeSolver(self, inputData):
         self.ts = TsSolver(self.comm)
@@ -221,20 +216,18 @@ class BaseProblem(object):
 
 class NoSlip(BaseProblem):
     def setUpEmptyMats(self):
-        self.logger.info("Creating Empty Matrices...")
         self.mat = MatNS(self.dim, self.comm)
         self.operator = Operators(self.dim, self.comm)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
-        self.logger.info("Creating Empty KLE Matrices...")
-        self.timer.tic()
-        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)
-        self.logger.info(f"[{self.comm.rank}] Empty KLE Matrices created in {self.timer.toc()} seconds")
 
-        self.logger.info("Creating Empty Operators Matrices...")
-        self.timer.tic()
+        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)
+        if not self.comm.rank:
+            self.logger.info(f"Empty KLE Matrices created")
+        
         self.operator.createAll(rStart, rEnd, d_nnz_ind, o_nnz_ind)
-        self.logger.info(f"[{self.comm.rank}] Empty Operators created in {self.timer.toc()} seconds")
+        if not self.comm.rank:
+            self.logger.info(f"Empty Operators created")
 
     def setUpSolver(self):
         super().setUpSolver()
@@ -251,16 +244,12 @@ class NoSlip(BaseProblem):
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def buildKLEMats(self):
-        self.logger.info("Building KLE Matrices...")
-        self.timer.tic()
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
         boundaryNodes = self.mat.globalIndicesNS
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
         locK, locRw, locRd = self.elemType.getElemKLEMatrices(cornerCoords)
         indices2onefs = set()
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
-            self.logger.debug("DMPlex cell: %s", cell)
-
             nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             # Build velocity and vorticity DoF indices
             indicesVel = self.dom.getVelocityIndex(nodes)
@@ -303,7 +292,6 @@ class NoSlip(BaseProblem):
             gldof2beSet = [indicesVel[ii] for ii in dof2beSet]
             gldofFree = [indicesVel[ii] for ii in dofFree]
             
-
             if nodeBCintersect:
                 self.mat.Krhs.setValues(
                 gldofFree, gldof2beSet,
@@ -329,9 +317,6 @@ class NoSlip(BaseProblem):
                 # Indices where diagonal entries should be reduced by 1
                 indices2onefs.update(gldofFreeFSSetNS)
 
-                # print(f" {[self.comm.rank]} : {gldofFreeFSSetNS = } ")
-                # print(f"{[self.comm.rank]} : {locRw.shape = }")
-                # print(f"{[self.comm.rank]} : {indicesW = }")
                 self.mat.Rwfs.setValues(gldofFreeFSSetNS, indicesW,
                                     locRw[dofFreeFSSetNS, :], addv=True)
 
@@ -373,7 +358,8 @@ class NoSlip(BaseProblem):
             self.mat.Krhsfs.setValues(indd, indd, 1, addv=False)
         self.mat.Krhsfs.assemble()
 
-        self.logger.info(f"KLE Matrices builded in {self.timer.toc()} seconds")
+        if not self.comm.rank:
+            self.logger.info(f"KLE Matrices builded")
 
 class FreeSlip(BaseProblem):
     def generateExactVecs(self, time):
@@ -383,20 +369,18 @@ class FreeSlip(BaseProblem):
         pass
 
     def setUpEmptyMats(self):
-        self.logger.info("Creating Empty Matrices...")
         self.mat = Mat(self.dim, self.comm)
         self.operator = Operators(self.dim, self.comm)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
-        self.logger.info("Creating Empty KLE Matrices...")
-        self.timer.tic()
-        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)
-        self.logger.info(f"[{self.comm.rank}] Empty KLE Matrices created in {self.timer.toc()} seconds")
 
-        self.logger.info("Creating Empty Operators Matrices...")
-        self.timer.tic()
+        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)
+        if not self.comm.rank:
+            self.logger.info(f"Empty KLE Matrices created")
+
         self.operator.createAll(rStart, rEnd, d_nnz_ind, o_nnz_ind)
-        self.logger.info(f"[{self.comm.rank}] Empty Operators created in {self.timer.toc()} seconds")
+        if not self.comm.rank:
+            self.logger.info(f"Empty Operators created")
 
     def solveKLE(self, time, vort):
         boundaryNodes = self.getBoundaryNodes()
@@ -426,8 +410,6 @@ class FreeSlip(BaseProblem):
         locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
 
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
-            self.logger.debug("DMPlex cell: %s", cell)
-
             nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             # Build velocity and vorticity DoF indices
             indicesVel = self.dom.getVelocityIndex(nodes)
@@ -472,3 +454,5 @@ class FreeSlip(BaseProblem):
                               locRw[np.ix_(dofFree, range(len(indicesW)))], addv=True)
         self.mat.assembleAll()
         self.mat.setIndices2One(indices2one)
+        if not self.comm.rank:
+            self.logger.info(f"KLE Matrices builded")
