@@ -32,15 +32,19 @@ class Senoidal(FreeSlip):
     def generateExactVecs(self):
         exactVel = self.mat.K.createVecRight()
         exactVort = self.mat.Rw.createVecRight()
+        exactConv = exactVort.copy()
         exactVel.setName(f"{self.caseName}-exact-vel")
         exactVort.setName(f"{self.caseName}-exact-vort")
+        exactConv.setName(f"{self.caseName}-exact-convective")
         allNodes = self.dom.getAllNodes()
         # generate a new function with t=constant and coords variable
         fvel_coords = lambda coords: self.taylorGreenVelFunction(coords, self.nu)
         fvort_coords = lambda coords: self.taylorGreenVortFunction(coords, self.nu)
+        fconv_coords = lambda coords: self.convective(coords, self.nu)
         exactVel = self.dom.applyFunctionVecToVec(allNodes, fvel_coords, exactVel, self.dim)
         exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort, self.dim_w)
-        return exactVel, exactVort
+        exactConv = self.dom.applyFunctionVecToVec(allNodes, fconv_coords, exactConv, self.dim_w )
+        return exactVel, exactVort, exactConv
 
     def applyBoundaryConditions(self, bcNodes):
         self.vel.set(0.0)
@@ -49,35 +53,48 @@ class Senoidal(FreeSlip):
         self.vel.assemble()
 
     # Se llama solve KLE pero es de los operators
-    def solveKLETests(self, startTime=0.0, endTime=1.0, steps=10):
-        # boundaryNodes = self.getBoundaryNodes()
+    def solveKLETests(self):
+        boundaryNodes = self.getBoundaryNodes()
+        self.applyBoundaryConditions(boundaryNodes)
         step = 0
-        exactVel, exactVort = self.generateExactVecs()
-        # self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
-        self.operator.Curl.mult( exactVel , self.vort )
+        exactVel, exactVort, exactConv = self.generateExactVecs()
+        self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+        self.operator.Curl.mult(exactVel, self.vort)
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
         self.viewer.saveVec(exactVel, timeStep=step)
         self.viewer.saveVec(exactVort, timeStep=step)
-        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, self.vort, self.vel])
+        self.viewer.saveVec(exactConv, timeStep=step)
+        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, self.vort, self.vel])
         self.viewer.writeXmf(self.caseName)
         self.logger.info("Operatores Tests")
 
     @staticmethod
     def taylorGreenVel_2D(coord, nu,t=None):
-        Wref = 1
-        x_ = Wref * pi * coord[1]
-        y_ = Wref * pi * coord[0]
-        vel = [sin(y_), sin(x_)]
+        Wref_x = 4
+        Wref_y = 2
+        x_ = Wref_y * pi * coord[1]
+        y_ = Wref_x * pi * coord[0]
+        vel = [sin(x_), sin(y_)]
         return [vel[0], vel[1]]
 
     @staticmethod
     def taylorGreenVort_2D(coord, nu,t=None):
-        Wref = 1
-        x_ = Wref * pi * coord[1]
-        y_ = Wref * pi * coord[0]
-        vort = Wref * pi * ( cos(y_) - cos(x_) )
+        Wref_x = 4
+        Wref_y = 2
+        x_ = Wref_y * pi * coord[1]
+        y_ = Wref_x * pi * coord[0]
+        vort = Wref_x * pi *  cos(y_) - Wref_y * pi * cos(x_)
         return [vort]
+
+    @staticmethod
+    def convective(coord, nu, t=None):
+        Wref_x = 4
+        Wref_y = 2
+        x_ = Wref_y * pi * coord[1]
+        y_ = Wref_x * pi * coord[0]
+        conv = ((Wref_y * pi)**2 - (Wref_x * pi )**2) * sin(x_) * sin(y_)
+        return [conv]
 
     @staticmethod
     def taylorGreenVel_3D(coord, nu ,t=None):
