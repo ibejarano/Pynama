@@ -267,22 +267,31 @@ class NoSlip(BaseProblem):
             indicesW = self.dom.getVorticityIndex(nodes)
            
             nodeBCintersect = boundaryNodes & set(nodes)
-            # self.logger.debug("te intersecto: %s", nodeBCintersect)
-            # print(f"{[self.comm.rank]} : {nodeBCintersect = }")
             dofFreeFSSetNS = set()  # local dof list free at FS sol
             dofSetFSNS = set()  # local dof list set at both solutions
-            for node in nodeBCintersect:
-                localBoundaryNode = nodes.index(node)
-                nsNorm = set()
-                coord=self.dom.getNodesCoordinates([node])[0]
-                for i in range(self.dim):
-                    if (coord[i]==self.upper[i]) or (coord[i]==self.lower[i]):
-                        nsNorm.add(i)
-                dofSetFSNS.update([localBoundaryNode*self.dim + d
-                                       for d in nsNorm])
-                dofFreeFSSetNS.update([localBoundaryNode*self.dim + d
-                                        for d in (set(range(self.dim)) - nsNorm)])
+            # for node in nodeBCintersect:
+            #     localBoundaryNode = nodes.index(node)
+            #     nsNorm = set()
+            #     coord=self.dom.getNodesCoordinates([node])[0]
+            #     for i in range(self.dim):
+            #         if (coord[i]==self.upper[i]) or (coord[i]==self.lower[i]):
+            #             nsNorm.add(i)
+            #     dofSetFSNS.update([localBoundaryNode*self.dim + d
+            #                            for d in nsNorm])
+            #     dofFreeFSSetNS.update([localBoundaryNode*self.dim + d
+            #                             for d in (set(range(self.dim)) - nsNorm)])
 
+            if nodeBCintersect:
+                borderNodes, normals = self.dom.getBorderNodesWithNormal(cell)
+                for i, globBorderNodes in enumerate(borderNodes):
+                    tangentialDofs = list(range(self.dim))
+                    tangentialDofs.pop(normals[i])
+                    localNodes = [ nodes.index(node) for node in globBorderNodes ]
+                    normalDof = normals[i]
+                    # print(f"{[self.comm.rank]} {nodes = } {globBorderNodes = } {normals = } {localNodes = } ")
+                    dofSetFSNS.update( [locNode * self.dim + normalDof for locNode in localNodes ]  )
+                    dofFreeFSSetNS.update( [locNode * self.dim + dof for locNode in localNodes for dof in tangentialDofs] )
+                dofFreeFSSetNS -= dofSetFSNS
 
             dofFree = list(set(range(len(indicesVel)))
                            - dofFreeFSSetNS - dofSetFSNS)
@@ -336,7 +345,6 @@ class NoSlip(BaseProblem):
                         - locK[np.ix_(dofFree, dofSetFSNS)], addv=True)
                 for indd in gldofSetFSNS:
                         self.mat.Krhsfs.setValues(indd, indd, 0, addv=True)
-
 
             self.mat.K.setValues(gldofFree, gldofFree,
                              locK[np.ix_(dofFree, dofFree)], addv=True)

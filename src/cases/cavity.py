@@ -20,7 +20,6 @@ class Cavity(NoSlip):
         
         cornerNodes = list(cornerNodes)
         self.cornerDofs = [self.dim * node + dof for node in cornerNodes for dof in range(self.dim)]
-
         self.logger.info("Corner Nodes collected")
 
     def readBoundaryCondition(self,inputData):
@@ -39,7 +38,6 @@ class Cavity(NoSlip):
         for wallName, wallVelocity in wallsWithVelocity.items():
             self.nsWalls.setWallVelocity(wallName, wallVelocity)
 
-
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
 
@@ -56,8 +54,6 @@ class Cavity(NoSlip):
         # set vel to zero in corner nodes
         self.vel.setValues(self.cornerDofs, np.repeat(0, len(self.cornerDofs)) )
         self.vel.assemble()
-        # fvel_coords = lambda coords: self.VelCavity(coords,self.BoundaryCondition,self.dim, t=time)
-        # self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel, self.dim)
 
     def applyBoundaryConditionsFS(self):
         wallsWithVel = self.nsWalls.getWallsWithVelocity()
@@ -74,10 +70,7 @@ class Cavity(NoSlip):
             dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
             self.velFS.setValues(dofVelToSet, np.repeat(0, len(nodes)*len(velDofs)))
 
-            # # TODO Set the tang of walls without vel to 0
         self.velFS.assemble()
-        # fvel_coords = lambda coords: self.VelCavity(coords,self.BoundaryCondition,self.dim, t=time)
-        # self.velFS = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.velFS, self.dim)
 
     @staticmethod
     def VelCavity(coord,BoundaryConditions,dim,t=None):
