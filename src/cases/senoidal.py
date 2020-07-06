@@ -59,15 +59,39 @@ class Senoidal(FreeSlip):
         step = 0
         exactVel, exactVort, exactConv = self.generateExactVecs()
         self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+        convectivo = self.getconvectivo(exactVel, exactConv)
+        convectivo.setName("convectivo")
         self.operator.Curl.mult(exactVel, self.vort)
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
         self.viewer.saveVec(exactVel, timeStep=step)
+        self.viewer.saveVec(convectivo, timeStep=step)
         self.viewer.saveVec(exactVort, timeStep=step)
         self.viewer.saveVec(exactConv, timeStep=step)
-        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, self.vort, self.vel])
+        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, self.vort, self.vel, convectivo])
         self.viewer.writeXmf(self.caseName)
         self.logger.info("Operatores Tests")
+
+    def getconvectivo(self,exactVel, exactConv):
+        convectivo = exactConv.copy()
+        sK, eK = self.mat.K.getOwnershipRange()
+        for indN in range(sK, eK, self.dim):
+            indicesVV = [indN * self.dim_s / self.dim + d
+                         for d in range(self.dim_s)]
+            VelN = exactVel.getValues([indN + d for d in range(self.dim)])
+            if self.dim==2:
+                VValues = [VelN[0] ** 2, VelN[0] * VelN[1], VelN[1] ** 2]
+            else:
+                raise Exception("Wrong dim")
+            self._VtensV.setValues(indicesVV, VValues, False)
+        aux=self.vel.copy()
+        self.operator.DivSrT.mult(self._VtensV, aux)
+        self.operator.Curl.mult(aux,convectivo)
+        return convectivo
+
+
+
+
 
     @staticmethod
     def taylorGreenVel_2D(coord, nu,t=None):
