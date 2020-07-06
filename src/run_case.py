@@ -18,6 +18,9 @@ elif case == 'uniform':
 elif case == 'ibm-static':
     name = 'ibm-static'
     from cases.immersed_boundary import ImmersedBoundaryStatic as FemProblem
+elif case == 'senoidal':
+    name = 'senoidal'
+    from cases.senoidal import Senoidal as FemProblem
 elif case == 'custom-func':
     raise Exception("class not found")
 elif case == 'cavity':
