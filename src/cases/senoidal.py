@@ -33,18 +33,22 @@ class Senoidal(FreeSlip):
         exactVel = self.mat.K.createVecRight()
         exactVort = self.mat.Rw.createVecRight()
         exactConv = exactVort.copy()
+        exactDiff = exactVort.copy()
         exactVel.setName(f"{self.caseName}-exact-vel")
         exactVort.setName(f"{self.caseName}-exact-vort")
         exactConv.setName(f"{self.caseName}-exact-convective")
+        exactDiff.setName(f"{self.caseName}-exact-diffusive")
         allNodes = self.dom.getAllNodes()
         # generate a new function with t=constant and coords variable
         fvel_coords = lambda coords: self.taylorGreenVelFunction(coords, self.nu)
         fvort_coords = lambda coords: self.taylorGreenVortFunction(coords, self.nu)
         fconv_coords = lambda coords: self.convective(coords, self.nu)
+        fdiff_coords = lambda coords: self.difusive(coords, self.nu)
         exactVel = self.dom.applyFunctionVecToVec(allNodes, fvel_coords, exactVel, self.dim)
         exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort, self.dim_w)
         exactConv = self.dom.applyFunctionVecToVec(allNodes, fconv_coords, exactConv, self.dim_w )
-        return exactVel, exactVort, exactConv
+        exactDiff = self.dom.applyFunctionVecToVec(allNodes, fdiff_coords, exactDiff, self.dim_w )
+        return exactVel, exactVort, exactConv, exactDiff
 
     def applyBoundaryConditions(self, bcNodes):
         self.vel.set(0.0)
@@ -57,7 +61,7 @@ class Senoidal(FreeSlip):
         boundaryNodes = self.getBoundaryNodes()
         self.applyBoundaryConditions(boundaryNodes)
         step = 0
-        exactVel, exactVort, exactConv = self.generateExactVecs()
+        exactVel, exactVort, exactConv, exactDiff = self.generateExactVecs()
         self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
         convectivo = self.getconvectivo(exactVel, exactConv)
         convectivo.setName("convectivo")
@@ -68,7 +72,9 @@ class Senoidal(FreeSlip):
         self.viewer.saveVec(convectivo, timeStep=step)
         self.viewer.saveVec(exactVort, timeStep=step)
         self.viewer.saveVec(exactConv, timeStep=step)
-        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, self.vort, self.vel, convectivo])
+        self.viewer.saveVec(exactDiff, timeStep=step)
+
+        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, exactDiff, self.vort, self.vel, convectivo])
         self.viewer.writeXmf(self.caseName)
         self.logger.info("Operatores Tests")
 
@@ -88,10 +94,6 @@ class Senoidal(FreeSlip):
         self.operator.DivSrT.mult(self._VtensV, aux)
         self.operator.Curl.mult(aux,convectivo)
         return convectivo
-
-
-
-
 
     @staticmethod
     def taylorGreenVel_2D(coord, nu,t=None):
@@ -119,6 +121,16 @@ class Senoidal(FreeSlip):
         y_ = Wref_x * pi * coord[0]
         conv = ((Wref_y * pi)**2 - (Wref_x * pi )**2) * sin(x_) * sin(y_)
         return [conv]
+
+    @staticmethod
+    def difusive(coord, nu, t=None):
+        Wref_x = 4
+        Wref_y = 2
+        x_ = Wref_y * pi * coord[1]
+        y_ = Wref_x * pi * coord[0]
+        tmp1 = -(Wref_x *pi)**3 * cos(y_) 
+        tmp2 = (Wref_y *pi)**3 * cos(x_) 
+        return [tmp1 + tmp2]
 
     @staticmethod
     def taylorGreenVel_3D(coord, nu ,t=None):
