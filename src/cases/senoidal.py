@@ -17,15 +17,15 @@ class Senoidal(FreeSlip):
         self.nu = self.mu / self.rho
 
         if self.dim == 2:
-            self.taylorGreenVelFunction = self.taylorGreenVel_2D
-            self.taylorGreenVortFunction = self.taylorGreenVort_2D
+            self.senoidalVelFunction = self.senoidalVel_2D
+            self.senoidalVortFunction = self.senoidalVort_2D
         else:
-            self.taylorGreenVelFunction = self.taylorGreenVel_3D
-            self.taylorGreenVortFunction = self.taylorGreenVort_3D
+            self.senoidalVelFunction = self.taylorGreenVel_3D
+            self.senoidalVortFunction = self.taylorGreenVort_3D
 
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()
-        fvort_coords = lambda coords: self.taylorGreenVortFunction(coords, self.nu,)
+        fvort_coords = lambda coords: self.senoidalVortFunction(coords, self.nu,)
         self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort, self.dim_w)
         self.vort.assemble()
 
@@ -40,10 +40,10 @@ class Senoidal(FreeSlip):
         exactDiff.setName(f"{self.caseName}-exact-diffusive")
         allNodes = self.dom.getAllNodes()
         # generate a new function with t=constant and coords variable
-        fvel_coords = lambda coords: self.taylorGreenVelFunction(coords, self.nu)
-        fvort_coords = lambda coords: self.taylorGreenVortFunction(coords, self.nu)
-        fconv_coords = lambda coords: self.convective(coords, self.nu)
-        fdiff_coords = lambda coords: self.difusive(coords, self.nu)
+        fvel_coords = lambda coords: self.senoidalVelFunction(coords, self.nu)
+        fvort_coords = lambda coords: self.senoidalVortFunction(coords, self.nu)
+        fconv_coords = lambda coords: self.senoidalConvective(coords, self.nu)
+        fdiff_coords = lambda coords: self.senoidalDiffusive(coords, self.nu)
         exactVel = self.dom.applyFunctionVecToVec(allNodes, fvel_coords, exactVel, self.dim)
         exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort, self.dim_w)
         exactConv = self.dom.applyFunctionVecToVec(allNodes, fconv_coords, exactConv, self.dim_w )
@@ -52,7 +52,7 @@ class Senoidal(FreeSlip):
 
     def applyBoundaryConditions(self, bcNodes):
         self.vel.set(0.0)
-        fvel_coords = lambda coords: self.taylorGreenVelFunction(coords, self.nu)
+        fvel_coords = lambda coords: self.senoidalVelFunction(coords, self.nu)
         self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel, self.dim)
         self.vel.assemble()
 
@@ -63,29 +63,29 @@ class Senoidal(FreeSlip):
         step = 0
         exactVel, exactVort, exactConv, exactDiff = self.generateExactVecs()
         self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
-        convectivo = self.getconvectivo(exactVel, exactConv)
-        convectivo.setName("convectivo")
-        difusivo = self.getDifusivo(exactVel, exactDiff)
-        difusivo.setName("difusivo")
+        convective = self.getConvective(exactVel, exactConv)
+        convective.setName("convective")
+        diffusive = self.getDiffusive(exactVel, exactDiff)
+        diffusive.setName("diffusive")
         self.operator.Curl.mult(exactVel, self.vort)
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
         self.viewer.saveVec(exactVel, timeStep=step)
-        self.viewer.saveVec(convectivo, timeStep=step)
+        self.viewer.saveVec(convective, timeStep=step)
         self.viewer.saveVec(exactVort, timeStep=step)
         self.viewer.saveVec(exactConv, timeStep=step)
         self.viewer.saveVec(exactDiff, timeStep=step)
-        self.viewer.saveVec(difusivo, timeStep=step)
-        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, exactDiff, self.vort, self.vel, convectivo, difusivo])
+        self.viewer.saveVec(diffusive, timeStep=step)
+        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, exactDiff, self.vort, self.vel, convective, diffusive])
         self.viewer.writeXmf(self.caseName)
-        errorConv = (convectivo - exactConv).norm(norm_type=2)
-        errorDiff = (difusivo - exactDiff).norm(norm_type=2)
+        errorConv = (convective - exactConv).norm(norm_type=2)
+        errorDiff = (diffusive - exactDiff).norm(norm_type=2)
         errorCurl = (self.vort - exactVort).norm(norm_type=2)
         self.logger.info("Operatores Tests")
         return errorConv, errorDiff, errorCurl
 
-    def getconvectivo(self,exactVel, exactConv):
-        convectivo = exactConv.copy()
+    def getConvective(self,exactVel, exactConv):
+        convective = exactConv.copy()
         sK, eK = self.mat.K.getOwnershipRange()
         for indN in range(sK, eK, self.dim):
             indicesVV = [indN * self.dim_s / self.dim + d
@@ -98,21 +98,21 @@ class Senoidal(FreeSlip):
             self._VtensV.setValues(indicesVV, VValues, False)
         aux=self.vel.copy()
         self.operator.DivSrT.mult(self._VtensV, aux)
-        self.operator.Curl.mult(aux,convectivo)
-        return convectivo
+        self.operator.Curl.mult(aux,convective)
+        return convective
 
-    def getDifusivo(self,exactVel, exactDiff):
-        difusivo = exactDiff.copy()
+    def getDiffusive(self,exactVel, exactDiff):
+        diffusive = exactDiff.copy()
         self.operator.SrT.mult(exactVel, self._Aux1)
         aux=self.vel.copy()
         self._Aux1 *= (2.0 * self.mu)
         self.operator.DivSrT.mult(self._Aux1, aux)
         aux.scale(1/self.rho)
-        self.operator.Curl.mult(aux,difusivo)
-        return difusivo
+        self.operator.Curl.mult(aux,diffusive)
+        return diffusive
 
     @staticmethod
-    def taylorGreenVel_2D(coord, nu,t=None):
+    def senoidalVel_2D(coord, nu,t=None):
         Wref_x = 4
         Wref_y = 2
         x_ = Wref_y * pi * coord[1]
@@ -121,7 +121,7 @@ class Senoidal(FreeSlip):
         return [vel[0], vel[1]]
 
     @staticmethod
-    def taylorGreenVort_2D(coord, nu,t=None):
+    def senoidalVort_2D(coord, nu,t=None):
         Wref_x = 4
         Wref_y = 2
         x_ = Wref_y * pi * coord[1]
@@ -130,7 +130,7 @@ class Senoidal(FreeSlip):
         return [vort]
 
     @staticmethod
-    def convective(coord, nu, t=None):
+    def senoidalConvective(coord, nu, t=None):
         Wref_x = 4
         Wref_y = 2
         x_ = Wref_y * pi * coord[1]
@@ -139,7 +139,7 @@ class Senoidal(FreeSlip):
         return [conv]
 
     @staticmethod
-    def difusive(coord, nu, t=None):
+    def senoidalDiffusive(coord, nu, t=None):
         Wref_x = 4
         Wref_y = 2
         x_ = Wref_y * pi * coord[1]
