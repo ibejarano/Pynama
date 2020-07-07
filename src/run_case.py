@@ -53,6 +53,31 @@ def generateChart(viscousTime=[0.001,0.002,0.01,0.02,0.03,0.09,0.5]):
     plt.grid(True)
     plt.show()
 
+def generateChartOperators():
+    hAx = list()
+    vAx = [list(), list(), list()]
+    names = ["convective", "diffusive", "curl"]
+    totalNgl = 21
+    for i, ngl in enumerate(range(2,totalNgl,1)):
+        fem = FemProblem(ngl=ngl)
+        fem.setUp()
+        fem.setUpSolver()
+        errorConv, errorDiff, errorCurl = fem.solveKLETests()
+        vAx[0].append(errorConv)
+        vAx[1].append(errorDiff)
+        vAx[2].append(errorCurl)
+
+    hAx = list(range(2,totalNgl,1))
+    marker = [',','v','>','<','1','2','3','4','s','p','*','h','+']
+    for i, error in enumerate(vAx):
+        plt.figure(figsize=(10,10))
+        plt.loglog(hAx, error,'k'+marker[i]+'-', basey=10,linewidth =0.5)
+        plt.xlabel(r'$N*$')
+        plt.ylabel(r'$||Error||_{\infty}$')
+        plt.grid(True)
+        plt.savefig(f"error-{names[i]}")
+        plt.clf()
+
 def generateParaviewer():
     fem = FemProblem()
     fem.setUp()
@@ -90,6 +115,8 @@ def main():
         generateParaviewer()
     elif runTests == 'chart':
         generateChart()
+    elif runTests == 'operators':
+        generateChartOperators()
     else:
         timeSolving(name)
 

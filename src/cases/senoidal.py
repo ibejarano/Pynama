@@ -78,7 +78,11 @@ class Senoidal(FreeSlip):
         self.viewer.saveVec(difusivo, timeStep=step)
         self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, exactDiff, self.vort, self.vel, convectivo, difusivo])
         self.viewer.writeXmf(self.caseName)
+        errorConv = (convectivo - exactConv).norm(norm_type=2)
+        errorDiff = (difusivo - exactDiff).norm(norm_type=2)
+        errorCurl = (self.vort - exactVort).norm(norm_type=2)
         self.logger.info("Operatores Tests")
+        return errorConv, errorDiff, errorCurl
 
     def getconvectivo(self,exactVel, exactConv):
         convectivo = exactConv.copy()
