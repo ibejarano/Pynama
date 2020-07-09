@@ -22,7 +22,10 @@ class BaseProblem(object):
         self.timerTotal= Timer()
         self.timerTotal.tic()
         self.timer = Timer()
-        case = PETSc.Options().getString('case', 'uniform' )
+        try:
+            case = kwargs['case']
+        except:
+            case = PETSc.Options().getString('case', 'uniform' )
         try:
             with open(f'src/cases/{case}.yaml') as f:
                 yamlData = yaml.load(f, Loader=yaml.Loader)
@@ -32,12 +35,6 @@ class BaseProblem(object):
         except:
             self.logger.info(f"Case '{case}' Not Found")
 
-        for key in kwargs.keys():
-            try:
-                assert  yamlData['domain'][key]
-                yamlData['domain'][key] = kwargs[key]
-            except:
-                print(f"Key >> {key} << not defined in yaml")
 
         self.caseName = yamlData['name']
         self.readDomainData(yamlData['domain'])
