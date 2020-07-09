@@ -95,12 +95,12 @@ def timeSolving(name):
     fem.viewer.writeXmf(name)
     if not fem.comm.rank:
         fem.logger.info(f"Solver Finished in {fem.timer.toc()} seconds")
+        fem.logger.info(f"Total time: {fem.timerTotal.toc()} seconds")
 
 def main():
     case = OptDB.getString('case', False)
     log = OptDB.getString('log', 'INFO')
     runTests = OptDB.getString('test', False)
-
     logging.basicConfig(level=log.upper() )
     logger = logging.getLogger("")
 

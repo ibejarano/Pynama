@@ -19,6 +19,8 @@ class BaseProblem(object):
         comm: MPI Communicator
         """
         self.comm = comm
+        self.timerTotal= Timer()
+        self.timerTotal.tic()
         self.timer = Timer()
         case = PETSc.Options().getString('case', 'uniform' )
         try:
@@ -40,7 +42,6 @@ class BaseProblem(object):
         self.caseName = yamlData['name']
         self.readDomainData(yamlData['domain'])
         self.readMaterialData(yamlData['material-properties'])
-        
         if 'time-solver' in yamlData:
             self.setUpTimeSolver(yamlData['time-solver'])
         if 'boundary-conditions' in yamlData:
@@ -118,12 +119,34 @@ class BaseProblem(object):
         time = ts.time
         step = ts.step_number
         incr = ts.getTimeStep()
+        proc = self.vort.copy()
+        proc.setName("num proc")
+        # procSize = proc.getLocalSize()
+        # print(f"{proc.getOwnershipRange() = }")
+        beg, end = proc.getOwnershipRange() 
+        # locSize = proc.getLocalSize()
+        # dofs = list(range(locSize))
+        # print(len(dofs), dofs)
+        # print(locSize)
+        for i in range(beg,end):
+            proc.setValue(i, self.comm.rank)
+        proc.assemble()
+        # proc.setValuesLocal(dofs, [self.comm.rank]*locSize)
+        # proc.assemble()
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
-        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+        self.viewer.saveVec(proc, timeStep=step)
+        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort, proc])
+        self.createVtkFile()
 
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
+
+    def createVtkFile(self):
+        viewer = PETSc.Viewer()
+        viewer.createVTK('immersed-body.vtk', mode=PETSc.Viewer.Mode.WRITE)
+        viewer.view(self.dom)
+        viewer.destroy()
 
     def getBoundaryNodes(self):
         """ IS: Index Set """
