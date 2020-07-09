@@ -17,50 +17,33 @@ class ImmersedBoundaryStatic(FreeSlip):
         super().setUp()
 
         self.boundaryNodes = self.getBoundaryNodes()
-        self.cteValue = [300,0]
-        ndiv = 4 * 7
+        self.cteValue = [10,0]
+        ndiv = 4 * 1
         assert self.dim == 2
         dxMax = self.upper[0] - self.lower[0]
         rawNelem = self.nelem[0]
         nelem =float(rawNelem)
         self.h = dxMax / nelem
-        self.body = Body(ndiv)
-        self.createIBMMatrix()
-        self.saveVTK()
-        # self.diracVec = self.mat.K.createVecRight()
-        # self.saveDiracVec()
+        self.body = Circle()
+        self.body.generateBody(ndiv, radius=0.5)
+        # self.createIBMMatrix()
+        self.body.saveVTK()
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
         self.solveKLE(startTime, self.vort)
         self.vort = self.getVorticityCorrection()
 
-    # def setDiracVec(self, nodes, d):
-    #     self.diracVec.setValues(nodes[::2], d, addv=True)
-    #     self.diracVec.setValues(nodes[1::2], d, addv=True)
-
-    # def saveDiracVec(self):
-    #     self.diracVec.assemble()
-    #     self.diracVec.setName("dirac")
-        # self.viewer.saveVec(self.diracVec, timeStep=1)
-
     def convergedStepFunction(self, ts):
         time = ts.time
         step = ts.step_number
         incr = ts.getTimeStep()
         self.vort = self.getVorticityCorrection()
-        self.solveKLE(time, self.vort)
+        # self.solveKLE(time, self.vort)
         self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
-        self.viewer.saveVec(self.diracVec, timeStep=step)
-        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort, self.diracVec])
-
-    def saveVTK(self):
-        viewer = PETSc.Viewer()
-        viewer.createVTK('dom.vtk', mode=PETSc.Viewer.Mode.WRITE)
-        viewer.view(self.body.dom)
-        viewer.destroy()
+        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
 
     def applyBoundaryConditions(self):
         self.vel.set(0.0)
@@ -71,15 +54,15 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.applyBoundaryConditions()
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
         vorticity_corrected = self.getVorticityCorrection()
-        self.solver( self.mat.Rw * vorticity_corrected + self.mat.Krhs * self.vel , self.vel)
+        self.solver( self.mat.Rw * (vorticity_corrected+vort) + self.mat.Krhs * self.vel , self.vel)
 
     def getVorticityCorrection(self, finalStep=False):
         velocityCorrection = self.computeVelocityCorrection()
-        vort = self.mat.Curl.createVecLeft()
+        vort = self.operator.Curl.createVecLeft()
         vort.setName("vorticity")
         if not finalStep:
             self.vel += velocityCorrection
-        self.mat.Curl(self.vel , vort)
+        self.operator.Curl(velocityCorrection , vort)
         return vort
 
     def computeVelocityCorrection(self):
@@ -92,15 +75,12 @@ class ImmersedBoundaryStatic(FreeSlip):
         return velCorrection
 
     def createIBMMatrix(self):
-        print("Creating ibm Matrices")
-        """creates a PETSc Mat type
-        """
         dim = self.dim
         nodesLagTot = self.body.getTotalNodes()
         nodesEultotal = len(self.dom.getAllNodes())
         nodeLagWnodesEuler = dict()
         pre_d_nnz_D = list()
-        cellsAffected = self.getAffectedCells()
+        cellsAffected = self.getAffectedCells(None)
         for nodeLag in range(nodesLagTot):
             nodesEuler = self.getEulerNodes(cellsAffected, nodeLag)
             nodeLagWnodesEuler.update({nodeLag: nodesEuler})
@@ -135,30 +115,38 @@ class ImmersedBoundaryStatic(FreeSlip):
         A.scale(self.h**2)
         self.ksp = KspSolver()
         self.ksp.createSolver(A, self.comm)
-        # self.createEmptyVecs()
 
-    def getAffectedCells(self):
-        """ONLY VALID FOR CIRCLE BODY"""
+    def getAffectedCells(self, xSide, ySide=None , center=None):
+        try:
+            assert ySide
+        except:
+            ySide = xSide
+
         cellStart, cellEnd = self.dom.getHeightStratum(0)
+
         cells = list()
-        circleCenter = np.array([0, 0])
-        radius = self.body.getRadius()
+
+        try:
+            assert center[0]
+        except:
+            center = np.array([0, 0])
         for cell in range(cellStart, cellEnd):
             cellCoords = self.dom.getCellCornersCoords(cell).reshape(( 2 ** self.dim, self.dim))
             cellCentroid = self.computeCentroid(cellCoords)
-            dist = cellCentroid - circleCenter
-            if dist[0] < (radius + 3*self.body.dl): #Solo tomo una porcion rectangular
+            dist = cellCentroid - center
+            if abs(dist[0]) < (xSide) and abs(dist[1]) < (ySide):
                 cells.append(cell)
         return cells
 
     def getEulerNodes(self, cellList, bodyNode):
         points2 = set()
         coordsBodyNode = self.body.getNodeCoordinates(bodyNode)
+        dl = self.body.getElementLong()
         for cell in cellList:
             coords = self.dom.getCellCornersCoords(cell).reshape((2**self.dim, self.dim))
             cellCentroid = self.computeCentroid(coords)
             dist = coordsBodyNode - cellCentroid
-            if (abs(dist[0]) < self.body.dl*2) & (abs(dist[1]) < self.body.dl*3):
+            if (abs(dist[0]) < dl*2) & (abs(dist[1]) < dl*2):
                 listaux = self.dom.getGlobalNodesFromCell(cell, shared=False)
                 points2.update(listaux)
         return points2
@@ -180,12 +168,6 @@ class ImmersedBoundaryStatic(FreeSlip):
                 distanceClosest.append(d)
                 nodesClose.append(nodes[node_ind])
                 pointsClosest.extend(self.dom.getVelocityIndex([nodes[node_ind]]))
-        # if nodeBody == 0:
-        #     self.setDiracVec(pointsClosest, distanceClosest)
-        #     print(f"{nodeBody =}")
-        #     print(f"{nodesClose =}")
-        #     print(f"{pointsClosest =}")
-        #     print(f"{distanceClosest =}")
         return distanceClosest, pointsClosest
 
     @staticmethod
@@ -201,66 +183,114 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         self.body.computeVelocity(t)
         self.body.updateCoordinates(t)
         self.buildMatrices()
-        vort = self.mat.Curl.createVecLeft()
+        vort = self.operator.Curl.createVecLeft()
         vort.setName("vorticity")
         self.vel += self.computeVelocityCorrection()
-        self.mat.Curl(self.vel , vort)
+        self.operator.Curl(self.vel , vort)
         return vort        
 
-class Body:
-    def __init__(self, divisions):
-        """Immersed boundary method class
-        Arguments:
-            domLag {string} -- it does indicates the location of .msh Gmsh File
-        """
+class ImmersedBody:
+    def __init__(self):
+        self.dirac = threeGrid
+        self.__centerDisplacement = [0,0]
+        self.__dl = None
+    
+    def setUpDimensions(self):
+        self.firstNode, self.lastNode = self.__dom.getHeightStratum(1)
+        self.coordinates = self.__dom.getCoordinatesLocal()
+        self.coordSection = self.__dom.getCoordinateSection()
 
-        # FIXME: i tried to create from gmsh but i cant
-        # self.domLag = PETSc.DMPlex().createFromFile(domLag)
-        self.radius = 1
-        self.bodyMovement = False  # FIXME dtype can be a PETSc Vec in a future
-        # FIXME: getHeightStratum(1) is only valid for dim=2
-        self.dirac = linear
-        self.dom , self.dl = generateCircleDMPlex(self.radius,divisions)
+    def generateDMPlex(self, coords, cone, dim=1):
+        self.__dom = PETSc.DMPlex().createFromCellList(dim, cone,coords)
         self.setUpDimensions()
 
-    def setUpDimensions(self):
-        # self.getInternalBodyNodes()
-        self.firstNode, self.lastNode = self.dom.getHeightStratum(1)
-        self.coordinates = self.dom.getCoordinatesLocal()
-        self.coordSection = self.dom.getCoordinateSection()
-        self._centerDisplacement = np.array([0,0])
-
-    def createVtkFile(self):
+    def saveVTK(self):
         viewer = PETSc.Viewer()
-        viewer.createVTK('ibCircle.vtk')
-        viewer.view(self.dom)
+        viewer.createVTK('body.vtk', mode=PETSc.Viewer.Mode.WRITE)
+        viewer.view(self.__dom)
         viewer.destroy()
 
-    def getRadius(self):
-        return self.radius
+    def setCenter(self, val):
+        self.__centerDisplacement = val
+
+    def setElementLong(self, dl):
+        self.__dl = dl
 
     def getElementLong(self):
-        return self.dl
+        return self.__dl
 
     def getTotalNodes(self):
         return self.lastNode - self.firstNode
 
     def getNodeCoordinates(self, node):
-        """Gets a List with all the coordinates from a node
-        Arguments:
-            node {int} -- Node from Lagrangian mesh
-        Raises:
-            Exception -- if node number exceedes the space range
-        Returns:
-            [float] -- x , y [,z] coordinates
-        """
-        if node + self.firstNode >= self.lastNode:
-            raise Exception('node parameter must be in local numbering!')
-        return self.dom.vecGetClosure(
+        return self.__dom.vecGetClosure(
             self.coordSection, self.coordinates, node + self.firstNode
-            ) + self._centerDisplacement
+            ) + self.__centerDisplacement
+    
+    def getRegion(self):
+        return None
 
-    # BODY MOVEMENTS FUNCTIONS
+    def computeDirac(self, eulerCoord):
+        points = list()
+        computedDiracs = list()
+        allPoints = self.getTotalNodes()
+        for poi in range(allPoints):
+            coord = self.getNodeCoordinates(poi)
+            dist = coord - eulerCoord
+            dirac = 1
+            for d in dist:
+                dirac *= self.dirac(d/self.__dl)
+            if dirac > 0:
+                computedDiracs.append(dirac)
+                points.append(poi)
+        return points, computedDiracs
+
+class Line(ImmersedBody):
+    def generateBody(self, div, **kwargs):
+        # this can be improved with lower & upper
+        longitud = kwargs['long']
+        coords_x = np.linspace(0, longitud, div)
+        coords_y = np.array([1]*div)
+        coords = np.array([coords_x.T, coords_y.T])
+        dl = longitud / (div-1)
+        cone= list()
+        for i in range(div-1):
+            localCone = [i,i+1]
+            cone.append(localCone)
+        self.__dl = dl
+        self.__centerDisplacement = [0,1]
+        self.generateDMPlex(coords.T, cone)
+
+    def getRegion(self):
+        return 1
+
+class Circle(ImmersedBody):
+    def generateBody(self, n, **kwargs):
+        r = kwargs['radius']
+        rev = 2 * pi
+        div = rev/n
+        angles = np.arange(0, rev+div , div)
+        x = r * np.cos(angles)
+        y = r * np.sin(angles)
+        coords = list()
+        cone = list()
+        for i in range(len(x)-1):
+            localCone = [i,i+1]
+            coords.append([x[i] , y[i]])
+            cone.append(localCone)
+        cone[-1][-1] = 0
+        dl = sqrt((coords[0][0]-coords[1][0])**2 + (coords[0][1]-coords[1][1])**2)
+
+        self.setCenter(np.array([0,0]))
+        self.setElementLong(dl)
+        self.radius = r
+        self.generateDMPlex(coords, cone)
+
+    def getRadius(self):
+        return self.radius
+
+    def getRegion(self):
+        return self.radius
 
     def computeVelocity(self, t):
         velX = 0
@@ -272,14 +302,14 @@ class Body:
             # print('velocity ind', velIndex)
             vel =  [velX, velY]
             # print('Vel', vel)
-            self._velocity.setValues(velIndex, vel, False)
+            self.__velocity.setValues(velIndex, vel, False)
         # print('Body vel size', self._BodyVelocity.getSize())
-        self._velocity.assemble()
+        self.__velocity.assemble()
 
     def updateCoordinates(self, t):
         displX = 0
         displY = t * sin(t/2)
-        self._centerDisplacement = np.array([displX , displY])
+        self.__centerDisplacement = np.array([displX , displY])
 
 def threeGrid(r):
     """supports only three cell grids"""
@@ -314,19 +344,60 @@ def fourGrid(r):
         return 0
     return accum
 
-def generateCircleDMPlex(radius,n):
-    r= radius
-    rev = 2 * pi
-    div = rev/n
-    angles = np.arange(0, rev+div , div)
-    x = r * np.cos(angles)
-    y = r * np.sin(angles)
-    coords = list()
-    cone = list()
-    for i in range(len(x)-1):
-        localCone = [i,i+1]
-        coords.append([x[i] , y[i]])
-        cone.append(localCone)
-    cone[-1][-1] = 0
-    dl = sqrt((coords[0][0]-coords[1][0])**2 + (coords[0][1]-coords[1][1])**2)
-    return PETSc.DMPlex().createFromCellList(1, cone,coords) ,  dl
+class EulerNodes:
+    def __init__(self, total, dim):
+        self.__eulerNodes = list()
+        self.__localLagNodes = set()
+        self.__totalNodes = total
+        self.__dim = dim
+
+    def __repr__(self):
+        print(f"Total Nodes in Domain: {self.__totalNodes}")
+        print("Nodes affected by Body")
+        for eul in self.__eulerNodes:
+            print(f"Node Euler: {eul.getNumEuler()} :  {eul.getLagList()}  ")
+
+        print(f"Local Lagrangian num Nodes: {self.__localLagNodes}")
+        return "------"
+
+    def getAffectedNodes(self):
+        return self.__eulerNodes
+
+    def add(self, eul, lag, diracs):
+        euler = EulerNode(eul, lag, diracs)
+        self.__eulerNodes.append(euler)
+        self.__localLagNodes.update(lag)
+
+    def generate_d_nnz(self):
+        d_nnz = [0] * self.__totalNodes * self.__dim
+        for eul in self.__eulerNodes:
+            nodeNum = eul.getNumEuler()
+            for dof in range(self.__dim):
+                d_nnz[nodeNum*2+dof] = eul.getNumLag()
+        return d_nnz
+
+    def getProblemDimension(self):
+        rows = self.__totalNodes * self.__dim
+        cols = len(self.__localLagNodes) * self.__dim
+        return cols, rows
+
+class EulerNode:
+    def __init__(self, num, lag, diracs):
+        self.__num = num
+        self.__lagNodes = lag
+        self.__diracs = diracs
+
+    def __repr__(self):
+        return f"Euler Node: {self.__num}"
+
+    def getLagList(self):
+        return self.__lagNodes
+
+    def getNumLag(self):
+        return len(self.__lagNodes)
+    
+    def getNumEuler(self):
+        return self.__num
+        
+    def getDiracComputed(self):
+        return self.__diracs
