@@ -54,25 +54,28 @@ def generateChart(viscousTime=[0.001,0.002,0.01,0.02,0.03,0.09,0.5]):
     plt.show()
 
 def generateChartOperators():
-    hAx = list()
-    vAx = [list(), list(), list()]
+    hAx = [list(),list()]
+    vAx = [[list(), list(), list()],[list(), list(), list()]]
     names = ["convective", "diffusive", "curl"]
-    totalNgl = 21
-    for i, ngl in enumerate(range(2,totalNgl,1)):
-        fem = FemProblem(ngl=ngl)
-        fem.setUp()
-        fem.setUpSolver()
-        errorConv, errorDiff, errorCurl = fem.solveKLETests()
-        vAx[0].append(errorConv)
-        vAx[1].append(errorDiff)
-        vAx[2].append(errorCurl)
-
-    hAx = list(range(2,totalNgl,1))
-    marker = [',','v','>','<','1','2','3','4','s','p','*','h','+']
-    for i, error in enumerate(vAx):
+    totalNgl = 23
+    for x, elem in enumerate(range(2,5,2)):
+        for i, ngl in enumerate(range(3,totalNgl,1)):
+            fem = FemProblem(ngl=ngl, nelem=[elem,elem])
+            fem.setUp()
+            fem.setUpSolver()
+            errorConv, errorDiff, errorCurl = fem.solveKLETests()
+            vAx[x][0].append(errorConv)
+            vAx[x][1].append(errorDiff)
+            vAx[x][2].append(errorCurl)
+            hAx[x].append((ngl-1)*elem)
+    #hAx = list(range(2,totalNgl,1))
+    marker = ['h','v','>','<','1','2','3','4','s','p','*','h','+']
+    for i in range(3):
         plt.figure(figsize=(10,10))
-        plt.loglog(hAx, error,'k'+marker[i]+'-', basey=10,linewidth =0.5)
+        plt.loglog(hAx[0], vAx[0][i],'k'+marker[i]+'-', basey=10,linewidth =0.5, color="b", label="Nel=2x2")
+        plt.loglog(hAx[1], vAx[1][i],'k'+marker[i]+'-', basey=10,linewidth =0.5, color="r", label="Nel=4x4")
         plt.xlabel(r'$N*$')
+        plt.legend()
         plt.ylabel(r'$||Error||_{\infty}$')
         plt.grid(True)
         plt.savefig(f"error-{names[i]}")
