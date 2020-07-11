@@ -53,7 +53,7 @@ class Cavity(NoSlip):
             self.vel.setValues(dofVelToSet, np.repeat(vel, len(nodes)))
 
         # set vel to zero in corner nodes
-        self.vel.setValues(self.cornerDofs, np.repeat(0, len(self.cornerDofs)) )
+        #self.vel.setValues(self.cornerDofs, np.repeat(0, len(self.cornerDofs)) )
         self.vel.assemble()
 
     def applyBoundaryConditionsFS(self):
