@@ -18,29 +18,55 @@ class ImmersedBoundaryStatic(FreeSlip):
 
         self.boundaryNodes = self.getBoundaryNodes()
         self.cteValue = [10,0]
-        ndiv = 4 * 1
+        ndiv = 4 * 5
         assert self.dim == 2
         dxMax = self.upper[0] - self.lower[0]
         rawNelem = self.nelem[0]
         nelem =float(rawNelem)
         self.h = dxMax / nelem
+        self.h /= 2
         self.body = Circle()
         self.body.generateBody(ndiv, radius=0.5)
-        # self.createIBMMatrix()
+        self.createIBMMatrix()
         self.body.saveVTK()
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
-        self.solveKLE(startTime, self.vort)
-        self.vort = self.getVorticityCorrection()
+
+    def setUpSolver(self):
+        self.solver = KspSolver()
+        self.solver.createSolver(self.mat.K, self.comm)
+        self.vel = self.mat.K.createVecRight()
+        self.vel.setName("velocity")
+        self.vort = self.mat.Rw.createVecRight()
+        self.vort.setName("vorticity")
+        self.vort.set(0.0)
+
+        self.vel_correction = self.vel.copy()
+        self.vel_correction.setName("velocity_correction")
+        self.vort_correction = self.vort.copy()
+        self.vort_correction.setName("vorticity_correction")
+
+        self.virtualFlux = self.S.createVecRight()
+        self.virtualFlux.setName("virtual_flux")
+        self.ibm_rhs = self.S.createVecRight()
+
+        sK, eK = self.mat.K.getOwnershipRange()
+        locRowsK = eK - sK
+
+        self._VtensV = PETSc.Vec().createMPI(
+            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
+        self._Aux1 = PETSc.Vec().createMPI(
+            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
 
     def convergedStepFunction(self, ts):
         time = ts.time
         step = ts.step_number
         incr = ts.getTimeStep()
-        self.vort = self.getVorticityCorrection()
+        # self.vort = self.getVorticityCorrection()
         # self.solveKLE(time, self.vort)
         self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
+        self.vel += self.vel_correction
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
         self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
@@ -53,83 +79,60 @@ class ImmersedBoundaryStatic(FreeSlip):
     def solveKLE(self, time, vort, finalStep=False):
         self.applyBoundaryConditions()
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
-        vorticity_corrected = self.getVorticityCorrection()
-        self.solver( self.mat.Rw * (vorticity_corrected+vort) + self.mat.Krhs * self.vel , self.vel)
+        self.getVorticityCorrection()
+        self.solver( self.mat.Rw * (self.vort_correction+vort) + self.mat.Krhs * self.vel , self.vel)
 
     def getVorticityCorrection(self, finalStep=False):
-        velocityCorrection = self.computeVelocityCorrection()
-        vort = self.operator.Curl.createVecLeft()
-        vort.setName("vorticity")
-        if not finalStep:
-            self.vel += velocityCorrection
-        self.operator.Curl(velocityCorrection , vort)
-        return vort
+        self.computeVelocityCorrection()
+        self.operator.Curl(self.vel_correction, self.vort_correction)
 
     def computeVelocityCorrection(self):
-        velCorrection = self.vel.copy()
-        virtualFlux = self.Dds.createVecRight()
-        rhs = self.Dds.createVecRight()
-        self.D.mult(self.vel * (self.h**2), rhs)
-        self.ksp.solve( -rhs, virtualFlux)
-        self.Dds.mult(virtualFlux, velCorrection)
-        return velCorrection
+        self.ibm_rhs.set(0.0)
+        self.vel_correction.set(0.0)
+        self.H.mult(self.vel, self.ibm_rhs)
+        self.ksp.solve( -self.ibm_rhs, self.virtualFlux)
+        self.S.mult(self.virtualFlux, self.vel_correction)
 
     def createIBMMatrix(self):
-        dim = self.dim
-        nodesLagTot = self.body.getTotalNodes()
-        nodesEultotal = len(self.dom.getAllNodes())
-        nodeLagWnodesEuler = dict()
-        pre_d_nnz_D = list()
-        cellsAffected = self.getAffectedCells(None)
-        for nodeLag in range(nodesLagTot):
-            nodesEuler = self.getEulerNodes(cellsAffected, nodeLag)
-            nodeLagWnodesEuler.update({nodeLag: nodesEuler})
-            pre_d_nnz_D.append(len(nodesEuler))
+        rows = self.body.getTotalNodes() * self.dim
+        cols = len(self.dom.getAllNodes()) * self.dim
+        bodyRegion = self.body.getRegion()
+        cellsAffected = self.getAffectedCells(bodyRegion)
+        nodes = self.dom.getGlobalNodesFromEntities(cellsAffected, shared=False)
+        d_nnz_D = len(nodes)
+        o_nnz_D = 0
 
-        d_nnz_D = [d for d in pre_d_nnz_D for j in range(dim)]
-        o_nnz_D = [0] * nodesLagTot * dim
-
-        self.D = PETSc.Mat().createAIJ(
-            size=(nodesLagTot*dim, nodesEultotal*dim), 
+        self.H = PETSc.Mat().createAIJ(size=(rows, cols), 
             nnz=(d_nnz_D, o_nnz_D), 
-            comm=self.comm
-            )
+            comm=self.comm)
+        self.H.setUp()
 
-        self.D.setUp()
-        for nodeBody, nodes in nodeLagWnodesEuler.items():
-            dist, eulerClosest = self.getClosestDistance(
-                nodeBody, nodes)
-            self.D.setValues(
-                nodeBody*2, eulerClosest[::2], dist
-                )
-            self.D.setValues(
-                nodeBody*2+1, eulerClosest[1::2], dist
-                )
-        
-        self.D.assemble()
-        self.Dds = self.D.copy().transpose()
+        lagNodes = self.body.getTotalNodes()
+        eulerIndices = [node*self.dim+dof for node in nodes for dof in range(self.dim)]
+        eulerCoords = self.dom.getNodesCoordinates(nodes)
+        for lagNode in range(lagNodes):
+            dirac = self.computeDirac(lagNode, eulerCoords)
+            for dof in range(self.dim):
+                self.H.setValues(lagNode*self.dim+dof, eulerIndices[dof::self.dim], dirac)
+
+        self.H.assemble()
+        self.S = self.H.copy().transpose()
 
         dl = self.body.getElementLong()
-        self.Dds.scale(dl)
-        A = self.D.matMult(self.Dds)
-        A.scale(self.h**2)
+        self.S.scale(dl)
+        self.H.scale(self.h**2)
+        A = self.H.matMult(self.S)
         self.ksp = KspSolver()
         self.ksp.createSolver(A, self.comm)
 
-    def getAffectedCells(self, xSide, ySide=None , center=None):
+    def getAffectedCells(self, xSide, ySide=None , center=[0,0]):
         try:
             assert ySide
         except:
             ySide = xSide
 
         cellStart, cellEnd = self.dom.getHeightStratum(0)
-
         cells = list()
-
-        try:
-            assert center[0]
-        except:
-            center = np.array([0, 0])
         for cell in range(cellStart, cellEnd):
             cellCoords = self.dom.getCellCornersCoords(cell).reshape(( 2 ** self.dim, self.dim))
             cellCentroid = self.computeCentroid(cellCoords)
@@ -138,37 +141,19 @@ class ImmersedBoundaryStatic(FreeSlip):
                 cells.append(cell)
         return cells
 
-    def getEulerNodes(self, cellList, bodyNode):
-        points2 = set()
-        coordsBodyNode = self.body.getNodeCoordinates(bodyNode)
+    def computeDirac(self, lagPoint, eulerCoords):
+        diracs = list()
+        coordBodyNode = self.body.getNodeCoordinates(lagPoint)
         dl = self.body.getElementLong()
-        for cell in cellList:
-            coords = self.dom.getCellCornersCoords(cell).reshape((2**self.dim, self.dim))
-            cellCentroid = self.computeCentroid(coords)
-            dist = coordsBodyNode - cellCentroid
-            if (abs(dist[0]) < dl*2) & (abs(dist[1]) < dl*2):
-                listaux = self.dom.getGlobalNodesFromCell(cell, shared=False)
-                points2.update(listaux)
-        return points2
-
-    def getClosestDistance(self, nodeBody, nodes):
-        nodes = list(nodes)
-        distanceClosest = list()
-        pointsClosest = list()
-        nodesClose = list()
-        coordBodyNode = self.body.getNodeCoordinates(nodeBody)
-        nodeCoordinates = self.dom.getNodesCoordinates(nodes)
-        for node_ind, coords in enumerate(nodeCoordinates):
+        for coords in eulerCoords:
             dist = coords - coordBodyNode
             d = 1
             for x in dist:
-                d *= self.body.dirac(x/self.h)
-            d /= (self.h**2)
-            if d > 0:
-                distanceClosest.append(d)
-                nodesClose.append(nodes[node_ind])
-                pointsClosest.extend(self.dom.getVelocityIndex([nodes[node_ind]]))
-        return distanceClosest, pointsClosest
+                r = x/dl
+                d *= self.body.dirac(r)
+                d /= (dl)
+            diracs.append(d)
+        return diracs
 
     @staticmethod
     def computeCentroid(corners):
@@ -290,7 +275,8 @@ class Circle(ImmersedBody):
         return self.radius
 
     def getRegion(self):
-        return self.radius
+        dl = self.getElementLong()
+        return self.radius + dl
 
     def computeVelocity(self, t):
         velX = 0
@@ -313,15 +299,13 @@ class Circle(ImmersedBody):
 
 def threeGrid(r):
     """supports only three cell grids"""
-    accum = 1
     r = abs(r)
+    d = 0
     if r <=  0.5:
-        accum *= (1 + sqrt(-3*r**2 + 1))/3
+        d = (1 + sqrt(-3*r**2 + 1))/3
     elif r <= 1.5:
-        accum *= (5 - 3*r - sqrt(-3*(1-r)**2 + 1))/6
-    else:
-        return 0
-    return accum
+        d = (5 - 3*r - sqrt(-3*(1-r)**2 + 1))/6
+    return d
 
 def linear(r):
     """Lineal Dirac discretization"""

@@ -13,7 +13,20 @@ class TestSearch(unittest.TestCase):
         self.fem.setUp()
 
     def test_total_euler_nodes_finded(self):
-        pass
+        cells = self.fem.getAffectedCells(1)
+        # send cells get nodes
+        nodes = self.fem.dom.getGlobalNodesFromEntities(cells, shared=False)
+        # ngl = 3
+        assert len(nodes) == 5*5
+
+        cells = self.fem.getAffectedCells(xSide=2, ySide=2)
+        nodes = self.fem.dom.getGlobalNodesFromEntities(cells, shared=False)
+        assert len(nodes) == 9*9
+
+        cells = self.fem.getAffectedCells(xSide=1, ySide=2)
+        nodes = self.fem.dom.getGlobalNodesFromEntities(cells, shared=False)
+        
+        assert len(nodes) == 5*9
 
     def test_affected_cells_center_origin(self):
         cells = self.fem.getAffectedCells(1)
