@@ -17,8 +17,8 @@ class ImmersedBoundaryStatic(FreeSlip):
         super().setUp()
 
         self.boundaryNodes = self.getBoundaryNodes()
-        self.cteValue = [10,0]
-        ndiv = 4 * 5
+        self.cteValue = [60,0]
+        ndiv = 4 * 6
         assert self.dim == 2
         dxMax = self.upper[0] - self.lower[0]
         rawNelem = self.nelem[0]
@@ -59,32 +59,98 @@ class ImmersedBoundaryStatic(FreeSlip):
         self._Aux1 = PETSc.Vec().createMPI(
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
 
+    def evalRHS(self, ts, t, Vort, f):
+        """Evaluate the KLE right hand side."""
+        # KLE spatial solution with vorticity given
+        dt = ts.getTimeStep()
+        self.solveKLE(t, Vort, dt)
+        # FIXME: Generalize for dim = 3 also
+        sK, eK = self.mat.K.getOwnershipRange()
+
+        for indN in range(sK, eK, self.dim):
+            indicesVV = [indN * self.dim_s / self.dim + d
+                         for d in range(self.dim_s)]
+            VelN = self.vel.getValues([indN + d for d in range(self.dim)])
+            if self.dim==2:
+                VValues = [VelN[0] ** 2, VelN[0] * VelN[1], VelN[1] ** 2]
+            elif self.dim==3:
+                VValues = [VelN[0] ** 2, VelN[0] * VelN[1] ,VelN[1] ** 2 , VelN[1] * VelN[2] , VelN[2] **2 , VelN[2] *VelN[0]]
+            else:
+                raise Exception("Wrong dim")
+
+            self._VtensV.setValues(indicesVV, VValues, False)
+
+        self._VtensV.assemble()
+
+        # self._Aux1 = self.SrT * self._Vel
+        self.operator.SrT.mult(self.vel, self._Aux1)
+
+        # _Aux1 = 2*Mu * S - rho * Vvec ^ VVec
+        self._Aux1 *= (2.0 * self.mu)
+        self._Aux1.axpy(-1.0 * self.rho, self._VtensV)
+
+        # FIXME: rhs should be created previously or not?
+        rhs = self.vel.duplicate()
+        # RHS = Curl * Div(SrT) * 2*Mu * S - rho * Vvec ^ VVec
+            # rhs = (self.DivSrT * self._Aux1) / self.rho
+        self.operator.DivSrT.mult(self._Aux1, rhs)
+        rhs.scale(1/self.rho)
+
+        self.operator.Curl.mult(rhs, f)
+
     def convergedStepFunction(self, ts):
         time = ts.time
         step = ts.step_number
+        solution = ts.getSolution()
         incr = ts.getTimeStep()
-        # self.vort = self.getVorticityCorrection()
-        # self.solveKLE(time, self.vort)
-        self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
+        self.getVorticityCorrection(incr)
+        # self.solver( self.mat.Rw * self.vort_correction + self.mat.Krhs * self.vel , self.vel)
         self.vel += self.vel_correction
+        self.operator.Curl.mult(self.vel , self.vort)
+        # self.solver( self.mat.Rw * self.vort + self.mat.Krhs * self.vel , self.vel)
+        # dl = self.body.getElementLong()
+        self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
+        
+        # force = self.virtualFlux.getArray()
+        # f_x = force[::2].sum()
+        # f_y = force[1::2].sum()
+        # print(f_x, f_y)
         self.viewer.saveVec(self.vel, timeStep=step)
-        self.viewer.saveVec(self.vort, timeStep=step)
-        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+        self.viewer.saveVec(solution, timeStep=step)
+        self.viewer.saveStepInXML(step, time, vecs=[self.vel, solution])
 
     def applyBoundaryConditions(self):
         self.vel.set(0.0)
         velDofs = [nodes*2 + dof for nodes in self.boundaryNodes for dof in range(2)]
         self.vel.setValues(velDofs, np.tile(self.cteValue, len(self.boundaryNodes)))
 
-    def solveKLE(self, time, vort, finalStep=False):
+    def solveKLE(self, time, vort, dt):
         self.applyBoundaryConditions()
+        # Obtain predicted velocity
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
-        self.getVorticityCorrection()
-        self.solver( self.mat.Rw * (self.vort_correction+vort) + self.mat.Krhs * self.vel , self.vel)
+        # Get vorticity corrected (dont touch predicted vel)
+        self.getVorticityCorrection(dt)
+        # Solve and get the velocity with the vorticity as input
+        self.solver( self.mat.Rw * self.vort_correction + self.mat.Krhs * self.vel , self.vel)
 
-    def getVorticityCorrection(self, finalStep=False):
+    def getVorticityCorrection(self, dt):
         self.computeVelocityCorrection()
-        self.operator.Curl(self.vel_correction, self.vort_correction)
+        # self.vel += self.vel_correction
+        # self.directForcing(dt)
+        self.operator.Curl(self.vel_correction + self.vel, self.vort_correction)
+
+    def directForcing(self, dt):
+        # print("dt", dt)
+        NF = 4
+        for i in range(NF):
+            self.H.mult((self.vel_correction+self.vel), self.virtualFlux)
+            #aca resto con la vel del cuerpo pero como es cero...
+            self.virtualFlux.scale(-1/dt)
+            # propago al fluido
+            f_aux = self.vel_correction.copy()
+            self.S.mult(self.virtualFlux, f_aux)
+            f_aux.scale(dt)
+            self.vel_correction += f_aux
 
     def computeVelocityCorrection(self):
         self.ibm_rhs.set(0.0)
@@ -144,14 +210,9 @@ class ImmersedBoundaryStatic(FreeSlip):
     def computeDirac(self, lagPoint, eulerCoords):
         diracs = list()
         coordBodyNode = self.body.getNodeCoordinates(lagPoint)
-        dl = self.body.getElementLong()
         for coords in eulerCoords:
             dist = coords - coordBodyNode
-            d = 1
-            for x in dist:
-                r = x/dl
-                d *= self.body.dirac(r)
-                d /= (dl)
+            d = self.body.getDiracs(dist)
             diracs.append(d)
         return diracs
 
@@ -162,17 +223,8 @@ class ImmersedBoundaryStatic(FreeSlip):
 class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
     def getVorticityCorrection(self, t, finalStep=False):
         """Main function to be called after a Converged Time Step"""
-        self.D.destroy()
-        self.Dds.destroy()
-        self.ksp.destroy()
-        self.body.computeVelocity(t)
-        self.body.updateCoordinates(t)
-        self.buildMatrices()
         vort = self.operator.Curl.createVecLeft()
-        vort.setName("vorticity")
-        self.vel += self.computeVelocityCorrection()
-        self.operator.Curl(self.vel , vort)
-        return vort        
+        return vort 
 
 class ImmersedBody:
     def __init__(self):
@@ -215,20 +267,12 @@ class ImmersedBody:
     def getRegion(self):
         return None
 
-    def computeDirac(self, eulerCoord):
-        points = list()
-        computedDiracs = list()
-        allPoints = self.getTotalNodes()
-        for poi in range(allPoints):
-            coord = self.getNodeCoordinates(poi)
-            dist = coord - eulerCoord
-            dirac = 1
-            for d in dist:
-                dirac *= self.dirac(d/self.__dl)
-            if dirac > 0:
-                computedDiracs.append(dirac)
-                points.append(poi)
-        return points, computedDiracs
+    def getDiracs(self, dist):
+        dirac = 1
+        for r in dist:   
+            dirac *= self.dirac(abs(r)/self.__dl)
+            dirac /= self.__dl
+        return dirac
 
 class Line(ImmersedBody):
     def generateBody(self, div, **kwargs):
@@ -299,34 +343,27 @@ class Circle(ImmersedBody):
 
 def threeGrid(r):
     """supports only three cell grids"""
-    r = abs(r)
-    d = 0
     if r <=  0.5:
-        d = (1 + sqrt(-3*r**2 + 1))/3
+        return (1 + sqrt(-3*r**2 + 1))/3
     elif r <= 1.5:
-        d = (5 - 3*r - sqrt(-3*(1-r)**2 + 1))/6
-    return d
+        return (5 - 3*r - sqrt(-3*(1-r)**2 + 1))/6
+    else:
+        return 0
 
 def linear(r):
     """Lineal Dirac discretization"""
-    accum = 1
-    r = abs(r)
     if (r < 1):
-        accum *= (1 - r)
+        return (1 - r)
     else:
         return 0
-    return accum
 
 def fourGrid(r):
-    accum = 1
-    r = abs(r)
     if r <=  1:
-        accum *= (3 - 2*r + sqrt(1 + 4*r - 4*r**2))/8
+        return (3 - 2*r + sqrt(1 + 4*r - 4*r**2))/8
     elif r <= 2:
-        accum *= (5 - 2*r - sqrt(-7+12*r-4*r**2))/8
+        return (5 - 2*r - sqrt(-7+12*r-4*r**2))/8
     else:
         return 0
-    return accum
 
 class EulerNodes:
     def __init__(self, total, dim):
