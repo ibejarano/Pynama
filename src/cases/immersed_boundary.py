@@ -8,30 +8,91 @@ from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
 from solver.ksp_solver import KspSolver
+import matplotlib.pyplot as plt
 
 # ibm imports
-from math import sqrt, sin, pi
+from math import sqrt, sin, pi, ceil
 
 class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
         super().setUp()
-
         self.boundaryNodes = self.getBoundaryNodes()
-        self.cteValue = [60,0]
-        ndiv = 4 * 6
-        assert self.dim == 2
-        dxMax = self.upper[0] - self.lower[0]
-        rawNelem = self.nelem[0]
-        nelem =float(rawNelem)
-        self.h = dxMax / nelem
-        self.h /= 2
-        self.body = Circle()
-        self.body.generateBody(ndiv, radius=0.5)
         self.createIBMMatrix()
         self.body.saveVTK()
 
+    def readBoundaryCondition(self, inputData):
+        try:
+            re = inputData['constant']['re']
+            L = self.body.getCaracteristicLong()
+            vel_x = re*(self.mu/self.rho) / L
+            self.U_ref = vel_x
+            self.cteValue = [vel_x,0]
+        except:
+            vel = inputData['constant']['vel']
+            self.U_ref = (vel[0]**2 + vel[1]**2)**0.5
+            self.cteValue = [vel_x,0]
+
+    def readDomainData(self, inputData):
+        super().readDomainData(inputData)
+        numElements = self.nelem[0]
+        self.h = (self.upper[0] - self.lower[0])/numElements
+        if self.ngl == 3:
+            self.h /= 2
+        elif self.ngl > 3:
+            raise Exception("High Order nodes not implemented")
+        self.body = self.createBody(inputData['body'])
+
+    def startSolver(self):
+        self.computeInitialCondition(startTime= 0.0)
+        self.vort.set(0.0)
+        self.computeVelocityCorrection(NF=4)
+        self.operator.Curl.mult(self.vel, self.vort)
+        self.ts.setSolution(self.vort)
+        cds = list()
+        clifts = list()
+        times = list()
+        for i in range(100):
+            self.ts.step()
+            step = self.ts.getStepNumber()
+            time = self.ts.time
+            dt = self.ts.getTimeStep()
+            qx , qy = self.computeVelocityCorrection(NF=4)
+            cd, cl = self.computeDragForce(qx / dt, qy / dt)
+            cds.append(cd)
+            clifts.append(cl)
+            times.append(time)
+            self.operator.Curl.mult(self.vel, self.vort)
+            self.viewer.saveVec(self.vel, timeStep=step)
+            self.viewer.saveVec(self.vort, timeStep=step)
+            self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+            self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Cd {cd} | Cl {cl} ")
+            # print(f"printing info {self.ts.getTime()= } {self.ts.getSolveTime()= } {self.ts.getPrevTime() = }")
+            # print(f"printing info {self.ts.getTimeStep()= } {self.ts.getStepNumber()= }")
+            self.ts.setSolution(self.vort)
+            self.viewer.writeXmf("ibm-static")
+        # print(times)
+        # print(cds)
+        # print(clifts)
+        plt.figure(figsize=(10,10))
+        plt.plot(times, cds, 'r-', label='c_drag')
+        plt.plot(times, clifts, 'b-', label='c_lift')
+        plt.legend()
+        plt.xlabel("times [s]")
+        plt.ylabel("C_d")
+        plt.grid(True)
+        # plt.show()
+        nombre = "pruebitas"
+        plt.savefig(f"cdsclsVtime-{nombre}.png")
+
+    def computeDragForce(self, fd, fl):
+        U = self.U_ref
+        denom = 0.5 * self.rho * (U**2)
+        cd = fd/denom
+        return cd, fl/denom
+
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
+        self.solveKLE(startTime, self.vort)
 
     def setUpSolver(self):
         self.solver = KspSolver()
@@ -59,105 +120,35 @@ class ImmersedBoundaryStatic(FreeSlip):
         self._Aux1 = PETSc.Vec().createMPI(
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
 
-    def evalRHS(self, ts, t, Vort, f):
-        """Evaluate the KLE right hand side."""
-        # KLE spatial solution with vorticity given
-        dt = ts.getTimeStep()
-        self.solveKLE(t, Vort, dt)
-        # FIXME: Generalize for dim = 3 also
-        sK, eK = self.mat.K.getOwnershipRange()
-
-        for indN in range(sK, eK, self.dim):
-            indicesVV = [indN * self.dim_s / self.dim + d
-                         for d in range(self.dim_s)]
-            VelN = self.vel.getValues([indN + d for d in range(self.dim)])
-            if self.dim==2:
-                VValues = [VelN[0] ** 2, VelN[0] * VelN[1], VelN[1] ** 2]
-            elif self.dim==3:
-                VValues = [VelN[0] ** 2, VelN[0] * VelN[1] ,VelN[1] ** 2 , VelN[1] * VelN[2] , VelN[2] **2 , VelN[2] *VelN[0]]
-            else:
-                raise Exception("Wrong dim")
-
-            self._VtensV.setValues(indicesVV, VValues, False)
-
-        self._VtensV.assemble()
-
-        # self._Aux1 = self.SrT * self._Vel
-        self.operator.SrT.mult(self.vel, self._Aux1)
-
-        # _Aux1 = 2*Mu * S - rho * Vvec ^ VVec
-        self._Aux1 *= (2.0 * self.mu)
-        self._Aux1.axpy(-1.0 * self.rho, self._VtensV)
-
-        # FIXME: rhs should be created previously or not?
-        rhs = self.vel.duplicate()
-        # RHS = Curl * Div(SrT) * 2*Mu * S - rho * Vvec ^ VVec
-            # rhs = (self.DivSrT * self._Aux1) / self.rho
-        self.operator.DivSrT.mult(self._Aux1, rhs)
-        rhs.scale(1/self.rho)
-
-        self.operator.Curl.mult(rhs, f)
-
-    def convergedStepFunction(self, ts):
-        time = ts.time
-        step = ts.step_number
-        solution = ts.getSolution()
-        incr = ts.getTimeStep()
-        self.getVorticityCorrection(incr)
-        # self.solver( self.mat.Rw * self.vort_correction + self.mat.Krhs * self.vel , self.vel)
-        self.vel += self.vel_correction
-        self.operator.Curl.mult(self.vel , self.vort)
-        # self.solver( self.mat.Rw * self.vort + self.mat.Krhs * self.vel , self.vel)
-        # dl = self.body.getElementLong()
-        self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
-        
-        # force = self.virtualFlux.getArray()
-        # f_x = force[::2].sum()
-        # f_y = force[1::2].sum()
-        # print(f_x, f_y)
-        self.viewer.saveVec(self.vel, timeStep=step)
-        self.viewer.saveVec(solution, timeStep=step)
-        self.viewer.saveStepInXML(step, time, vecs=[self.vel, solution])
-
-    def applyBoundaryConditions(self):
+    def applyBoundaryConditions(self, a, b):
         self.vel.set(0.0)
         velDofs = [nodes*2 + dof for nodes in self.boundaryNodes for dof in range(2)]
         self.vel.setValues(velDofs, np.tile(self.cteValue, len(self.boundaryNodes)))
 
-    def solveKLE(self, time, vort, dt):
-        self.applyBoundaryConditions()
-        # Obtain predicted velocity
-        self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
-        # Get vorticity corrected (dont touch predicted vel)
-        self.getVorticityCorrection(dt)
-        # Solve and get the velocity with the vorticity as input
-        self.solver( self.mat.Rw * self.vort_correction + self.mat.Krhs * self.vel , self.vel)
-
-    def getVorticityCorrection(self, dt):
-        self.computeVelocityCorrection()
-        # self.vel += self.vel_correction
-        # self.directForcing(dt)
-        self.operator.Curl(self.vel_correction + self.vel, self.vort_correction)
-
-    def directForcing(self, dt):
-        # print("dt", dt)
-        NF = 4
+    def computeVelocityCorrection(self, NF=1):
+        fx = 0
+        fy = 0
+        bodyVel = self.body.getVelocity()
         for i in range(NF):
-            self.H.mult((self.vel_correction+self.vel), self.virtualFlux)
-            #aca resto con la vel del cuerpo pero como es cero...
-            self.virtualFlux.scale(-1/dt)
-            # propago al fluido
-            f_aux = self.vel_correction.copy()
-            self.S.mult(self.virtualFlux, f_aux)
-            f_aux.scale(dt)
-            self.vel_correction += f_aux
+            self.H.mult(self.vel, self.ibm_rhs)
+            self.ksp.solve(bodyVel - self.ibm_rhs, self.virtualFlux)
+            self.S.mult(self.virtualFlux, self.vel_correction)
+            aux = self.virtualFlux.getArray()
+            fx_part, fy_part = self.body.computeForce(aux)
+            fx += fx_part
+            fy += fy_part
+            self.vel += self.vel_correction
+        return abs(fx*self.rho), abs(fy*self.rho)
 
-    def computeVelocityCorrection(self):
-        self.ibm_rhs.set(0.0)
-        self.vel_correction.set(0.0)
-        self.H.mult(self.vel, self.ibm_rhs)
-        self.ksp.solve( -self.ibm_rhs, self.virtualFlux)
-        self.S.mult(self.virtualFlux, self.vel_correction)
+    def createBody(self, inp):
+        vel = inp['vel']
+        body = inp['type']
+        if body['name'] == "circle":
+            radius = body['radius']
+            center = body['center']
+            ibmBody = Circle(vel)
+            ibmBody.generateBody(self.h, radius=radius)
+            return ibmBody
 
     def createIBMMatrix(self):
         rows = self.body.getTotalNodes() * self.dim
@@ -220,6 +211,8 @@ class ImmersedBoundaryStatic(FreeSlip):
     def computeCentroid(corners):
         return np.mean(corners, axis=0)
 
+
+
 class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
     def getVorticityCorrection(self, t, finalStep=False):
         """Main function to be called after a Converged Time Step"""
@@ -227,10 +220,11 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         return vort 
 
 class ImmersedBody:
-    def __init__(self):
-        self.dirac = threeGrid
+    def __init__(self, vel=[0,0]):
+        self.dirac = fourGrid
         self.__centerDisplacement = [0,0]
         self.__dl = None
+        self.__vel = vel
     
     def setUpDimensions(self):
         self.firstNode, self.lastNode = self.__dom.getHeightStratum(1)
@@ -240,6 +234,12 @@ class ImmersedBody:
     def generateDMPlex(self, coords, cone, dim=1):
         self.__dom = PETSc.DMPlex().createFromCellList(dim, cone,coords)
         self.setUpDimensions()
+        points = self.getTotalNodes()
+        ind = [poi*2+dof for poi in range(points) for dof in range(len(self.__vel))]
+        self.__velVec = PETSc.Vec().createMPI(
+            (( points * len(self.__vel), None)))
+        self.__velVec.setValues( ind , np.tile(self.__vel, points) )
+        self.__velVec.assemble()
 
     def saveVTK(self):
         viewer = PETSc.Viewer()
@@ -250,14 +250,38 @@ class ImmersedBody:
     def setCenter(self, val):
         self.__centerDisplacement = val
 
-    def setElementLong(self, dl):
+    def setElementLong(self, dl, normals):
+        self.__normals = normals
         self.__dl = dl
+
+    def computeForce(self, q):
+        # fx = q[0]*norm[0] + q[2]*norm[2]
+        # fy = q[1]*norm[1] + q[3]*norm[3]
+        fx = 0
+        fy = 0
+        points = self.getTotalNodes()
+        for poi in range(points):
+            coord = self.getNodeCoordinates(poi)
+            d_x = coord[0] * self.__dl / 0.5
+            d_y = coord[1] * self.__dl / 0.5
+            fx += q[poi*2]*d_x
+            fy += q[poi*2+1]*d_y
+        return fx, fy
+
+    def getVelocity(self):
+        return self.__velVec
 
     def getElementLong(self):
         return self.__dl
 
     def getTotalNodes(self):
         return self.lastNode - self.firstNode
+
+    def setCaracteristigLong(self, val):
+        self.__L = val
+
+    def getCaracteristicLong(self):
+        return self.__L
 
     def getNodeCoordinates(self, node):
         return self.__dom.vecGetClosure(
@@ -286,32 +310,41 @@ class Line(ImmersedBody):
         for i in range(div-1):
             localCone = [i,i+1]
             cone.append(localCone)
-        self.__dl = dl
-        self.__centerDisplacement = [0,1]
+
         self.generateDMPlex(coords.T, cone)
+        self.setCenter(np.array([0,0]))
+        self.setCaracteristigLong(longitud)
+        self.setElementLong(dl, normals=[1])
 
     def getRegion(self):
         return 1
 
 class Circle(ImmersedBody):
-    def generateBody(self, n, **kwargs):
+    def generateBody(self, dh, **kwargs):
         r = kwargs['radius']
-        rev = 2 * pi
+        rev = 2*pi
+        n = ceil(rev*r/dh)
+        assert n > 4
         div = rev/n
+        startAng = 0.1*pi
+        # startAng = 0
         angles = np.arange(0, rev+div , div)
-        x = r * np.cos(angles)
-        y = r * np.sin(angles)
+        x = r * np.cos(angles + startAng)
+        y = r * np.sin(angles + startAng)
         coords = list()
         cone = list()
+        norms = list()
         for i in range(len(x)-1):
             localCone = [i,i+1]
             coords.append([x[i] , y[i]])
+            norms.append([x[i]/r , y[i]/r])
             cone.append(localCone)
         cone[-1][-1] = 0
         dl = sqrt((coords[0][0]-coords[1][0])**2 + (coords[0][1]-coords[1][1])**2)
 
         self.setCenter(np.array([0,0]))
-        self.setElementLong(dl)
+        self.setElementLong(dl, normals=norms)
+        self.setCaracteristigLong(r*2)
         self.radius = r
         self.generateDMPlex(coords, cone)
 
