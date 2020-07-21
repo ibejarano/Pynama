@@ -1,11 +1,11 @@
 import numpy as np
-from math import sin , pi , sqrt, ceil
+from math import sin, cos , pi , sqrt, ceil
 from petsc4py import PETSc
 
 class ImmersedBody:
-    def __init__(self, vel=[0,0]):
+    def __init__(self, vel=[0,0], center=[0,0]):
         self.dirac = fourGrid
-        self.__centerDisplacement = [0,0]
+        self.__centerDisplacement = center
         self.__dl = None
         self.__vel = vel
     
@@ -70,6 +70,9 @@ class ImmersedBody:
     def getCaracteristicLong(self):
         return self.__L
 
+    def getCenterBody(self):
+        return self.__centerDisplacement
+
     def getNodeCoordinates(self, node):
         return self.__dom.vecGetClosure(
             self.coordSection, self.coordinates, node + self.firstNode
@@ -85,6 +88,23 @@ class ImmersedBody:
             dirac /= self.__dl
         return dirac
 
+    def updateBodyParameters(self, t):
+        velX = 0
+        displX = 0
+        f = 0.1
+        A = 2*pi*t*f
+        displY = 0.5 * sin(A)
+        velY = 0.5 * 2*pi* f * cos(A)
+        self.__vel = [velX, velY]
+        self.__centerDisplacement = [displX, displY]
+        self.updateVelocity()
+
+    def updateVelocity(self):
+        points = self.getTotalNodes()
+        ind = [poi*2+dof for poi in range(points) for dof in range(len(self.__vel))]
+        self.__velVec.setValues( ind , np.tile(self.__vel, points) )
+        self.__velVec.assemble()
+
 class Line(ImmersedBody):
     def generateBody(self, div, **kwargs):
         # this can be improved with lower & upper
@@ -99,7 +119,7 @@ class Line(ImmersedBody):
             cone.append(localCone)
 
         self.generateDMPlex(coords.T, cone)
-        self.setCenter(np.array([0,0]))
+        self.setCenter(np.array([0,1]))
         self.setCaracteristigLong(longitud)
         self.setElementLong(dl, normals=[1])
 
@@ -140,26 +160,7 @@ class Circle(ImmersedBody):
 
     def getRegion(self):
         dl = self.getElementLong()
-        return self.radius + dl
-
-    def computeVelocity(self, t):
-        velX = 0
-        velY = sin(t/2)
-        # print('Computed Vel Y' , velY)
-        nodes = self.lastNode - self.firstNode
-        for i in range(nodes):
-            velIndex = [i*2 , i*2 +1] 
-            # print('velocity ind', velIndex)
-            vel =  [velX, velY]
-            # print('Vel', vel)
-            self.__velocity.setValues(velIndex, vel, False)
-        # print('Body vel size', self._BodyVelocity.getSize())
-        self.__velocity.assemble()
-
-    def updateCoordinates(self, t):
-        displX = 0
-        displY = t * sin(t/2)
-        self.__centerDisplacement = np.array([displX , displY])
+        return self.radius + 2*dl
 
 def threeGrid(r):
     """supports only three cell grids"""
