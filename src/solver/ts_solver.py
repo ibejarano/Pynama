@@ -3,8 +3,8 @@ from petsc4py.PETSc import TS
 class TsSolver(TS):
     def __init__(self, comm):
         self.create(comm=comm)
-        self.setProblemType(self.ProblemType.LINEAR)  # Should we use LINEAR?
-        self.setEquationType(self.EquationType.ODE_EXPLICIT)
+        self.setProblemType(self.ProblemType.NONLINEAR)  # Should we use LINEAR?
+        # self.setEquationType(self.EquationType.ODE_EXPLICIT)
         self.setType(self.Type.RK)
         # self.setRKType(self.RKType.RK5F)
 
