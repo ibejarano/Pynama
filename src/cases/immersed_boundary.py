@@ -7,6 +7,7 @@ import yaml
 from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
+from viewer.plotter import DualAxesPlotter
 from solver.ksp_solver import KspSolver
 from domain.immersed_body import Circle, Line
 import matplotlib.pyplot as plt
@@ -18,8 +19,13 @@ class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
         super().setUp()
         self.boundaryNodes = self.getBoundaryNodes()
-        self.createIBMMatrix()
+        self.createEmptyIBMMatrix()
+        self.buildIBMMatrix()
         self.body.saveVTK()
+
+        name1= r'Coef. de arrastre $C_D$'
+        name2= r'Coef. de empuje $C_{L}$'
+        self.plotter = DualAxesPlotter(name1, name2)
 
     def readBoundaryCondition(self, inputData):
         try:
@@ -50,18 +56,6 @@ class ImmersedBoundaryStatic(FreeSlip):
         clifts = list()
         times = list()
         maxSteps = self.ts.getMaxSteps()
-
-        fig, ax1 = plt.subplots()
-        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-        color = 'tab:red'
-        ax1.set_xlabel('time (s)')
-        ax1.set_ylabel(r'Coef. de arrastre $C_D$', color='red')
-        ax1.tick_params(axis='y', labelcolor=color)
-        color = 'tab:blue'
-        ax2.set_ylabel(r'Coef. de empuje $C_{L}$', color='blue')  # we already handled the x-label with ax1
-        ax2.tick_params(axis='y', labelcolor=color)
-
-        fig.tight_layout()  # otherwise the right y-label is slightly clipped
         for i in range(maxSteps):
             self.ts.step()
             step = self.ts.getStepNumber()
@@ -81,21 +75,15 @@ class ImmersedBoundaryStatic(FreeSlip):
             self.ts.setSolution(self.vort)
             self.viewer.writeXmf("ibm-static")
             if i % 50 == 0:
-                ax1.clear()
-                ax2.clear()
-                ax1.set_ylim(0,3.5)
-                ax2.set_ylim(0,3.5)
-                ax1.plot(times, cds, color="red")
-                ax2.plot(times, clifts, color="blue")
-                plt.pause(0.0001)
+                self.plotter.updatePlot(times, cds, clifts, realTimePlot=True)
             if time > self.ts.getMaxTime():
                 break
         # plt.show()
         data = {"times": times, "cd": cds, "cl": clifts}
         with open('data.yml', 'w') as outfile:
             yaml.dump(data, outfile, default_flow_style=False)
-        nombre = "re40"
-        plt.savefig(f"cdsclsVtime-{nombre}.png")
+        nombre = "cds-cl-re20"
+        self.plotter.savePlot(nombre)
 
     def computeDragForce(self, fd, fl):
         U = self.U_ref
@@ -165,17 +153,17 @@ class ImmersedBoundaryStatic(FreeSlip):
         if body['name'] == "circle":
             radius = body['radius']
             center = body['center']
-            ibmBody = Circle(vel)
+            ibmBody = Circle(vel, center)
             ibmBody.generateBody(self.h, radius=radius)
             return ibmBody
 
-    def createIBMMatrix(self):
+    def createEmptyIBMMatrix(self):
         rows = self.body.getTotalNodes() * self.dim
         cols = len(self.dom.getAllNodes()) * self.dim
         bodyRegion = self.body.getRegion()
         cellsAffected = self.getAffectedCells(bodyRegion)
-        nodes = self.dom.getGlobalNodesFromEntities(cellsAffected, shared=False)
-        d_nnz_D = len(nodes)
+        self.ibmNodes = self.dom.getGlobalNodesFromEntities(cellsAffected, shared=False)
+        d_nnz_D = len(self.ibmNodes)
         o_nnz_D = 0
 
         self.H = PETSc.Mat().createAIJ(size=(rows, cols), 
@@ -183,9 +171,10 @@ class ImmersedBoundaryStatic(FreeSlip):
             comm=self.comm)
         self.H.setUp()
 
+    def buildIBMMatrix(self):
         lagNodes = self.body.getTotalNodes()
-        eulerIndices = [node*self.dim+dof for node in nodes for dof in range(self.dim)]
-        eulerCoords = self.dom.getNodesCoordinates(nodes)
+        eulerIndices = [node*self.dim+dof for node in self.ibmNodes for dof in range(self.dim)]
+        eulerCoords = self.dom.getNodesCoordinates(self.ibmNodes)
         for lagNode in range(lagNodes):
             dirac = self.computeDirac(lagNode, eulerCoords)
             totNNZ = 0
@@ -235,7 +224,55 @@ class ImmersedBoundaryStatic(FreeSlip):
         return np.mean(corners, axis=0)
 
 class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
-    def getVorticityCorrection(self, t, finalStep=False):
-        """Main function to be called after a Converged Time Step"""
-        vort = self.operator.Curl.createVecLeft()
-        return vort 
+    def startSolver(self):
+        self.computeInitialCondition(startTime= 0.0)
+        self.ts.setSolution(self.vort)
+        maxSteps = self.ts.getMaxSteps()
+        for step in range(1,maxSteps):
+            self.ts.step()
+            time = self.ts.time
+            self.computeVelocityCorrection(time, NF=4)
+            position = self.body.getCenterBody()
+            self.operator.Curl.mult(self.vel, self.vort)
+            self.viewer.saveVec(self.vel, timeStep=step)
+            self.viewer.saveVec(self.vort, timeStep=step)
+            self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+            self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} ")
+            self.ts.setSolution(self.vort)
+            self.viewer.writeXmf("ibm-static")
+
+    def computeInitialCondition(self, startTime):
+        self.vort.set(0.0)
+        self.solveKLE(startTime, self.vort)
+        self.computeVelocityCorrection(startTime, NF=2)
+        self.operator.Curl.mult(self.vel, self.vort)
+
+    def computeVelocityCorrection(self, t, NF=1):
+        self.body.updateBodyParameters(t)
+        self.rebuildMatrix()
+        bodyVel = self.body.getVelocity()
+        for i in range(NF):
+            self.H.mult(self.vel, self.ibm_rhs)
+            self.ksp.solve(bodyVel - self.ibm_rhs, self.virtualFlux)
+            self.S.mult(self.virtualFlux, self.vel_correction)
+            self.vel += self.vel_correction
+
+    def createEmptyIBMMatrix(self):
+        rows = self.body.getTotalNodes() * self.dim
+        cols = len(self.dom.getAllNodes()) * self.dim
+        bodyRegion = self.body.getRegion()
+        cellsAffected = self.getAffectedCells(bodyRegion*1.5)
+        self.ibmNodes = self.dom.getGlobalNodesFromEntities(cellsAffected, shared=False)
+        d_nnz_D = len(self.ibmNodes)
+        o_nnz_D = 0
+        self.H = PETSc.Mat().createAIJ(size=(rows, cols), 
+            nnz=(d_nnz_D, o_nnz_D), 
+            comm=self.comm)
+        self.H.setUp()
+
+    def rebuildMatrix(self):
+        self.H.destroy()
+        self.S.destroy()
+        self.ksp.destroy()
+        self.createEmptyIBMMatrix()
+        self.buildIBMMatrix()

@@ -18,6 +18,9 @@ elif case == 'uniform':
 elif case == 'ibm-static':
     name = 'ibm-static'
     from cases.immersed_boundary import ImmersedBoundaryStatic as FemProblem
+elif case == 'ibm-dynamic':
+    name = case
+    from cases.immersed_boundary import ImmersedBoundaryDynamic as FemProblem
 elif case == 'senoidal':
     name = 'senoidal'
     from cases.senoidal import Senoidal as FemProblem
@@ -91,10 +94,10 @@ def timeSolving(name):
     if not fem.comm.rank:
         fem.logger.info("Solving problem...")
     fem.timer.tic()
-    try:
-        fem.startSolver()
-    except:
-        fem.logger.info("Error ocurred...")
+    # try:
+    fem.startSolver()
+    # except:
+    #     fem.logger.info("Error ocurred...")
     fem.viewer.writeXmf(name)
     if not fem.comm.rank:
         fem.logger.info(f"Solver Finished in {fem.timer.toc()} seconds")
