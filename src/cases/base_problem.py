@@ -35,7 +35,6 @@ class BaseProblem(object):
         except:
             self.logger.info(f"Case '{case}' Not Found")
 
-
         self.caseName = yamlData['name']
         self.readDomainData(yamlData['domain'])
         self.readMaterialData(yamlData['material-properties'])
