@@ -8,6 +8,9 @@ class ImmersedBody:
         self.__centerDisplacement = center
         self.__dl = None
         self.__vel = vel
+
+    def setVelRef(self, vel):
+        self.__Uref = vel
     
     def setUpDimensions(self):
         self.firstNode, self.lastNode = self.__dom.getHeightStratum(1)
@@ -49,7 +52,7 @@ class ImmersedBody:
         for poi in range(points):
             nodes = self.__lagNodes[poi]
             fx += q[poi*2] * nodes
-            fy += q[poi*2] * 16
+            fy += q[poi*2+1] * nodes
             if 16 - nodes < 0:
                 print("HAY MAS NODOS!")
             fouris += 16 - nodes
@@ -89,12 +92,14 @@ class ImmersedBody:
         return dirac
 
     def updateBodyParameters(self, t):
+        # A1 : f/D = 7.5 & A=D = 1 => f=7.5 & A =1
         velX = 0
         displX = 0
-        f = 0.1
-        A = 2*pi*t*f
-        displY = 0.5 * sin(A)
-        velY = 0.5 * 2*pi* f * cos(A)
+        f = 7.5
+        A = 1
+        alpha = 2 * pi * self.__Uref / f  
+        displY = A * sin(alpha * t)
+        velY = A * alpha * cos(A)
         self.__vel = [velX, velY]
         self.__centerDisplacement = [displX, displY]
         self.updateVelocity()
@@ -133,7 +138,7 @@ class Circle(ImmersedBody):
         n = ceil(rev*r/dh)
         assert n > 4
         div = rev/n
-        startAng = 0.1*pi
+        startAng = pi/1000
         # startAng = 0
         angles = np.arange(0, rev+div , div)
         x = r * np.cos(angles + startAng)
