@@ -33,7 +33,7 @@ class Paraviewer:
             ViewHDF5.create(name + '.h5', mode=PETSc.Viewer.Mode.WRITE,
                             comm=self.comm)
         else:
-            ViewHDF5.create(name + '-%04d.h5' % timeStep,
+            ViewHDF5.create(name + '-%05d.h5' % timeStep,
                             mode=PETSc.Viewer.Mode.WRITE, comm=self.comm)
         ViewHDF5.pushGroup('/fields')
         ViewHDF5.view(obj=vec)   # Put PETSc object into the viewer
