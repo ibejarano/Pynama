@@ -50,8 +50,13 @@ class TestSearch(unittest.TestCase):
         assert len(cells)== 1 * 3
 
 class TestDirac(unittest.TestCase):
+    def setUp(self):
+        self.ibm = ImmersedBoundaryStatic(case='ibm-static')
+        self.ibm.setUp()
+        self.ibm.setUpSolver()
+
     def test_mass_conservation(self):
-        pass
+        assert 2==1
 
     def test_momentum_conservation(self):
         pass
