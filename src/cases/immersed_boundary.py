@@ -34,6 +34,7 @@ class ImmersedBoundaryStatic(FreeSlip):
             vel_x = re*(self.mu/self.rho) / L
             self.U_ref = vel_x
             self.cteValue = [vel_x,0]
+            self.re = re
         except:
             vel = inputData['constant']['vel']
             self.U_ref = (vel[0]**2 + vel[1]**2)**0.5
@@ -67,23 +68,22 @@ class ImmersedBoundaryStatic(FreeSlip):
             clifts.append(cl)
             times.append(time)
             self.operator.Curl.mult(self.vel, self.vort)
-            # self.solveKLE(time, self.vort)
-            self.viewer.saveVec(self.vel, timeStep=step)
-            self.viewer.saveVec(self.vort, timeStep=step)
-            self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
-            self.logger.info(f"Nodos arafue {fs}  Converged: Step {step:4} | Time {time:.4e} | Cd {cd:.6f} | Cl {cl:.3f}")
             self.ts.setSolution(self.vort)
-            self.viewer.writeXmf("ibm-static")
-            if i % 50 == 0:
-                self.plotter.updatePlot(times, cds, clifts, realTimePlot=True)
+            self.logger.info(f"Nodos arafue {fs}  Converged: Step {step:4} | Time {time:.4e} | Cd {cd:.6f} | Cl {cl:.3f}")
             if time > self.ts.getMaxTime():
                 break
-        # plt.show()
+            elif i % 10 == 0:
+                self.viewer.saveVec(self.vort, timeStep=step)
+                self.viewer.saveVec(self.vel, timeStep=step)
+                self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+                self.viewer.writeXmf(self.caseName)
+
+        self.plotter.updatePlot(times, cds, clifts, realTimePlot=False)
         data = {"times": times, "cd": cds, "cl": clifts}
-        with open('data.yml', 'w') as outfile:
+        runName = f"{self.caseName}-{self.re}"
+        with open(runName+'.yaml', 'w') as outfile:
             yaml.dump(data, outfile, default_flow_style=False)
-        nombre = "cds-cl-re20"
-        self.plotter.savePlot(nombre)
+        self.plotter.savePlot(runName)
 
     def computeDragForce(self, fd, fl):
         U = self.U_ref
@@ -145,7 +145,7 @@ class ImmersedBoundaryStatic(FreeSlip):
             fx_part, fy_part, fs = self.body.computeForce(aux)
             fx += fx_part
             fy += fy_part
-        return abs(fx)*self.h**2, abs(fy)*self.h**2, fs
+        return -fx*self.h**2,  -fy*self.h**2, fs
 
     def createBody(self, inp):
         vel = inp['vel']
@@ -228,21 +228,23 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         self.computeInitialCondition(startTime= 0.0)
         self.ts.setSolution(self.vort)
         maxSteps = self.ts.getMaxSteps()
-        for step in range(1,maxSteps):
+        for step in range(1,maxSteps+1):
             self.ts.step()
             time = self.ts.time
             self.computeVelocityCorrection(time, NF=4)
             position = self.body.getCenterBody()
             self.operator.Curl.mult(self.vel, self.vort)
-            self.viewer.saveVec(self.vel, timeStep=step)
-            self.viewer.saveVec(self.vort, timeStep=step)
-            self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} ")
             self.ts.setSolution(self.vort)
-            self.viewer.writeXmf("ibm-static")
+            if step % 10 == 0:
+                self.viewer.saveVec(self.vel, timeStep=step)
+                self.viewer.saveVec(self.vort, timeStep=step)
+                self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+                self.viewer.writeXmf(self.caseName)
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
+        self.body.setVelRef(self.U_ref)
         self.solveKLE(startTime, self.vort)
         self.computeVelocityCorrection(startTime, NF=2)
         self.operator.Curl.mult(self.vel, self.vort)
@@ -261,7 +263,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         rows = self.body.getTotalNodes() * self.dim
         cols = len(self.dom.getAllNodes()) * self.dim
         bodyRegion = self.body.getRegion()
-        cellsAffected = self.getAffectedCells(bodyRegion*1.5)
+        cellsAffected = self.getAffectedCells(bodyRegion*3)
         self.ibmNodes = self.dom.getGlobalNodesFromEntities(cellsAffected, shared=False)
         d_nnz_D = len(self.ibmNodes)
         o_nnz_D = 0
