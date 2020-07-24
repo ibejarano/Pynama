@@ -116,7 +116,7 @@ class XmlGenerator(object):
 
     @staticmethod
     def formatStep(step):
-        maxZeros = 4
+        maxZeros = 5
         step = str(step)
         zerosToAdd = maxZeros - len(step)
         zerosInFront = '0' * zerosToAdd
