@@ -50,6 +50,18 @@ class ImmersedBoundaryStatic(FreeSlip):
             self.h /= 4
         self.body = self.createBody(inputData['body'])
 
+    def buildOperators(self):
+        cornerCoords = self.dom.getCellCornersCoords(cell=0)
+        localOperators = self.elemType.getElemKLEOperators(cornerCoords)
+        for cell in range(self.dom.cellStart, self.dom.cellEnd):
+            nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
+            self.operator.setValues(localOperators, nodes)
+        self.operator.weigDivSrT.assemble()
+        self.weigArea = self.operator.weigDivSrT.copy()
+        self.operator.assembleAll()
+        if not self.comm.rank:
+            self.logger.info(f"Operators Matrices builded")
+
     def startSolver(self):
         self.computeInitialCondition(startTime= 0.0)
         self.ts.setSolution(self.vort)
@@ -189,7 +201,8 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.S = self.H.copy().transpose()
         dl = self.body.getElementLong()
         self.S.scale(dl)
-        self.H.scale(self.h**2)
+        self.H.diagonalScale(R=self.weigArea)
+        self.weigArea.destroy()
         A = self.H.matMult(self.S)
         self.ksp = KspSolver()
         self.ksp.createSolver(A, self.comm)
