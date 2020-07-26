@@ -73,8 +73,7 @@ class XmlGenerator(object):
         attrData.set("Dimensions", "{}".format(self.dimensions))
         attrData.set("NumberType", "Float")
         attrData.set("Format", "HDF")
-        stepFormat = self.formatStep(step)
-        attrData.text = "{}-{}.h5:/fields/{}".format(name, stepFormat, name) 
+        attrData.text = "{}-{:05d}.h5:/fields/{}".format(name, step, name) 
 
     def setDataToAttribute(self, attrData, step, name, dof):
         dofs = ['X', 'Y', 'Z']
@@ -94,8 +93,7 @@ class XmlGenerator(object):
         velData.set("Dimensions", str(self.dimensions * self.dim))
         velData.set("NumberType", "Float")
         velData.set("Format", "HDF")
-        stepFormat = self.formatStep(step)
-        velData.text = "{}-{}.h5:/fields/{}".format(name, stepFormat, name) 
+        velData.text = "{}-{:05d}.h5:/fields/{}".format(name, step, name) 
 
     def writeFile(self, nameFile):
         """Return a pretty-printed XML string for the Element.
@@ -116,7 +114,7 @@ class XmlGenerator(object):
 
     @staticmethod
     def formatStep(step):
-        maxZeros = 4
+        maxZeros = 5
         step = str(step)
         zerosToAdd = maxZeros - len(step)
         zerosInFront = '0' * zerosToAdd
