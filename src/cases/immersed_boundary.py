@@ -89,11 +89,11 @@ class ImmersedBoundaryStatic(FreeSlip):
             self.logger.info(f"Nodos arafue {fs}  Converged: Step {step:4} | Time {time:.4e} | Cd {cd:.6f} | Cl {cl:.3f}")
             if time > self.ts.getMaxTime():
                 break
-            # elif i % 10 == 0:
-            self.viewer.saveVec(self.vort, timeStep=step)
-            self.viewer.saveVec(self.vel, timeStep=step)
-            self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
-            self.viewer.writeXmf(self.caseName)
+            elif i % 10 == 0:
+                self.viewer.saveVec(self.vort, timeStep=step)
+                self.viewer.saveVec(self.vel, timeStep=step)
+                self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+                self.viewer.writeXmf(self.caseName)
 
         self.plotter.updatePlot(times, cds, clifts, realTimePlot=False)
         data = {"times": times, "cd": cds, "cl": clifts}
