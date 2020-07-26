@@ -27,28 +27,33 @@ class ImmersedBoundaryStatic(FreeSlip):
         name2= r'Coef. de empuje $C_{L}$'
         self.plotter = DualAxesPlotter(name1, name2)
 
-    def readBoundaryCondition(self, inputData):
+    def readBoundaryCondition(self):
+        bc = self.config.get("boundary-conditions")
         try:
-            re = inputData['constant']['re']
+            re = bc['constant']['re']
             L = self.body.getCaracteristicLong()
             vel_x = re*(self.mu/self.rho) / L
             self.U_ref = vel_x
             self.cteValue = [vel_x,0]
             self.re = re
         except:
-            vel = inputData['constant']['vel']
+            vel = bc['constant']['vel']
             self.U_ref = (vel[0]**2 + vel[1]**2)**0.5
             self.cteValue = [vel_x,0]
 
-    def readDomainData(self, inputData):
-        super().readDomainData(inputData)
+    def readDomainData(self):
+        super().readDomainData()
         numElements = self.nelem[0]
-        self.h = (self.upper[0] - self.lower[0])/numElements
+        self.h = (eval(self.upper[0]) - eval(self.lower[0]))/numElements
         if self.ngl == 3:
             self.h /= 2
         else:
             self.h /= 4
-        self.body = self.createBody(inputData['body'])
+
+        bodies = self.config.get("body")
+        for body in bodies:
+            # ONLY for 1 body
+            self.body = self.createBody(body)
 
     def buildOperators(self):
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
@@ -74,7 +79,7 @@ class ImmersedBoundaryStatic(FreeSlip):
             step = self.ts.getStepNumber()
             time = self.ts.time
             dt = self.ts.getTimeStep()
-            qx , qy, fs = self.computeVelocityCorrection(NF=4)
+            qx , qy, fs = self.computeVelocityCorrection(NF=1)
             cd, cl = self.computeDragForce(qx / dt, qy / dt)
             cds.append(cd)
             clifts.append(cl)
@@ -84,11 +89,11 @@ class ImmersedBoundaryStatic(FreeSlip):
             self.logger.info(f"Nodos arafue {fs}  Converged: Step {step:4} | Time {time:.4e} | Cd {cd:.6f} | Cl {cl:.3f}")
             if time > self.ts.getMaxTime():
                 break
-            elif i % 10 == 0:
-                self.viewer.saveVec(self.vort, timeStep=step)
-                self.viewer.saveVec(self.vel, timeStep=step)
-                self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
-                self.viewer.writeXmf(self.caseName)
+            # elif i % 10 == 0:
+            self.viewer.saveVec(self.vort, timeStep=step)
+            self.viewer.saveVec(self.vel, timeStep=step)
+            self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+            self.viewer.writeXmf(self.caseName)
 
         self.plotter.updatePlot(times, cds, clifts, realTimePlot=False)
         data = {"times": times, "cd": cds, "cl": clifts}
@@ -106,7 +111,7 @@ class ImmersedBoundaryStatic(FreeSlip):
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
         self.solveKLE(startTime, self.vort)
-        self.computeVelocityCorrection(NF=2)
+        self.computeVelocityCorrection(NF=1)
         self.operator.Curl.mult(self.vel, self.vort)
 
     def setUpSolver(self):
@@ -159,10 +164,10 @@ class ImmersedBoundaryStatic(FreeSlip):
             fy += fy_part
         return -fx*self.h**2,  -fy*self.h**2, fs
 
-    def createBody(self, inp):
-        vel = inp['vel']
-        body = inp['type']
-        if body['name'] == "circle":
+    def createBody(self, body):
+        vel = body['vel']
+        geo = body['type']
+        if geo == "circle":
             radius = body['radius']
             center = body['center']
             ibmBody = Circle(vel, center)
@@ -201,7 +206,8 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.S = self.H.copy().transpose()
         dl = self.body.getElementLong()
         self.S.scale(dl)
-        self.H.diagonalScale(R=self.weigArea)
+        # self.H.diagonalScale(R=self.weigArea)
+        self.H.scale(self.h**2)
         self.weigArea.destroy()
         A = self.H.matMult(self.S)
         self.ksp = KspSolver()
@@ -247,13 +253,15 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
             self.computeVelocityCorrection(time, NF=4)
             position = self.body.getCenterBody()
             self.operator.Curl.mult(self.vel, self.vort)
-            self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} ")
             self.ts.setSolution(self.vort)
             if step % 10 == 0:
                 self.viewer.saveVec(self.vel, timeStep=step)
                 self.viewer.saveVec(self.vort, timeStep=step)
                 self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
                 self.viewer.writeXmf(self.caseName)
+                self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} | Saved Step ")
+            else:
+                self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} ")
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
