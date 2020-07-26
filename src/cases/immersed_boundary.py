@@ -90,9 +90,7 @@ class ImmersedBoundaryStatic(FreeSlip):
             if time > self.ts.getMaxTime():
                 break
             elif i % 10 == 0:
-                self.viewer.saveVec(self.vort, timeStep=step)
-                self.viewer.saveVec(self.vel, timeStep=step)
-                self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+                self.viewer.saveData(step, time, self.vort, self.vel)
                 self.viewer.writeXmf(self.caseName)
 
         self.plotter.updatePlot(times, cds, clifts, realTimePlot=False)
@@ -112,6 +110,13 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.vort.set(0.0)
         self.solveKLE(startTime, self.vort)
         self.computeVelocityCorrection(NF=1)
+        self.operator.Curl.mult(self.vel, self.vort)
+
+    def computeInitialCondition(self, startTime):
+        self.vort.set(0.0)
+        self.body.setVelRef(self.U_ref)
+        self.solveKLE(startTime, self.vort)
+        self.computeVelocityCorrection(startTime, NF=2)
         self.operator.Curl.mult(self.vel, self.vort)
 
     def setUpSolver(self):
@@ -256,21 +261,12 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
             self.operator.Curl.mult(self.vel, self.vort)
             self.ts.setSolution(self.vort)
             if step % 10 == 0:
-                self.viewer.saveVec(self.vel, timeStep=step)
-                self.viewer.saveVec(self.vort, timeStep=step)
-                self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+                self.viewer.saveData(step, time, self.vort, self.vel)
                 self.viewer.writeXmf(self.caseName)
                 self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} | Saved Step ")
                 self.body.viewState()
             else:
                 self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} ")
-
-    def computeInitialCondition(self, startTime):
-        self.vort.set(0.0)
-        self.body.setVelRef(self.U_ref)
-        self.solveKLE(startTime, self.vort)
-        self.computeVelocityCorrection(startTime, NF=2)
-        self.operator.Curl.mult(self.vel, self.vort)
 
     def computeVelocityCorrection(self, t, NF=1):
         self.body.updateBodyParameters(t)
