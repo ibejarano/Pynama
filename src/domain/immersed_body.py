@@ -1,6 +1,8 @@
 import numpy as np
 from math import sin, cos , pi , sqrt, ceil, floor
 from petsc4py import PETSc
+import logging
+
 
 class ImmersedBody:
     def __init__(self, vel=[0,0], center=[0,0]):
@@ -8,9 +10,16 @@ class ImmersedBody:
         self.__centerDisplacement = center
         self.__dl = None
         self.__vel = vel
+        self.logger = logging.getLogger("Body Immersed")
 
     def setVelRef(self, vel):
         self.__Uref = vel
+
+    def view(self):
+        self.logger.info(f"Arc len: {self.__dl} | Dirac Type: {self.dirac.__name__} | Vel Fluid Reference: {self.__Uref} ")
+
+    def viewState(self):
+        self.logger.info(f"Body vel: {self.__vel} | Body position {self.__centerDisplacement}")
     
     def setUpDimensions(self):
         self.firstNode, self.lastNode = self.__dom.getHeightStratum(1)
@@ -93,7 +102,7 @@ class ImmersedBody:
 
     def updateBodyParameters(self, t):
         # A1 : f/D = 7.5 & A=D = 1 => f=7.5 & A =1
-        velX = self.__Uref
+        velX = 0
         displX = 0
         f = 7.5
         A = 1

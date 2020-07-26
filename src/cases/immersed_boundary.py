@@ -61,8 +61,8 @@ class ImmersedBoundaryStatic(FreeSlip):
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             self.operator.setValues(localOperators, nodes)
-        self.operator.weigDivSrT.assemble()
-        self.weigArea = self.operator.weigDivSrT.copy()
+        # self.operator.weigDivSrT.assemble()
+        # self.weigArea = self.operator.weigDivSrT.copy()
         self.operator.assembleAll()
         if not self.comm.rank:
             self.logger.info(f"Operators Matrices builded")
@@ -208,7 +208,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.S.scale(dl)
         # self.H.diagonalScale(R=self.weigArea)
         self.H.scale(self.h**2)
-        self.weigArea.destroy()
+        # self.weigArea.destroy()
         A = self.H.matMult(self.S)
         self.ksp = KspSolver()
         self.ksp.createSolver(A, self.comm)
@@ -247,6 +247,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         self.computeInitialCondition(startTime= 0.0)
         self.ts.setSolution(self.vort)
         maxSteps = self.ts.getMaxSteps()
+        self.body.view()
         for step in range(1,maxSteps+1):
             self.ts.step()
             time = self.ts.time
@@ -260,6 +261,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
                 self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
                 self.viewer.writeXmf(self.caseName)
                 self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} | Saved Step ")
+                self.body.viewState()
             else:
                 self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} ")
 
