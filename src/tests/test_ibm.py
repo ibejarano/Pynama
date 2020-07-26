@@ -56,7 +56,15 @@ class TestDirac(unittest.TestCase):
         self.ibm.setUpSolver()
 
     def test_mass_conservation(self):
-        assert 2==1
+        D = self.ibm.H
+        sizeLoc, sizeGl = D.getSizes()[0]
+        dl = self.ibm.body.getElementLong()
+        print("dl:", dl)
+        print("h :",self.ibm.h)
+        for i in range(sizeGl):
+            mass = D.getRow(i)[1].sum()
+            print(mass*dl**2 , mass*self.ibm.h**2 )
+        assert False
 
     def test_momentum_conservation(self):
         pass
