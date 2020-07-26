@@ -1,29 +1,30 @@
 ---
 name: IBM-Dynamic
+save-dir: run-A1-contrary-meshB
 
 domain:
   dim: 2
-  nelem: [140, 70]
+  nelem: [200, 100]
   ngl: 3
-  lower: [-5,-5]
-  upper: [15,5]
-  # upper: [16,5] double
-  body:
+  lower: [-2*pi,-2*pi]
+  upper: [6*pi,2*pi]
+
+body:
+  -
     vel: [0,0]
-    type:
-      name: "circle"
-      radius: 0.5
-      center: [0,0]
+    type: "circle"
+    radius: 0.5
+    center: [0,0]
 
 boundary-conditions:
   constant:
-    re: 40
+    re: 140
 
 material-properties:
   rho: 0.5
   mu: 0.01
 
 time-solver:
-  max-steps: 6000
+  max-steps: 25000
   start-time: 0
   end-time: 200
