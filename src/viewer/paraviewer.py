@@ -1,12 +1,16 @@
 from petsc4py import PETSc
 import logging
 from viewer.xml_generator import XmlGenerator
+import os
+
+access_rights = 0o755
 
 class Paraviewer:
-    def __init__(self, dim, comm):
+    def __init__(self, dim, comm, saveDir=None):
         self.comm = comm
-
-        #hacer en paralelo aun
+        self.saveDir = '.' if not saveDir else saveDir
+        if not os.path.isdir(self.saveDir):
+            os.makedirs(f"./{self.saveDir}")
         self.xmlWriter = XmlGenerator(dim)
 
     def saveMesh(self, coords, name='mesh'):
@@ -14,13 +18,17 @@ class Paraviewer:
         self.xmlWriter.setUpDomainNodes(totalNodes=totalNodes)
         self.xmlWriter.generateXMLTemplate()
 
-        coords.setName(name) #coords must be a PETSc vec obj
-        ViewHDF5 = PETSc.Viewer()     # Init. Viewer
-        ViewHDF5.createHDF5(name + '.h5', mode=PETSc.Viewer.Mode.WRITE,
+        coords.setName(name)
+        ViewHDF5 = PETSc.Viewer()
+        try:
+            ViewHDF5.createHDF5(f'{self.saveDir}/mesh.h5', mode=PETSc.Viewer.Mode.WRITE,
+                            comm=self.comm)
+        except:
+            os.makedirs(f"./{self.saveDir}")
+            ViewHDF5.createHDF5(f'./{self.saveDir}/mesh.h5', mode=PETSc.Viewer.Mode.WRITE,
                             comm=self.comm)
 
-        # self.fullCoordVec.view()
-        ViewHDF5.view(obj=coords)  # Put PETSc object into viewer
+        ViewHDF5.view(obj=coords)
         ViewHDF5.destroy()
 
     def saveVec(self, vec, timeStep=None):
@@ -30,10 +38,10 @@ class Paraviewer:
         ViewHDF5 = PETSc.ViewerHDF5()     # Init. Viewer
 
         if timeStep is None:
-            ViewHDF5.create(name + '.h5', mode=PETSc.Viewer.Mode.WRITE,
+            ViewHDF5.create(f"./{self.saveDir}/{name}.h5", mode=PETSc.Viewer.Mode.WRITE,
                             comm=self.comm)
         else:
-            ViewHDF5.create(name + '-%05d.h5' % timeStep,
+            ViewHDF5.create(f"./{self.saveDir}/{name}-{timeStep:05d}.h5",
                             mode=PETSc.Viewer.Mode.WRITE, comm=self.comm)
         ViewHDF5.pushGroup('/fields')
         ViewHDF5.view(obj=vec)   # Put PETSc object into the viewer
@@ -52,4 +60,4 @@ class Paraviewer:
                     self.xmlWriter.setVectorAttribute(vec.getName(), step, dataGrid)
 
     def writeXmf(self, name):
-        self.xmlWriter.writeFile(name)
+        self.xmlWriter.writeFile(f"./{self.saveDir}/{name}")
