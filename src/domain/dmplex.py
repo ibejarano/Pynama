@@ -3,11 +3,17 @@ from domain.indices import IndicesManager
 import numpy as np
 import logging
 from mpi4py import MPI
-
+from math import pi
 class DMPlexDom(PETSc.DMPlex):
     def __init__(self, lower, upper, faces):
         comm = MPI.COMM_WORLD
-        self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
+        try:
+            self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
+        except TypeError:
+            lower = [eval(lower[0]) , eval(lower[1])]
+            upper = [eval(upper[0]) , eval(upper[1])]
+            self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
+
         self.logger = logging.getLogger(f"[{self.comm.rank}] Class")
         self.logger.debug("Domain Instance Created")
         self.createLabel('marco')

@@ -1,29 +1,29 @@
 ---
-name: UniformFlow
+name: ibm-static
 
 domain:
-  dim: 2 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [50,25]
+  dim: 2
+  nelem: [100, 50]
   ngl: 3
-  lower: [-20,-20]
-  upper: [60,20]
-
-time-solver:
-  max-steps: 250
-  start-time: 0
-  end-time: 100
+  lower: [-1.5*pi,-1*pi]
+  upper: [9.5*pi,1*pi]
+  # upper: [16,5] double
+  body:
+    vel: [0,0]
+    type:
+      name: "circle"
+      radius: 0.5
+      center: [0,0]
 
 boundary-conditions:
-  border-name:
-    0 :
-      vel: [ 2 , 'flatPlateVy' ]
-    1 :
-      vel: [ 1, 2]
-    2 :
-      vel: [ 1, 0]
-      vort: ['taylorGreenVort']
-    3 :
-      vel: [ 1, 0]
-  # no-slip-border:
-  #   - 0
-  #   - 3
+  constant:
+    re: 140
+
+material-properties:
+  rho: 0.5
+  mu: 0.01
+
+time-solver:
+  max-steps: 9999
+  start-time: 0
+  end-time: 150

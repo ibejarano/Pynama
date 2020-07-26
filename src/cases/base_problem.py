@@ -19,32 +19,30 @@ class BaseProblem(object):
         comm: MPI Communicator
         """
         self.comm = comm
+        self.timerTotal= Timer()
+        self.timerTotal.tic()
         self.timer = Timer()
-        case = PETSc.Options().getString('case', 'uniform' )
         try:
-            with open(f'src/cases/{case}.yaml') as f:
-                yamlData = yaml.load(f, Loader=yaml.Loader)
-            self.logger = logging.getLogger(yamlData['name'])
-            if not self.comm.rank:
-                self.logger.info("Initializing problem...")
+            case = kwargs['case']
         except:
-            self.logger.info(f"Case '{case}' Not Found")
+            case = PETSc.Options().getString('case', 'uniform' )
+        # try:
+        with open(f'src/cases/{case}.yaml') as f:
+            self.config = yaml.load(f, Loader=yaml.Loader)
+        self.logger = logging.getLogger(self.config.get("name"))
+        if not self.comm.rank:
+            self.logger.info("Initializing problem...")
+        # except:
+            # self.logger.info(f"Case '{case}' Not Found")
+            # pass
 
-        for key in kwargs.keys():
-            try:
-                assert  yamlData['domain'][key]
-                yamlData['domain'][key] = kwargs[key]
-            except:
-                print(f"Key >> {key} << not defined in yaml")
-
-        self.caseName = yamlData['name']
-        self.readDomainData(yamlData['domain'])
-        self.readMaterialData(yamlData['material-properties'])
-        
-        if 'time-solver' in yamlData:
-            self.setUpTimeSolver(yamlData['time-solver'])
-        if 'boundary-conditions' in yamlData:
-            self.readBoundaryCondition(yamlData['boundary-conditions'])
+        self.caseName = self.config.get("name")
+        self.readDomainData()
+        self.readMaterialData()
+        if 'time-solver' in self.config:
+            self.setUpTimeSolver()
+        if 'boundary-conditions' in self.config:
+            self.readBoundaryCondition()
 
     def setUp(self):
         self.setUpGeneral()
@@ -70,23 +68,27 @@ class BaseProblem(object):
         if not self.comm.rank:
             self.logger.info(f"Boundary Conditions setted up")
 
-    def readMaterialData(self, inputData):
-        self.rho = inputData['rho']
-        self.mu = inputData['mu']
+    def readMaterialData(self):
+        materialData = self.config.get("material-properties")
+        self.rho = materialData['rho']
+        self.mu = materialData['mu']
 
-    def readDomainData(self, inputData):
-        self.dim = len(inputData['nelem'])
+    def readDomainData(self):
+        domain = self.config.get("domain")
+        self.dim = len(domain['nelem'])
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
-        self.ngl = inputData['ngl']
-        self.lower = inputData['lower']
-        self.upper = inputData['upper']
-        self.nelem = inputData['nelem']
+        self.ngl = domain['ngl']
+        self.lower = domain['lower']
+        self.upper = domain['upper']
+        self.nelem = domain['nelem']
 
-    def createMesh(self):
-        self.viewer = Paraviewer(self.dim ,self.comm)
+    def createMesh(self, saveMesh=True):
+        saveDir = self.config.get("save-dir")
+        self.viewer = Paraviewer(self.dim ,self.comm, saveDir)
         self.dom.computeFullCoordinates(self.elemType)
-        self.viewer.saveMesh(self.dom.fullCoordVec)
+        if saveMesh:
+            self.viewer.saveMesh(self.dom.fullCoordVec)
         if not self.comm.rank:
             self.logger.info(f"Mesh of {self.nelem} created")
 
@@ -106,11 +108,12 @@ class BaseProblem(object):
         if not self.comm.rank:
             self.logger.info(f"Operators Matrices builded")
 
-    def setUpTimeSolver(self, inputData):
+    def setUpTimeSolver(self):
+        options = self.config.get("time-solver")
         self.ts = TsSolver(self.comm)
-        sTime = inputData['start-time']
-        eTime = inputData['end-time']
-        maxSteps = inputData['max-steps']
+        sTime = options['start-time']
+        eTime = options['end-time']
+        maxSteps = options['max-steps']
         self.ts.setUpTimes(sTime, eTime, maxSteps)
         self.ts.initSolver(self.evalRHS, self.convergedStepFunction)
 
@@ -118,12 +121,34 @@ class BaseProblem(object):
         time = ts.time
         step = ts.step_number
         incr = ts.getTimeStep()
+        proc = self.vort.copy()
+        proc.setName("num proc")
+        # procSize = proc.getLocalSize()
+        # print(f"{proc.getOwnershipRange() = }")
+        beg, end = proc.getOwnershipRange() 
+        # locSize = proc.getLocalSize()
+        # dofs = list(range(locSize))
+        # print(len(dofs), dofs)
+        # print(locSize)
+        for i in range(beg,end):
+            proc.setValue(i, self.comm.rank)
+        proc.assemble()
+        # proc.setValuesLocal(dofs, [self.comm.rank]*locSize)
+        # proc.assemble()
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
-        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+        self.viewer.saveVec(proc, timeStep=step)
+        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort, proc])
+        self.createVtkFile()
 
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
+
+    def createVtkFile(self):
+        viewer = PETSc.Viewer()
+        viewer.createVTK('immersed-body.vtk', mode=PETSc.Viewer.Mode.WRITE)
+        viewer.view(self.dom)
+        viewer.destroy()
 
     def getBoundaryNodes(self):
         """ IS: Index Set """
@@ -190,7 +215,7 @@ class BaseProblem(object):
     def applyBoundaryConditions(self, time, bcNodes):
         pass
 
-    def readBoundaryCondition(self,inputData):
+    def readBoundaryCondition(self):
         pass
 
     def setUpSolver(self):

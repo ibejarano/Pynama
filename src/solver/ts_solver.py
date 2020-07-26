@@ -4,9 +4,9 @@ class TsSolver(TS):
     def __init__(self, comm):
         self.create(comm=comm)
         self.setProblemType(self.ProblemType.NONLINEAR)  # Should we use LINEAR?
-        self.setEquationType(self.EquationType.ODE_EXPLICIT)
+        # self.setEquationType(self.EquationType.ODE_EXPLICIT)
         self.setType(self.Type.RK)
-        self.setRKType(self.RKType.RK5F)
+        # self.setRKType(self.RKType.RK5F)
 
     def setUpTimes(self, sTime, eTime, steps):
         self.setTime(sTime)
@@ -16,7 +16,7 @@ class TsSolver(TS):
         self.setMaxTime(eTime)
         self.setMaxSteps(steps)
         self.setExactFinalTime(self.ExactFinalTime.MATCHSTEP)
-        #ts.setExactFinalTime(ts.ExactFinalTime.INTERPOLATE) N
+        # self.setExactFinalTime(self.ExactFinalTime.INTERPOLATE)
         # Sundials doesn't support MATCHSTEP (-ts_exact_final_time INTERPOLATE)
 
     def initSolver(self, rhsFunction, convergedStepFunction):
