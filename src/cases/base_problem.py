@@ -132,6 +132,7 @@ class BaseProblem(object):
         step = ts.step_number
         incr = ts.getTimeStep()
         self.viewer.saveData(step, time, self.vel, self.vort)
+        # self.viewer.newSaveVec([self.vel, self.vort], step)
         self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")

@@ -2,10 +2,11 @@ from xml.etree.ElementTree import Element, SubElement, Comment, tostring
 from xml.dom import minidom
 
 class XmlGenerator(object):
-    def __init__(self, dim):
+    def __init__(self, dim, h5name):
         self.root = Element('Xdmf')
         self.root.set('Version', '2.0')
         self.dim = dim
+        self.h5name = h5name
 
     def setUpDomainNodes(self, totalNodes=None, nodesPerDim=None):
         """
@@ -73,7 +74,7 @@ class XmlGenerator(object):
         attrData.set("Dimensions", "{}".format(self.dimensions))
         attrData.set("NumberType", "Float")
         attrData.set("Format", "HDF")
-        attrData.text = "{}-{:05d}.h5:/fields/{}".format(name, step, name) 
+        attrData.text = f"{self.h5name}-{step:05d}.h5:/fields/{name}"
 
     def setDataToAttribute(self, attrData, step, name, dof):
         dofs = ['X', 'Y', 'Z']
@@ -93,7 +94,7 @@ class XmlGenerator(object):
         velData.set("Dimensions", str(self.dimensions * self.dim))
         velData.set("NumberType", "Float")
         velData.set("Format", "HDF")
-        velData.text = "{}-{:05d}.h5:/fields/{}".format(name, step, name) 
+        velData.text = f"{self.h5name}-{step:05d}.h5:/fields/{name}"
 
     def writeFile(self, nameFile):
         """Return a pretty-printed XML string for the Element.
