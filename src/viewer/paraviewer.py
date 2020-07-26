@@ -11,7 +11,8 @@ class Paraviewer:
         self.saveDir = '.' if not saveDir else saveDir
         if not os.path.isdir(self.saveDir):
             os.makedirs(f"./{self.saveDir}")
-        self.xmlWriter = XmlGenerator(dim)
+        self.h5name = "vec-data"
+        self.xmlWriter = XmlGenerator(dim, self.h5name)
 
     def saveMesh(self, coords, name='mesh'):
         totalNodes = int(coords.size / self.xmlWriter.dim)
@@ -32,24 +33,18 @@ class Paraviewer:
         ViewHDF5.destroy()
 
     def saveData(self, step, time, *vecs):
-        for vec in vecs:
-            self.saveVec(vec, step)
+        self.saveVec(vecs, step)
         self.saveStepInXML(step, time, vecs=vecs)
 
-    def saveVec(self, vec, step=None):
-        """Save the vector."""
-        name = vec.getName()
+    def saveVec(self, vecs, step):
+        name = self.h5name
         # self.logger.debug("saveVec %s" % name)
         ViewHDF5 = PETSc.ViewerHDF5()     # Init. Viewer
-
-        if step is None:
-            ViewHDF5.create(f"./{self.saveDir}/{name}.h5", mode=PETSc.Viewer.Mode.WRITE,
-                            comm=self.comm)
-        else:
-            ViewHDF5.create(f"./{self.saveDir}/{name}-{step:05d}.h5",
+        ViewHDF5.create(f"./{self.saveDir}/{name}-{step:05d}.h5",
                             mode=PETSc.Viewer.Mode.WRITE, comm=self.comm)
         ViewHDF5.pushGroup('/fields')
-        ViewHDF5.view(obj=vec)   # Put PETSc object into the viewer
+        for vec in vecs:
+            ViewHDF5.view(obj=vec)   # Put PETSc object into the viewer
         ViewHDF5.destroy()            # Destroy Viewer
 
     def saveStepInXML(self, step, time, vec=None ,vecs=None):
