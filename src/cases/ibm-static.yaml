@@ -1,12 +1,12 @@
 ---
-name: immersed boundary
+name: ibm-static
 
 domain:
   dim: 2
-  nelem: [140, 70]
+  nelem: [100, 50]
   ngl: 3
-  lower: [-5,-5]
-  upper: [15,5]
+  lower: [-1.5*pi,-1*pi]
+  upper: [9.5*pi,1*pi]
   # upper: [16,5] double
   body:
     vel: [0,0]
@@ -17,13 +17,13 @@ domain:
 
 boundary-conditions:
   constant:
-    re: 20
+    re: 140
 
 material-properties:
   rho: 0.5
   mu: 0.01
 
 time-solver:
-  max-steps: 6000
+  max-steps: 9999
   start-time: 0
-  end-time: 200
+  end-time: 150
