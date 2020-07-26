@@ -117,30 +117,24 @@ class BaseProblem(object):
         self.ts.setUpTimes(sTime, eTime, maxSteps)
         self.ts.initSolver(self.evalRHS, self.convergedStepFunction)
 
+    def createNumProcVec(self, step):
+        proc = self.vort.copy()
+        proc.setName("num proc")
+        beg, end = proc.getOwnershipRange() 
+        for i in range(beg,end):
+            proc.setValue(i, self.comm.rank)
+        proc.assemble()
+        self.createVtkFile()
+        self.viewer.saveVec(proc, timeStep=step)
+
     def convergedStepFunction(self, ts):
         time = ts.time
         step = ts.step_number
         incr = ts.getTimeStep()
-        proc = self.vort.copy()
-        proc.setName("num proc")
-        # procSize = proc.getLocalSize()
-        # print(f"{proc.getOwnershipRange() = }")
-        beg, end = proc.getOwnershipRange() 
-        # locSize = proc.getLocalSize()
-        # dofs = list(range(locSize))
-        # print(len(dofs), dofs)
-        # print(locSize)
-        for i in range(beg,end):
-            proc.setValue(i, self.comm.rank)
-        proc.assemble()
-        # proc.setValuesLocal(dofs, [self.comm.rank]*locSize)
-        # proc.assemble()
         self.viewer.saveVec(self.vel, timeStep=step)
         self.viewer.saveVec(self.vort, timeStep=step)
-        self.viewer.saveVec(proc, timeStep=step)
-        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort, proc])
-        self.createVtkFile()
-
+        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+        self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
 
