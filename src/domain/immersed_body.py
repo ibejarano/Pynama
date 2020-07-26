@@ -1,5 +1,5 @@
 import numpy as np
-from math import sin, cos , pi , sqrt, ceil
+from math import sin, cos , pi , sqrt, ceil, floor
 from petsc4py import PETSc
 
 class ImmersedBody:
@@ -93,13 +93,13 @@ class ImmersedBody:
 
     def updateBodyParameters(self, t):
         # A1 : f/D = 7.5 & A=D = 1 => f=7.5 & A =1
-        velX = 0
+        velX = self.__Uref
         displX = 0
         f = 7.5
         A = 1
         alpha = 2 * pi * self.__Uref / f  
         displY = A * sin(alpha * t)
-        velY = A * alpha * cos(A)
+        velY = A * alpha * cos(alpha * t)
         self.__vel = [velX, velY]
         self.__centerDisplacement = [displX, displY]
         self.updateVelocity()
@@ -134,13 +134,13 @@ class Line(ImmersedBody):
 class Circle(ImmersedBody):
     def generateBody(self, dh, **kwargs):
         r = kwargs['radius']
-        rev = 2*pi
-        n = ceil(rev*r/dh)
-        assert n > 4
-        div = rev/n
+        longTotal = 2*pi*r
+        points = floor(longTotal/dh) + 2
+        assert points > 4
+        dl_exact = longTotal/points
         startAng = pi/1000
         # startAng = 0
-        angles = np.arange(0, rev+div , div)
+        angles = np.linspace(0, 2*pi , points)
         x = r * np.cos(angles + startAng)
         y = r * np.sin(angles + startAng)
         coords = list()
@@ -153,6 +153,8 @@ class Circle(ImmersedBody):
             cone.append(localCone)
         cone[-1][-1] = 0
         dl = sqrt((coords[0][0]-coords[1][0])**2 + (coords[0][1]-coords[1][1])**2)
+        # print(dl)
+        # assert dl_exact == dl
 
         self.setCenter(np.array([0,0]))
         self.setElementLong(dl, normals=norms)
