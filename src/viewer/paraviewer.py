@@ -31,17 +31,22 @@ class Paraviewer:
         ViewHDF5.view(obj=coords)
         ViewHDF5.destroy()
 
-    def saveVec(self, vec, timeStep=None):
+    def saveData(self, step, time, *vecs):
+        for vec in vecs:
+            self.saveVec(vec, step)
+        self.saveStepInXML(step, time, vecs=vecs)
+
+    def saveVec(self, vec, step=None):
         """Save the vector."""
         name = vec.getName()
         # self.logger.debug("saveVec %s" % name)
         ViewHDF5 = PETSc.ViewerHDF5()     # Init. Viewer
 
-        if timeStep is None:
+        if step is None:
             ViewHDF5.create(f"./{self.saveDir}/{name}.h5", mode=PETSc.Viewer.Mode.WRITE,
                             comm=self.comm)
         else:
-            ViewHDF5.create(f"./{self.saveDir}/{name}-{timeStep:05d}.h5",
+            ViewHDF5.create(f"./{self.saveDir}/{name}-{step:05d}.h5",
                             mode=PETSc.Viewer.Mode.WRITE, comm=self.comm)
         ViewHDF5.pushGroup('/fields')
         ViewHDF5.view(obj=vec)   # Put PETSc object into the viewer

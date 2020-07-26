@@ -125,15 +125,13 @@ class BaseProblem(object):
             proc.setValue(i, self.comm.rank)
         proc.assemble()
         self.createVtkFile()
-        self.viewer.saveVec(proc, timeStep=step)
+        return proc
 
     def convergedStepFunction(self, ts):
         time = ts.time
         step = ts.step_number
         incr = ts.getTimeStep()
-        self.viewer.saveVec(self.vel, timeStep=step)
-        self.viewer.saveVec(self.vort, timeStep=step)
-        self.viewer.saveStepInXML(step, time, vecs=[self.vel, self.vort])
+        self.viewer.saveData(step, time, self.vel, self.vort)
         self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
