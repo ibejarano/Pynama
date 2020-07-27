@@ -223,10 +223,9 @@ class DMPlexDom(PETSc.DMPlex):
         summary; this method needs to map nodes to indices
         """
         coords = self.getNodesCoordinates(nodes)
-        for i,coord in enumerate(coords):
-            values = f_vec(coord)
-            indices = [nodes[i]*dof + pos for pos in range(dof)]
-            vec.setValues(indices, values, addv=None)
+        inds = [node*dof + pos for node in nodes for pos in range(dof)]
+        values = np.array(list(map(f_vec, coords)))
+        vec.setValues(inds, values, addv=False)
         return vec
 
     def applyFunctionScalarToVec(self, nodes, f_scalar, vec):
@@ -235,9 +234,8 @@ class DMPlexDom(PETSc.DMPlex):
         summary: this nodes = indices
         """
         coords = self.getNodesCoordinates(nodes)
-        for i,coord in enumerate(coords):
-            value = f_scalar(coord)
-            vec.setValues(nodes[i], value, addv=None)
+        values = np.array(list(map(f_scalar, coords)))
+        vec.setValues(nodes, values, addv=False)
         return vec
 
     def applyValuesToVec(self, nodes, values, vec):
