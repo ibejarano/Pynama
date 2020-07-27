@@ -57,7 +57,7 @@ class Senoidal(FreeSlip):
         self.vel.assemble()
 
     # Se llama solve KLE pero es de los operators
-    def solveKLETests(self):
+    def OperatorsTests(self):
         boundaryNodes = self.getBoundaryNodes()
         self.applyBoundaryConditions(boundaryNodes)
         step = 0
