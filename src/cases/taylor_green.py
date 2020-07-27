@@ -58,7 +58,6 @@ class TaylorGreen(FreeSlip):
             self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
             self.operator.Curl.mult( exactVel , self.vort )
             self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort)
-            self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort, self.vort, self.vel])
         self.viewer.writeXmf(self.caseName)
 
 
@@ -98,7 +97,6 @@ class TaylorGreen(FreeSlip):
         diffusive.setName("diffusive")
         self.operator.Curl.mult(exactVel, self.vort)
         self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort,exactConv,exactDiff,convective,diffusive )
-        self.viewer.saveStepInXML(step, time=0.0, vecs=[exactVel, exactVort, exactConv, exactDiff, self.vort, self.vel, convective, diffusive])
         self.viewer.writeXmf(self.caseName)
         errorConv = (convective - exactConv).norm(norm_type=2)
         errorDiff = (diffusive - exactDiff).norm(norm_type=2)
