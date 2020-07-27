@@ -33,20 +33,21 @@ else:
 def generateChart(viscousTime=[0.001,0.002,0.01,0.02,0.03,0.09,0.5]):
     hAx = list()
     vAx = list()
-    totalNgl = 13
-    for i, ngl in enumerate(range(3,totalNgl,2)):
+    totalNgl = 10
+    for i, ngl in enumerate(range(3,totalNgl,1)):
         fem = FemProblem(ngl=ngl)
         fem.setUp()
         fem.setUpSolver()
         vAx.append(fem.getKLEError(times=viscousTime))
+        hAx.append((ngl-1)*2)
 
-    hAx = list(range(3,totalNgl,2))
+    #hAx = list(range(3,totalNgl,2))
     marker = [',','v','>','<','1','2','3','4','s','p','*','h','+']
     vAxArray = np.array(vAx)
     plt.figure(figsize=(10,10))
     for i in range(vAxArray.shape[1]):
         plt.semilogy(hAx, vAxArray[:,i],'k'+marker[i]+'-', basey=10,label=r'$ \tau = $' + str(viscousTime[i]) ,linewidth =0.5)
-
+        
     plt.legend()
     plt.xlabel(r'$N*$')
     plt.ylabel(r'$||Error||_{\infty}$')
@@ -57,13 +58,14 @@ def generateChartOperators():
     hAx = [list(),list()]
     vAx = [[list(), list(), list()],[list(), list(), list()]]
     names = ["convective", "diffusive", "curl"]
-    totalNgl = 23
+    totalNgl = 7
+    dim = 3
     for x, elem in enumerate(range(2,5,2)):
         for i, ngl in enumerate(range(3,totalNgl,1)):
-            fem = FemProblem(ngl=ngl, nelem=[elem,elem])
+            fem = FemProblem(ngl=ngl, nelem=[elem]*dim)
             fem.setUp()
             fem.setUpSolver()
-            errorConv, errorDiff, errorCurl = fem.solveKLETests()
+            errorConv, errorDiff, errorCurl = fem.OperatorsTests()
             vAx[x][0].append(errorConv)
             vAx[x][1].append(errorDiff)
             vAx[x][2].append(errorCurl)
