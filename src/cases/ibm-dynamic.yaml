@@ -1,13 +1,13 @@
 ---
 name: IBM-Dynamic
-save-dir: run-A1-nobodyxvel-meshb
+save-dir: run-A1
 
 domain:
   dim: 2
-  nelem: [200, 80]
+  nelem: [125, 75]
   ngl: 3
-  lower: [-2*pi,-2*pi]
-  upper: [8*pi,2*pi]
+  lower: [-2*pi,-2.5*pi]
+  upper: [8*pi,2.5*pi]
 
 body:
   -

@@ -41,8 +41,8 @@ class ImmersedBoundaryStatic(FreeSlip):
             self.U_ref = (vel[0]**2 + vel[1]**2)**0.5
             self.cteValue = [vel_x,0]
 
-    def readDomainData(self):
-        super().readDomainData()
+    def readDomainData(self, kwargs):
+        super().readDomainData(kwargs)
         numElements = self.nelem[0]
         self.h = (eval(self.upper[0]) - eval(self.lower[0]))/numElements
         if self.ngl == 3:
