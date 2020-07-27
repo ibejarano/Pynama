@@ -2,3 +2,6 @@
 *.h5
 *.xmf
 .vscode/
+*png
+re*
+toplot/
