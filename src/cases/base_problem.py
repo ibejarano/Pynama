@@ -37,7 +37,7 @@ class BaseProblem(object):
             # pass
 
         self.caseName = self.config.get("name")
-        self.readDomainData()
+        self.readDomainData(kwargs)
         self.readMaterialData()
         if 'time-solver' in self.config:
             self.setUpTimeSolver()
@@ -73,15 +73,21 @@ class BaseProblem(object):
         self.rho = materialData['rho']
         self.mu = materialData['mu']
 
-    def readDomainData(self):
+    def readDomainData(self, kwargs):
         domain = self.config.get("domain")
         self.dim = len(domain['nelem'])
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
-        self.ngl = domain['ngl']
         self.lower = domain['lower']
         self.upper = domain['upper']
-        self.nelem = domain['nelem']
+        if "ngl" in kwargs:
+            self.ngl = kwargs['ngl']
+        else:
+            self.ngl = domain['ngl']
+        if "nelem" in kwargs:
+            self.nelem = kwargs['nelem']
+        else:
+            self.nelem = domain['nelem']
 
     def createMesh(self, saveMesh=True):
         saveDir = self.config.get("save-dir")
