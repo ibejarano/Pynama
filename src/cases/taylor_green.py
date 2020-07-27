@@ -46,8 +46,11 @@ class TaylorGreen(FreeSlip):
     def applyBoundaryConditions(self, time, bcNodes):
         self.vel.set(0.0)
         fvel_coords = lambda coords: self.taylorGreenVelFunction(coords, self.nu, t=time)
+        fvort_coords = lambda coords: self.taylorGreenVortFunction(coords, self.nu, t=time)
         self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel, self.dim)
+        self.vort = self.dom.applyFunctionVecToVec(bcNodes, fvort_coords, self.vort, self.dim_w)
         self.vel.assemble()
+        self.vort.assemble()
 
     def solveKLETests(self, startTime=0.0, endTime=1.0, steps=10):
         times = np.linspace(startTime, endTime, steps)
