@@ -2,10 +2,11 @@ from xml.etree.ElementTree import Element, SubElement, Comment, tostring
 from xml.dom import minidom
 
 class XmlGenerator(object):
-    def __init__(self, dim):
+    def __init__(self, dim, h5name):
         self.root = Element('Xdmf')
         self.root.set('Version', '2.0')
         self.dim = dim
+        self.h5name = h5name
 
     def setUpDomainNodes(self, totalNodes=None, nodesPerDim=None):
         """
@@ -73,8 +74,7 @@ class XmlGenerator(object):
         attrData.set("Dimensions", "{}".format(self.dimensions))
         attrData.set("NumberType", "Float")
         attrData.set("Format", "HDF")
-        stepFormat = self.formatStep(step)
-        attrData.text = "{}-{}.h5:/fields/{}".format(name, stepFormat, name) 
+        attrData.text = f"{self.h5name}-{step:05d}.h5:/fields/{name}"
 
     def setDataToAttribute(self, attrData, step, name, dof):
         dofs = ['X', 'Y', 'Z']
@@ -94,8 +94,7 @@ class XmlGenerator(object):
         velData.set("Dimensions", str(self.dimensions * self.dim))
         velData.set("NumberType", "Float")
         velData.set("Format", "HDF")
-        stepFormat = self.formatStep(step)
-        velData.text = "{}-{}.h5:/fields/{}".format(name, stepFormat, name) 
+        velData.text = f"{self.h5name}-{step:05d}.h5:/fields/{name}"
 
     def writeFile(self, nameFile):
         """Return a pretty-printed XML string for the Element.
@@ -116,7 +115,7 @@ class XmlGenerator(object):
 
     @staticmethod
     def formatStep(step):
-        maxZeros = 4
+        maxZeros = 5
         step = str(step)
         zerosToAdd = maxZeros - len(step)
         zerosInFront = '0' * zerosToAdd

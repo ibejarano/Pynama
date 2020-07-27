@@ -1,0 +1,30 @@
+---
+name: IBM-Dynamic
+save-dir: run-A1-nobodyxvel-meshb
+
+domain:
+  dim: 2
+  nelem: [200, 80]
+  ngl: 3
+  lower: [-2*pi,-2*pi]
+  upper: [8*pi,2*pi]
+
+body:
+  -
+    vel: [0,0]
+    type: "circle"
+    radius: 0.5
+    center: [0,0]
+
+boundary-conditions:
+  constant:
+    re: 140
+
+material-properties:
+  rho: 0.5
+  mu: 0.01
+
+time-solver:
+  max-steps: 25000
+  start-time: 0
+  end-time: 200
