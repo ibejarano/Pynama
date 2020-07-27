@@ -75,7 +75,11 @@ class BaseProblem(object):
 
     def readDomainData(self, kwargs):
         domain = self.config.get("domain")
-        self.dim = len(domain['nelem'])
+        if "nelem" in kwargs:
+            self.nelem = kwargs['nelem']
+        else:
+            self.nelem = domain['nelem']
+        self.dim = len(self.nelem)
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
         self.lower = domain['lower']
@@ -84,10 +88,6 @@ class BaseProblem(object):
             self.ngl = kwargs['ngl']
         else:
             self.ngl = domain['ngl']
-        if "nelem" in kwargs:
-            self.nelem = kwargs['nelem']
-        else:
-            self.nelem = domain['nelem']
 
     def createMesh(self, saveMesh=True):
         saveDir = self.config.get("save-dir")
