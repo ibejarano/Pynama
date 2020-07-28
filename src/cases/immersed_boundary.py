@@ -249,7 +249,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         for step in range(1,maxSteps+1):
             self.ts.step()
             time = self.ts.time
-            self.computeVelocityCorrection(time, NF=4)
+            self.computeVelocityCorrection(time, NF=1)
             position = self.body.getCenterBody()
             self.operator.Curl.mult(self.vel, self.vort)
             self.ts.setSolution(self.vort)
@@ -260,6 +260,13 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
                 self.body.viewState()
             else:
                 self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} ")
+
+    def computeInitialCondition(self, startTime):
+        self.vort.set(0.0)
+        self.body.setVelRef(self.U_ref)
+        self.solveKLE(startTime, self.vort)
+        self.computeVelocityCorrection(startTime, NF=1)
+        self.operator.Curl.mult(self.vel, self.vort)
 
     def computeVelocityCorrection(self, t, NF=1):
         self.body.updateBodyParameters(t)
