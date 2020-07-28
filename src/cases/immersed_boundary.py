@@ -86,7 +86,7 @@ class ImmersedBoundaryStatic(FreeSlip):
             times.append(time)
             self.operator.Curl.mult(self.vel, self.vort)
             self.ts.setSolution(self.vort)
-            self.logger.info(f"Nodos arafue {fs}  Converged: Step {step:4} | Time {time:.4e} | Cd {cd:.6f} | Cl {cl:.3f}")
+            self.logger.info(f"Nodos Off {fs}  Converged: Step {step:4} | Time {time:.4e} | Cd {cd:.6f} | Cl {cl:.3f}")
             if time > self.ts.getMaxTime():
                 break
             elif i % 10 == 0:
@@ -110,13 +110,6 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.vort.set(0.0)
         self.solveKLE(startTime, self.vort)
         self.computeVelocityCorrection(NF=1)
-        self.operator.Curl.mult(self.vel, self.vort)
-
-    def computeInitialCondition(self, startTime):
-        self.vort.set(0.0)
-        self.body.setVelRef(self.U_ref)
-        self.solveKLE(startTime, self.vort)
-        self.computeVelocityCorrection(startTime, NF=2)
         self.operator.Curl.mult(self.vel, self.vort)
 
     def setUpSolver(self):
