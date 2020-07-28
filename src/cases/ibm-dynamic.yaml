@@ -4,10 +4,10 @@ save-dir: run-A1
 
 domain:
   dim: 2
-  nelem: [125, 75]
+  nelem: [480, 200]
   ngl: 3
   lower: [-2*pi,-2.5*pi]
-  upper: [8*pi,2.5*pi]
+  upper: [10*pi,2.5*pi]
 
 body:
   -

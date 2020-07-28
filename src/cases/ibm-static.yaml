@@ -1,23 +1,24 @@
 ---
 name: ibm-static
+save-dir: test-re20-ngl5
 
 domain:
   dim: 2
-  nelem: [100, 50]
+  nelem: [80, 40]
   ngl: 3
   lower: [-1.5*pi,-1*pi]
-  upper: [9.5*pi,1*pi]
+  upper: [2.5*pi,1*pi]
   # upper: [16,5] double
-  body:
+body:
+  -
     vel: [0,0]
-    type:
-      name: "circle"
-      radius: 0.5
-      center: [0,0]
+    type: "circle"
+    radius: 0.5
+    center: [0,0]
 
 boundary-conditions:
   constant:
-    re: 140
+    re: 20
 
 material-properties:
   rho: 0.5
