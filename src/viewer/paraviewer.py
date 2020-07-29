@@ -59,5 +59,14 @@ class Paraviewer:
                 else:
                     self.xmlWriter.setVectorAttribute(vec.getName(), step, dataGrid)
 
+    def writeVTK(self, name, dm , step=None):
+        viewer = PETSc.Viewer()
+        if step == None:
+            viewer.createVTK(f"./{self.saveDir}/{name}.vtk", mode=PETSc.Viewer.Mode.WRITE)
+        else:
+            viewer.createVTK(f"./{self.saveDir}/{name}-{step:05d}.vtk", mode=PETSc.Viewer.Mode.WRITE)
+        viewer.view(obj=dm)
+        viewer.destroy()       
+
     def writeXmf(self, name):
         self.xmlWriter.writeFile(f"./{self.saveDir}/{name}")
