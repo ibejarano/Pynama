@@ -30,7 +30,10 @@ class ImmersedBody:
     def setEulerNodes(self, lagPoi, NNZNodes):
         self.__lagNodes[lagPoi] = NNZNodes
 
-    def generateDMPlex(self, coords, cone, dim=1):
+    def generateDMPlex(self, dh, dim=1):
+        coords, cone ,dl = self.generateBody(dh)
+        self.__dl = dl
+        self.__L = self.getLong()
         self.__dom = PETSc.DMPlex().createFromCellList(dim, cone,coords)
         self.setUpDimensions()
         points = self.getTotalNodes()
@@ -40,9 +43,17 @@ class ImmersedBody:
         self.__velVec.setValues( ind , np.tile(self.__vel, points) )
         self.__velVec.assemble()
 
-    def saveVTK(self):
+    def regenerateDMPlex(self, dh, dim=1):
+        coords, cone , _ = self.generateBody(dh)
+        dm = PETSc.DMPlex().createFromCellList(dim, cone,coords)
+        return dm
+
+    def saveVTK(self, dir, step=None):
         viewer = PETSc.Viewer()
-        viewer.createVTK('body.vtk', mode=PETSc.Viewer.Mode.WRITE)
+        if step == None:
+            viewer.createVTK('body.vtk', mode=PETSc.Viewer.Mode.WRITE)
+        else:
+            viewer.createVTK(f"body-{step:05d}", mode=PETSc.Viewer.Mode.WRITE)
         viewer.view(self.__dom)
         viewer.destroy()
 
@@ -76,7 +87,10 @@ class ImmersedBody:
     def getTotalNodes(self):
         return self.lastNode - self.firstNode
 
-    def setCaracteristigLong(self, val):
+    def getLong(self):
+        return None
+
+    def setCaracteristicLong(self, val):
         self.__L = val
 
     def getCaracteristicLong(self):
@@ -119,6 +133,9 @@ class ImmersedBody:
         self.__velVec.setValues( ind , np.tile(self.__vel, points) )
         self.__velVec.assemble()
 
+    def generateBody(self, *args):
+        return None, None ,None
+
 class Line(ImmersedBody):
     def generateBody(self, div, **kwargs):
         # this can be improved with lower & upper
@@ -137,46 +154,48 @@ class Line(ImmersedBody):
         self.setCaracteristigLong(longitud)
         self.setElementLong(dl, normals=[1])
 
+    def getLong(self):
+        return 1
+
     def getRegion(self):
         return 1
 
 class Circle(ImmersedBody):
-    def generateBody(self, dh, **kwargs):
-        r = kwargs['radius']
+    def __init__(self, vel, center, radius):
+        super().__init__(vel, center)
+        self.__radius = radius
+
+    def generateBody(self, dh):
+        r = self.__radius
+        center = self.getCenterBody()
         longTotal = 2*pi*r
+        print(dh)
         points = floor(longTotal/dh) + 2
         assert points > 4
-        dl_exact = longTotal/points
         startAng = pi/1000
-        # startAng = 0
         angles = np.linspace(0, 2*pi , points)
-        x = r * np.cos(angles + startAng)
-        y = r * np.sin(angles + startAng)
+        x = r * np.cos(angles + startAng) + center[0]
+        y = r * np.sin(angles + startAng) + center[1]
         coords = list()
         cone = list()
-        norms = list()
         for i in range(len(x)-1):
             localCone = [i,i+1]
             coords.append([x[i] , y[i]])
-            norms.append([x[i]/r , y[i]/r])
             cone.append(localCone)
         cone[-1][-1] = 0
         dl = sqrt((coords[0][0]-coords[1][0])**2 + (coords[0][1]-coords[1][1])**2)
-        # print(dl)
-        # assert dl_exact == dl
-
-        self.setCenter(np.array([0,0]))
-        self.setElementLong(dl, normals=norms)
-        self.setCaracteristigLong(r*2)
-        self.radius = r
-        self.generateDMPlex(coords, cone)
+        # self.generateDMPlex(coords, cone)
+        return coords, cone, dl
 
     def getRadius(self):
-        return self.radius
+        return self.__radius
+
+    def getLong(self):
+        return self.__radius*2
 
     def getRegion(self):
         dl = self.getElementLong()
-        return self.radius + 2*dl
+        return self.__radius + 2*dl
 
 def threeGrid(r):
     """supports only three cell grids"""
