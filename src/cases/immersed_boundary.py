@@ -21,7 +21,6 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.boundaryNodes = self.getBoundaryNodes()
         self.createEmptyIBMMatrix()
         self.buildIBMMatrix()
-        self.body.saveVTK()
 
         name1= r'Coef. de arrastre $C_D$'
         name2= r'Coef. de empuje $C_{L}$'
@@ -45,10 +44,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         super().readDomainData(kwargs)
         numElements = self.nelem[0]
         self.h = (eval(self.upper[0]) - eval(self.lower[0]))/numElements
-        if self.ngl == 3:
-            self.h /= 2
-        else:
-            self.h /= 4
+        self.h /= (self.ngl-1)
 
         bodies = self.config.get("body")
         for body in bodies:
@@ -168,8 +164,8 @@ class ImmersedBoundaryStatic(FreeSlip):
         if geo == "circle":
             radius = body['radius']
             center = body['center']
-            ibmBody = Circle(vel, center)
-            ibmBody.generateBody(self.h, radius=radius)
+            ibmBody = Circle(vel, center, radius)
+            ibmBody.generateDMPlex(self.h)
             return ibmBody
 
     def createEmptyIBMMatrix(self):
@@ -249,24 +245,32 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         for step in range(1,maxSteps+1):
             self.ts.step()
             time = self.ts.time
-            self.computeVelocityCorrection(time, NF=1)
+            self.computeVelocityCorrection(time, NF=6)
             position = self.body.getCenterBody()
             self.operator.Curl.mult(self.vel, self.vort)
             self.ts.setSolution(self.vort)
+            self.markAffectedNodes()
             if step % 10 == 0:
-                self.viewer.saveData(step, time, self.vort, self.vel)
+                self.viewer.saveData(step, time, self.vort, self.vel, self.affectedNodes)
                 self.viewer.writeXmf(self.caseName)
                 self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} | Saved Step ")
-                self.body.viewState()
+                dm = self.body.regenerateDMPlex(self.h)
+                self.viewer.writeVTK("body", dm, step)
             else:
                 self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} ")
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
+        self.affectedNodes = self.vort.copy()
+        self.affectedNodes.setName("ibmNodes")
         self.body.setVelRef(self.U_ref)
         self.solveKLE(startTime, self.vort)
         self.computeVelocityCorrection(startTime, NF=1)
         self.operator.Curl.mult(self.vel, self.vort)
+
+    def markAffectedNodes(self):
+        nnodes = len(self.ibmNodes)
+        self.affectedNodes.setValues(list(self.ibmNodes), [1]*nnodes, addv=False)
 
     def computeVelocityCorrection(self, t, NF=1):
         self.body.updateBodyParameters(t)
@@ -282,7 +286,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         rows = self.body.getTotalNodes() * self.dim
         cols = len(self.dom.getAllNodes()) * self.dim
         bodyRegion = self.body.getRegion()
-        cellsAffected = self.getAffectedCells(bodyRegion*3)
+        cellsAffected = self.getAffectedCells(bodyRegion*6)
         self.ibmNodes = self.dom.getGlobalNodesFromEntities(cellsAffected, shared=False)
         d_nnz_D = len(self.ibmNodes)
         o_nnz_D = 0
