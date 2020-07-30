@@ -1,6 +1,6 @@
 import sys
 import petsc4py
-from math import pi, sin, cos, exp
+from math import pi, sin, cos, exp, erf, sqrt
 petsc4py.init(sys.argv)
 
 from cases.base_problem import FreeSlip
@@ -35,7 +35,13 @@ class CustomFuncCase(FreeSlip):
             else:
                 raise Exception("not defined func")
         elif self.case == 'flat-plate':
-            raise Exception("not implemented func")
+            if self.dim == 2:
+                self.velFunction = self.flatplateVel
+                self.vortFunction = self.flatplateVort
+                self.diffusiveFunction = self.flatplateDiffusive
+                self.convectiveFunction = self.flatplateConvective
+            else:
+                raise Exception("not implemented func for dim 3")
 
 
     def computeInitialCondition(self, startTime):
@@ -262,3 +268,33 @@ class CustomFuncCase(FreeSlip):
         tmp1 = -(Wref_x *pi)**3 * cos(y_) 
         tmp2 = (Wref_y *pi)**3 * cos(x_) 
         return [tmp1 + tmp2]
+
+    @staticmethod
+    def flatplateVel(coord, nu , t=None):
+        U_ref = 1
+        vx = U_ref * erf(coord[1]/ sqrt(4*nu*t))
+        vy = 0
+        return [vx, vy]
+
+    @staticmethod
+    def flatplateVort(coord, nu, t=None):
+        tau = sqrt(4*nu*t)
+        vort = -(2/(tau * sqrt(pi))) * exp(-(coord[1]/tau)**2)
+        return [vort]
+
+    @staticmethod
+    def flatplateConvective(coord, nu, t=None):
+        c = 1
+        tau = sqrt(4*nu*t)
+        alpha = 4 * c * coord[1] / ( sqrt(pi) * tau**3 )
+        convective = alpha * exp( -(coord[1]/tau)**2 )
+        return [convective]
+
+    @staticmethod
+    def flatplateDiffusive(coord, nu, t=None):
+        c = 1
+        tau = sqrt(4*nu*t)
+        alpha = 4 / (sqrt(pi)* tau**3)
+        beta = ( 1 - 2 * coord[1]**2 / (tau**2) )
+        diffusive = alpha * beta * exp( -(coord[1]/tau)**2 )
+        return [diffusive]

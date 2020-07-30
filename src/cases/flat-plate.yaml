@@ -1,0 +1,30 @@
+---
+name: FlatPlate
+save-dir: test-flat-plate
+
+domain:
+  nelem: [20,20]
+  ngl: 3
+  lower: [0,0]
+  upper: [1,1]
+
+time-solver:
+  max-steps: 300
+  start-time: 0.001
+  end-time: 100
+
+material-properties:
+  rho: 0.5
+  mu: 0.01
+
+boundary-conditions:
+  border-name:
+    0 :
+      vel: [ 2 , 'flatPlateVy' ]
+    1 :
+      vel: [ 1, 2]
+    2 :
+      vel: [ 1, 0]
+      vort: ['taylorGreenVort']
+    3 :
+      vel: [ 1, 0]
