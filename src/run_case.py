@@ -11,7 +11,7 @@ case = OptDB.getString('case', False)
 
 if case == 'taylor-green':
     name = 'taylor-green'
-    from cases.taylor_green import TaylorGreen as FemProblem
+    from cases.custom_func import CustomFuncCase as FemProblem
 elif case == 'uniform':
     name = 'uniform'
     from cases.uniform import UniformFlow as FemProblem
@@ -23,7 +23,7 @@ elif case == 'ibm-dynamic':
     from cases.immersed_boundary import ImmersedBoundaryDynamic as FemProblem
 elif case == 'senoidal':
     name = 'senoidal'
-    from cases.senoidal import Senoidal as FemProblem
+    from cases.custom_func import CustomFuncCase as FemProblem
 elif case == 'custom-func':
     raise Exception("class not found")
 elif case == 'cavity':

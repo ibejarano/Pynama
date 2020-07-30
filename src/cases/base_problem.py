@@ -35,7 +35,7 @@ class BaseProblem(object):
         # except:
             # self.logger.info(f"Case '{case}' Not Found")
             # pass
-
+        self.case = case
         self.caseName = self.config.get("name")
         self.readDomainData(kwargs)
         self.readMaterialData()
