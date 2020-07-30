@@ -9,7 +9,9 @@ import yaml
 OptDB = petsc4py.PETSc.Options()
 case = OptDB.getString('case', False)
 
-if case == 'taylor-green':
+customFunctions = ['taylor-green', 'senoidal', 'flat-plate']
+
+if case in customFunctions:
     name = 'taylor-green'
     from cases.custom_func import CustomFuncCase as FemProblem
 elif case == 'uniform':
@@ -21,11 +23,6 @@ elif case == 'ibm-static':
 elif case == 'ibm-dynamic':
     name = case
     from cases.immersed_boundary import ImmersedBoundaryDynamic as FemProblem
-elif case == 'senoidal':
-    name = 'senoidal'
-    from cases.custom_func import CustomFuncCase as FemProblem
-elif case == 'custom-func':
-    raise Exception("class not found")
 elif case == 'cavity':
     name = 'cavity'
     from cases.cavity import Cavity as FemProblem

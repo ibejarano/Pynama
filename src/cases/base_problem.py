@@ -199,7 +199,8 @@ class BaseProblem(object):
         self.operator.Curl.mult(rhs, f)
 
     def startSolver(self):
-        self.computeInitialCondition(startTime = 0.0)
+        initTime = self.ts.getTime()
+        self.computeInitialCondition(startTime=initTime)
         self.ts.solve(self.vort)
 
     def solveKLE(self, time, vort):
