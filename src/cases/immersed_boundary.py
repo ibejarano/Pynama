@@ -138,6 +138,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.vel.set(0.0)
         velDofs = [nodes*2 + dof for nodes in self.boundaryNodes for dof in range(2)]
         self.vel.setValues(velDofs, np.tile(self.cteValue, len(self.boundaryNodes)))
+        self.vort.setValues( self.boundaryNodes, np.zeros(len(self.boundaryNodes)) , addv=False )
 
     def computeVelocityCorrection(self, NF=1):
         fx = 0
