@@ -10,6 +10,7 @@ from matrices.mat_generator import Mat, Operators
 from matrices.mat_ns import MatNS
 from solver.ksp_solver import KspSolver
 from common.timer import Timer
+from math import sqrt
 import logging
 import numpy as np
 
@@ -412,12 +413,13 @@ class FreeSlip(BaseProblem):
         self.applyBoundaryConditions(time, boundaryNodes)
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
-    def getKLEError(self, times=None ,startTime=0.0, endTime=1.0, steps=10):
+    def getKLEError(self, viscousTimes=None ,startTime=0.0, endTime=1.0, steps=10):
         try:
-            assert times !=None
+            assert viscousTimes !=None
         except:
-            times = np.arange(startTime, endTime, (endTime - startTime)/steps)
+            viscousTimes = np.arange(startTime, endTime, (endTime - startTime)/steps)
 
+        times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
         boundaryNodes = self.getBoundaryNodes()
         errors = list()
         for time in times:
