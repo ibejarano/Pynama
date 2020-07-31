@@ -17,6 +17,7 @@ class CustomFuncCase(FreeSlip):
         self.setUpBoundaryConditions()
         self.setUpEmptyMats()
         self.buildKLEMats()
+        self.buildOperators()
 
         self.nu = self.mu / self.rho
 
