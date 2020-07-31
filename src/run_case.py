@@ -29,7 +29,7 @@ def generateChart(viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0
     # viscousTime = [0.01 , 0.05 , 0.1, 0.15]
     hAx = list()
     vAx = list()
-    totalNgl = 21
+    totalNgl = 9
     for i, ngl in enumerate(range(3,totalNgl,1)):
         fem = FemProblem(ngl=ngl)
         fem.setUp()
@@ -51,7 +51,7 @@ def generateChart(viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0
     plt.grid(True)
     plt.show()
 
-def generateChartOperators():
+def generateChartOperators(config):
     hAx = [list(),list()]
     vAx = [[list(), list(), list()],[list(), list(), list()]]
     names = ["convective", "diffusive", "curl"]
@@ -59,7 +59,7 @@ def generateChartOperators():
     dim = 3
     for x, elem in enumerate(range(2,5,2)):
         for i, ngl in enumerate(range(3,totalNgl,1)):
-            fem = FemProblem(ngl=ngl, nelem=[elem]*dim)
+            fem = FemProblem(config, ngl=ngl, nelem=[elem]*dim)
             fem.setUp()
             fem.setUpSolver()
             errorConv, errorDiff, errorCurl = fem.OperatorsTests()
@@ -80,14 +80,14 @@ def generateChartOperators():
         plt.savefig(f"error-{names[i]}")
         plt.clf()
 
-def generateParaviewer():
-    fem = FemProblem()
+def generateParaviewer(config):
+    fem = FemProblem(config)
     fem.setUp()
     fem.setUpSolver()
     fem.solveKLETests()
 
-def timeSolving():
-    fem = FemProblem()
+def timeSolving(config):
+    fem = FemProblem(config)
     fem.setUp()
     fem.setUpSolver()
     if not fem.comm.rank:
@@ -103,26 +103,21 @@ def main():
     log = OptDB.getString('log', 'INFO')
     runTests = OptDB.getString('test', False)
     logging.basicConfig(level=log.upper() )
-    logger = logging.getLogger("")
-
+    logger = logging.getLogger("Init")
     try:
         with open(f'src/cases/{case}.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
-
     except:
         logger.info(f"Case '{case}' Not Found")
 
     if runTests == 'kle':
-        generateParaviewer()
+        generateParaviewer(yamlData)
     elif runTests == 'chart':
-        generateChart()
+        generateChart(yamlData)
     elif runTests == 'operators':
-        generateChartOperators()
+        generateChartOperators(yamlData)
     else:
-        timeSolving()
-
-    # self.logger.info(yamlData)
-    # self.caseName = "taylor-green"
+        timeSolving(yamlData)
 
 if __name__ == "__main__":
     main()

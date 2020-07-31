@@ -15,27 +15,18 @@ import logging
 import numpy as np
 
 class BaseProblem(object):
-    def __init__(self, comm=MPI.COMM_WORLD, **kwargs):
+    def __init__(self, config,**kwargs):
         """
         comm: MPI Communicator
         """
-        self.comm = comm
+        self.comm = MPI.COMM_WORLD
         self.timerTotal= Timer()
         self.timerTotal.tic()
         self.timer = Timer()
-        try:
-            case = kwargs['case']
-        except:
-            case = PETSc.Options().getString('case', 'uniform' )
-        # try:
-        with open(f'src/cases/{case}.yaml') as f:
-            self.config = yaml.load(f, Loader=yaml.Loader)
+        case = PETSc.Options().getString('case', 'uniform' )
+        # case = kwargs['case']
+        self.config = config
         self.logger = logging.getLogger(self.config.get("name"))
-        if not self.comm.rank:
-            self.logger.info("Initializing problem...")
-        # except:
-            # self.logger.info(f"Case '{case}' Not Found")
-            # pass
         self.case = case
         self.caseName = self.config.get("name")
         self.readDomainData(kwargs)
