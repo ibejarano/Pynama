@@ -25,12 +25,19 @@ else:
     print("Case not defined unabled to import")
     exit()
 
+MARKERS = [',','v','>','<','1','2','3','4','s','p','*','h','+']
+
 def generateChart(config, viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.8,0.9]):
     # viscousTime = [0.01 , 0.05 , 0.1, 0.15]
     hAx = list()
     vAx = list()
-    totalNgl = 9
+    totalNgl = 21
     plt.figure(figsize=(10,10))
+    plt.legend()
+    plt.xlabel(r'$N*$')
+    plt.ylabel(r'$||Error||_{\infty}$')
+    plt.grid(True)
+
     for i, ngl in enumerate(range(3,totalNgl,1)):
         fem = FemProblem(config, ngl=ngl)
         fem.setUp()
@@ -39,16 +46,11 @@ def generateChart(config, viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0
         del fem
         hAx.append((ngl-1)*2)
 
-    #hAx = list(range(3,totalNgl,2))
-    marker = [',','v','>','<','1','2','3','4','s','p','*','h','+']
-    vAxArray = np.array(vAx)
-    for i in range(vAxArray.shape[1]):
-        plt.loglog(hAx, vAxArray[:,i],'k'+marker[i]+'-', basey=10,label=r'$ \tau = $' + str(viscousTime[i]) ,linewidth =0.5)
+        vAxArray = np.array(vAx)
+        for i in range(vAxArray.shape[1]):
+            plt.loglog(hAx, vAxArray[:,i],'k'+MARKERS[i]+'-', basey=10,label=r'$ \tau = $' + str(viscousTime[i]) ,linewidth =0.5)
+        plt.pause(0.001)
         
-    plt.legend()
-    plt.xlabel(r'$N*$')
-    plt.ylabel(r'$||Error||_{\infty}$')
-    plt.grid(True)
     plt.show()
 
 def generateChartOperators(config):
@@ -67,12 +69,11 @@ def generateChartOperators(config):
             vAx[x][1].append(errorDiff)
             vAx[x][2].append(errorCurl)
             hAx[x].append((ngl-1)*elem)
-    #hAx = list(range(2,totalNgl,1))
-    marker = ['h','v','>','<','1','2','3','4','s','p','*','h','+']
+
     for i in range(3):
         plt.figure(figsize=(10,10))
-        plt.loglog(hAx[0], vAx[0][i],'k'+marker[i]+'-', basey=10,linewidth =0.5, color="b", label="Nel=2x2")
-        plt.loglog(hAx[1], vAx[1][i],'k'+marker[i]+'-', basey=10,linewidth =0.5, color="r", label="Nel=4x4")
+        plt.loglog(hAx[0], vAx[0][i],'k'+MARKERS[i]+'-', basey=10,linewidth =0.5, color="b", label="Nel=2x2")
+        plt.loglog(hAx[1], vAx[1][i],'k'+MARKERS[i]+'-', basey=10,linewidth =0.5, color="r", label="Nel=4x4")
         plt.xlabel(r'$N*$')
         plt.legend()
         plt.ylabel(r'$||Error||_{\infty}$')
