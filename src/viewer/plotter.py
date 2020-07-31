@@ -50,11 +50,11 @@ class Plotter:
     def updatePlot(self, x : list , variables: dict, save=False ,**kwargs):
         self.ax.set(**kwargs)
         self.ax.grid()
-        for i, var in enumerate(variables):
-            self.ax.plot(x, var['data'], label=var['name'], color=self.color[i])
-        self.plt.legend()
-        
-        if save:
-            self.plt.savefig("static-cd-cl-re80.png")
-        else:
-            self.plt.show()
+        for var in variables:
+            self.ax.plot(x, var['data'], label=var['name'])
+
+    def scatter(self, x, y, name):
+        self.ax.scatter(x, y)
+
+    def show(self):
+        self.plt.show()

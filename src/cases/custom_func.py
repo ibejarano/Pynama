@@ -9,7 +9,7 @@ import yaml
 from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
-
+from viewer.plotter import Plotter
 
 class CustomFuncCase(FreeSlip):
     def setUp(self):
@@ -76,15 +76,27 @@ class CustomFuncCase(FreeSlip):
         self.vel.assemble()
         self.vort.assemble()
 
-    def solveKLETests(self, startTime=0.0, endTime=1.0, steps=10):
+    def solveKLETests(self, steps=10):
+        self.logger.info("Running KLE Tests")
+        startTime = self.ts.getTime()
+        endTime = self.ts.getMaxTime()
         times = np.linspace(startTime, endTime, steps)
+        nodesToPlot, coords = self.dom.getNodesOverline("x", 0.5)
         boundaryNodes = self.getBoundaryNodes()
+        plotter = Plotter("Y" , "Vel")
         for step,time in enumerate(times):
             exactVel, exactVort = self.generateExactVecs(time)
             self.applyBoundaryConditions(time, boundaryNodes)
             self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
             self.operator.Curl.mult( exactVel , self.vort )
             self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort)
+            exact_x , _ = self.dom.getVecArrayFromNodes(exactVel, nodesToPlot)
+            calc_x, _ = self.dom.getVecArrayFromNodes(self.vel, nodesToPlot)
+            plotter.updatePlot(exact_x, [{"name": 'velocity_x' ,"data":coords}] )
+            plotter.scatter(calc_x , coords, "calc")
+            plotter.plt.pause(0.001)
+            self.logger.info(f"Saving time: {time:.1f} | Step: {step}")
+        plotter.show()
         self.viewer.writeXmf(self.caseName)
 
     def generateExactOperVecs(self,time):
