@@ -12,33 +12,30 @@ case = OptDB.getString('case', False)
 customFunctions = ['taylor-green', 'senoidal', 'flat-plate']
 
 if case in customFunctions:
-    name = 'taylor-green'
     from cases.custom_func import CustomFuncCase as FemProblem
 elif case == 'uniform':
-    name = 'uniform'
     from cases.uniform import UniformFlow as FemProblem
 elif case == 'ibm-static':
-    name = 'ibm-static'
     from cases.immersed_boundary import ImmersedBoundaryStatic as FemProblem
 elif case == 'ibm-dynamic':
-    name = case
     from cases.immersed_boundary import ImmersedBoundaryDynamic as FemProblem
 elif case == 'cavity':
-    name = 'cavity'
     from cases.cavity import Cavity as FemProblem
 else:
     print("Case not defined unabled to import")
     exit()
 
-def generateChart(viscousTime=[0.001,0.002,0.01,0.02,0.03,0.09,0.5]):
+def generateChart(viscousTimes=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.8,0.9]):
+    viscousTime = [0.01 , 0.05 , 0.1, 0.15]
     hAx = list()
     vAx = list()
-    totalNgl = 10
+    totalNgl = 21
     for i, ngl in enumerate(range(3,totalNgl,1)):
         fem = FemProblem(ngl=ngl)
         fem.setUp()
         fem.setUpSolver()
-        vAx.append(fem.getKLEError(times=viscousTime))
+        vAx.append(fem.getKLEError(viscousTimes=viscousTime))
+        del fem
         hAx.append((ngl-1)*2)
 
     #hAx = list(range(3,totalNgl,2))
@@ -46,7 +43,7 @@ def generateChart(viscousTime=[0.001,0.002,0.01,0.02,0.03,0.09,0.5]):
     vAxArray = np.array(vAx)
     plt.figure(figsize=(10,10))
     for i in range(vAxArray.shape[1]):
-        plt.semilogy(hAx, vAxArray[:,i],'k'+marker[i]+'-', basey=10,label=r'$ \tau = $' + str(viscousTime[i]) ,linewidth =0.5)
+        plt.loglog(hAx, vAxArray[:,i],'k'+marker[i]+'-', basey=10,label=r'$ \tau = $' + str(viscousTime[i]) ,linewidth =0.5)
         
     plt.legend()
     plt.xlabel(r'$N*$')
@@ -89,7 +86,7 @@ def generateParaviewer():
     fem.setUpSolver()
     fem.solveKLETests()
 
-def timeSolving(name):
+def timeSolving():
     fem = FemProblem()
     fem.setUp()
     fem.setUpSolver()
@@ -122,7 +119,7 @@ def main():
     elif runTests == 'operators':
         generateChartOperators()
     else:
-        timeSolving(name)
+        timeSolving()
 
     # self.logger.info(yamlData)
     # self.caseName = "taylor-green"

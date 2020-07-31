@@ -13,7 +13,10 @@ from viewer.paraviewer import Paraviewer
 
 class CustomFuncCase(FreeSlip):
     def setUp(self):
-        super().setUp()
+        self.setUpGeneral()
+        self.setUpBoundaryConditions()
+        self.setUpEmptyMats()
+        self.buildKLEMats()
 
         self.nu = self.mu / self.rho
 
@@ -83,7 +86,6 @@ class CustomFuncCase(FreeSlip):
             self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort)
         self.viewer.writeXmf(self.caseName)
 
-
     def generateExactOperVecs(self,time):
         exactVel = self.mat.K.createVecRight()
         exactVort = self.mat.Rw.createVecRight()
@@ -105,8 +107,6 @@ class CustomFuncCase(FreeSlip):
         exactDiff = self.dom.applyFunctionVecToVec(allNodes, fdiff_coords, exactDiff, self.dim_w )
         return exactVel, exactVort, exactConv, exactDiff
 
-
-    # Se llama solve KLE pero es de los operators
     def OperatorsTests(self):
         time = 0.0
         boundaryNodes = self.getBoundaryNodes()
@@ -279,7 +279,7 @@ class CustomFuncCase(FreeSlip):
     @staticmethod
     def flatplateVort(coord, nu, t=None):
         tau = sqrt(4*nu*t)
-        vort = -(2/(tau * sqrt(pi))) * exp(-(coord[1]/tau)**2)
+        vort = (-2/(tau * sqrt(pi))) * exp(-(coord[1]/tau)**2)
         return [vort]
 
     @staticmethod
