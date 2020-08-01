@@ -253,26 +253,25 @@ class DMPlexDom(PETSc.DMPlex):
         return vec
 
     ## Matrix build ind
+    # @profile
     def getMatIndices(self):
         conecMat = self.getDMConectivityMat()
         rStart, rEnd = conecMat.getOwnershipRange()
         locElRow = rEnd - rStart
-        ind_d = [0] * (rEnd - rStart)
-        ind_o = [0] * (rEnd - rStart)
+        # ind_d = [0] * (rEnd - rStart)
+        ind_d = np.zeros(rEnd-rStart, dtype=set)
+        # ind_o = [0] * (rEnd - rStart)
+        ind_o = np.zeros(rEnd-rStart, dtype=set)
         for row in range(rStart, rEnd):
-            cols, vals = conecMat.getRow(row)
+            cols, _ = conecMat.getRow(row)
             locRow = row - rStart
-
-            ind_d[locRow] = set([c for c in cols
-                                 if ((c >= rStart) and (c < rEnd))])
-            ind_o[locRow] = set([c for c in cols
-                                 if ((c < rStart) or (c >= rEnd))])
+            mask_diag = np.logical_and(cols >= rStart,cols < rEnd)
+            mask_off = np.logical_or(cols < rStart,cols >= rEnd)
+            ind_d[locRow] = set(cols[mask_diag])
+            ind_o[locRow] = set(cols[mask_off])
         conecMat.destroy()
-
         d_nnz_ind = [len(indSet) for indSet in ind_d]
         o_nnz_ind = [len(indSet) for indSet in ind_o]
-
-        # Limit nonzeros in diagonal block row to number of local rows
         locElRow = rEnd - rStart
         d_nnz_ind = [x if x <= locElRow else locElRow for x in d_nnz_ind]
         return rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o
