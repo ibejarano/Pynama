@@ -28,8 +28,8 @@ class Spectral(Element):
             self.indBdiv=[[0,1],[1,2]]
             self.setUpSpectralMats2D(ngl)
         elif dim == 3:
-            self.indWCurl=[[0,2,1],[0,1,2],[1,2,0],[1,0,2],[2,1,0],[2,0,1]]
-            self.indCurl=[[0,2,1],[0,1,2],[1,2,0],[1,0,2],[2,1,0],[2,0,1]]
+            self.indWCurl=[[0,2,1],[0,1,2],[1,0,2], [1,2,0],[2,1,0],[2,0,1]]
+            self.indCurl=[[0,2,1],[0,1,2], [1,0,2], [1,2,0],[2,1,0],[2,0,1]]
             self.indBdiv=[[0,1,5],[1,2,3],[5,3,4]]
             self.nnodface = (ngl - 2)**2
             self.setUpSpectralMats3D(ngl)
