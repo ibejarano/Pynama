@@ -4,6 +4,7 @@ plt.rcParams['ytick.labelsize'] = 12
 plt.rcParams['xtick.labelsize'] = 12
 plt.rcParams['legend.fontsize'] = 14
 
+MARKERS = ['o','v','>','<','1','2','3','4','s','p','*','h','+']
 class DualAxesPlotter:
     availableTypes = ["simple","dual", "semilog", "log"]
     def __init__(self, varName1, varName2):
@@ -47,11 +48,12 @@ class Plotter:
         self.fig = fig
         self.plt = plt
 
-    def updatePlot(self, x : list , variables: dict, save=False ,**kwargs):
+    def updatePlot(self, x : list , variables: dict,step, save=False ,**kwargs):
         self.ax.set(**kwargs)
         self.ax.grid()
-        for var in variables:
-            self.ax.plot(x, var['data'], label=var['name'])
+        for i, var in enumerate(variables):
+            style = f"k-{MARKERS[step]}"
+            self.ax.plot(x, var['data'], style, label=var['name'], markersize=3, linewidth=0.5 )
 
     def scatter(self, x, y, name):
         self.ax.scatter(x, y)

@@ -81,9 +81,11 @@ class CustomFuncCase(FreeSlip):
         startTime = self.ts.getTime()
         endTime = self.ts.getMaxTime()
         times = np.linspace(startTime, endTime, steps)
+        viscousTimes=[0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+        times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
         nodesToPlot, coords = self.dom.getNodesOverline("x", 0.5)
         boundaryNodes = self.getBoundaryNodes()
-        plotter = Plotter("Y" , "Vel")
+        plotter = Plotter(r"$\frac{u}{U}$" , r"$\frac{y}{Y}$")
         for step,time in enumerate(times):
             exactVel, exactVort = self.generateExactVecs(time)
             self.applyBoundaryConditions(time, boundaryNodes)
@@ -92,10 +94,11 @@ class CustomFuncCase(FreeSlip):
             self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort)
             exact_x , _ = self.dom.getVecArrayFromNodes(exactVel, nodesToPlot)
             calc_x, _ = self.dom.getVecArrayFromNodes(self.vel, nodesToPlot)
-            plotter.updatePlot(exact_x, [{"name": 'velocity_x' ,"data":coords}] )
-            plotter.scatter(calc_x , coords, "calc")
-            plotter.plt.pause(0.001)
+            plotter.updatePlot(exact_x, [{"name": fr"$\tau$ = ${viscousTimes[step]}$" ,"data":coords}], step )
+            # plotter.scatter(calc_x , coords, "calc")
+            # plotter.plt.pause(0.001)
             self.logger.info(f"Saving time: {time:.1f} | Step: {step}")
+        plotter.plt.legend()
         plotter.show()
         self.viewer.writeXmf(self.caseName)
 
