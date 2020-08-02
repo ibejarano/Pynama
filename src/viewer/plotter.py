@@ -5,6 +5,15 @@ plt.rcParams['xtick.labelsize'] = 12
 plt.rcParams['legend.fontsize'] = 14
 
 MARKERS = ['o','v','>','<','1','2','3','4','s','p','*','h','+']
+
+class BasePlotter:
+    def __init__(self):
+        fig, ax1 = plt.subplots()
+        plt.figure(figsize=(10,10))
+        fig.tight_layout()
+        self.ax = ax1
+        self.fig = fig
+        self.plt = plt
 class DualAxesPlotter:
     availableTypes = ["simple","dual", "semilog", "log"]
     def __init__(self, varName1, varName2):
@@ -60,3 +69,23 @@ class Plotter:
 
     def show(self):
         self.plt.show()
+
+
+class ErrorPlotter(BasePlotter):
+    def __init__(self):
+        super().__init__()
+        self.ax.set_xlabel(r'$N*$')
+        self.ax.set_ylabel(r'$||Error||_{2}$')
+        self.plt.grid(True)
+
+    def updateLogLogPlot(self,x , y , labels , legend=False):
+        # for i in range(y.shape[1]):
+            # self.ax.loglog(x, y[:,i],'k'+MARKERS[i]+'-', basey=10,label=fr"$\tau$ = ${labels[i]}$" ,linewidth =0.75)
+        self.ax.plot([0,1,10], [1,22,23])
+        self.plt.show()
+        print("plotie")
+        if legend:
+            self.plt.legend()
+
+    def savePlot(self, name):
+        self.plt.savefig(f"{name}.png")
