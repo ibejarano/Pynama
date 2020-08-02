@@ -34,7 +34,8 @@ class BaseProblem(object):
         if 'time-solver' in self.config:
             self.setUpTimeSolver()
         if 'boundary-conditions' in self.config:
-            self.readBoundaryCondition()
+            boundaryConditions = self.config.get("boundary-conditions")
+            self.readBoundaryCondition(boundaryConditions)
 
     def setUp(self):
         self.setUpGeneral()
