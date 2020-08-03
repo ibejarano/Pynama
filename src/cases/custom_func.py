@@ -129,7 +129,7 @@ class CustomFuncCase(FreeSlip):
         self.applyBoundaryConditions(time, boundaryNodes)
         step = 0
         exactVel, exactVort, exactConv, exactDiff = self.generateExactOperVecs(time)
-        exactDiff.scale(2*self.mu)
+        #exactDiff.scale(2*self.mu)
         self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
         convective = self.getConvective(exactVel, exactConv)
         convective.setName("convective")
@@ -138,6 +138,7 @@ class CustomFuncCase(FreeSlip):
         self.operator.Curl.mult(exactVel, self.vort)
         self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort,exactConv,exactDiff,convective,diffusive )
         self.viewer.writeXmf(self.caseName)
+        self.operator.weigCurl.reciprocal()
         err = convective - exactConv
         errorConv = sqrt((err * err ).dot(self.operator.weigCurl))
         err = diffusive - exactDiff
@@ -315,5 +316,5 @@ class CustomFuncCase(FreeSlip):
         tau = sqrt(4*nu*t)
         alpha = 4 / (sqrt(pi)* tau**3)
         beta = ( 1 - 2 * coord[1]**2 / tau**2 )
-        diffusive = alpha * beta * exp( -(coord[1]/tau)**2 )
+        diffusive = nu * alpha * beta * exp( -(coord[1]/tau)**2 )
         return [diffusive]
