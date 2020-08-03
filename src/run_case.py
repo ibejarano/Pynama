@@ -25,19 +25,25 @@ else:
     print("Case not defined unabled to import")
     exit()
 
-MARKERS = [',','v','>','<','1','2','3','4','s','p','*','h','+']
+MARKERS = ['o','*','>','p','+','1','2','3','4','s','+']
 
 def generateChart(config, viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.8,0.9]):
-    # viscousTime = [0.01 , 0.05 , 0.1, 0.15]
+    # viscousTime = [0.01 , 0.04 , 0.08, 0.12, 0.16]
+    viscousTime = [0.01, 0.02 , 0.05 , 0.1 , 0.15]
+    plt.rcParams['axes.labelsize'] = 16
+    plt.rcParams['ytick.labelsize'] = 16
+    plt.rcParams['xtick.labelsize'] = 16
+    plt.rcParams['legend.fontsize'] = 16
+    viscousTime = [0.2,0.4,0.6,0.8,0.9]
     hAx = list()
     vAx = list()
     totalNgl = 21
     plt.figure(figsize=(10,10))
     plt.legend()
     plt.xlabel(r'$N*$')
-    plt.ylabel(r'$||Error||_{\infty}$')
+    plt.ylabel(r'$||\mathit{Error}||_{2}$')
     plt.grid(True)
-
+    plt.tight_layout(pad=3)
     for i, ngl in enumerate(range(3,totalNgl,1)):
         fem = FemProblem(config, ngl=ngl)
         fem.setUp()
@@ -45,38 +51,76 @@ def generateChart(config, viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0
         vAx.append(fem.getKLEError(viscousTimes=viscousTime))
         del fem
         hAx.append((ngl-1)*2)
+        vAxArray = np.array(vAx)
+
+    for i in range(vAxArray.shape[1]):
+        plt.loglog(hAx, vAxArray[:,i],'k'+MARKERS[i]+'-', markersize=9, basey=10,label=r'$ \tau = $' + str(viscousTime[i]) ,linewidth =0.9)
+        
+    plt.legend()
+    hAx = list()
+    vAx = list()
+    viscousTime = [viscousTime[0], viscousTime[-1]]
+    for i, ngl in enumerate(range(3,totalNgl,1)):
+        fem = FemProblem(config, ngl=3, nelem=[ngl-1, ngl-1])
+        fem.setUp()
+        fem.setUpSolver()
+        vAx.append(fem.getKLEError(viscousTimes=viscousTime))
+        del fem
+        hAx.append((ngl-1)*2)
 
         vAxArray = np.array(vAx)
-        for i in range(vAxArray.shape[1]):
-            plt.loglog(hAx, vAxArray[:,i],'k'+MARKERS[i]+'-', basey=10,label=r'$ \tau = $' + str(viscousTime[i]) ,linewidth =0.5)
-        plt.pause(0.001)
-        
-    plt.show()
+
+    for i in range(vAxArray.shape[1]):
+        plt.loglog(hAx, vAxArray[:,i],'b'+'-'*(i+1), basey=10,label=fr"$\tau = {viscousTime[i]} - Q_2 $", linewidth =1.25)
+    plt.legend()
+    plt.savefig("test-kle.png")
+    # plt.show()
 
 def generateChartOperators(config):
-    hAx = [list(),list()]
-    vAx = [[list(), list(), list()],[list(), list(), list()]]
+    Nelem = [list(),list()]
+    totalNelem = []
+    errors = [[list(), list(), list()],[list(), list(), list()]]
+    errors_h = [list(), list(), list()]
     names = ["convective", "diffusive", "curl"]
-    totalNgl = 7
-    dim = 3
+    totalNgl = 21
+    dim = len(config.get("domain").get("nelem"))
     for x, elem in enumerate(range(2,5,2)):
         for i, ngl in enumerate(range(3,totalNgl,1)):
             fem = FemProblem(config, ngl=ngl, nelem=[elem]*dim)
             fem.setUp()
             fem.setUpSolver()
             errorConv, errorDiff, errorCurl = fem.OperatorsTests()
-            vAx[x][0].append(errorConv)
-            vAx[x][1].append(errorDiff)
-            vAx[x][2].append(errorCurl)
-            hAx[x].append((ngl-1)*elem)
+            errors[x][0].append(errorConv)
+            errors[x][1].append(errorDiff)
+            errors[x][2].append(errorCurl)
+            Nelem[x].append((ngl-1)*elem)
+            totalNelem.append((ngl-1) * (elem-1) * 2)
+
+    totalNelem = list(set(totalNelem))
+    for n in totalNelem:
+        fem = FemProblem(config, ngl=3, nelem=[n/2]*dim)
+        fem.setUp()
+        fem.setUpSolver()
+        errorConv, errorDiff, errorCurl = fem.OperatorsTests()
+        errors_h[0].append(errorConv)
+        errors_h[1].append(errorDiff)
+        errors_h[2].append(errorCurl)
+
+    with open(f"out-operators-test-{config['name']}.yaml", "w") as f:
+            data = dict()
+            data["mesh-2x2"] = {"N": Nelem[0], "error-curl": errors[0][0], "error-diff": errors[0][1], "error-conv": errors[0][2]}
+            data["mesh-4x4"] = {"N": Nelem[1], "error-curl": errors[1][0], "error-diff": errors[1][1], "error-conv": errors[1][2]}
+            data["mesh-href"] = {"N": totalNelem, "error-curl": errors_h[0], "error-diff": errors_h[1], "error-conv": errors_h[2]}
+            f.write(yaml.dump(data))
 
     for i in range(3):
         plt.figure(figsize=(10,10))
-        plt.loglog(hAx[0], vAx[0][i],'k'+MARKERS[i]+'-', basey=10,linewidth =0.5, color="b", label="Nel=2x2")
-        plt.loglog(hAx[1], vAx[1][i],'k'+MARKERS[i]+'-', basey=10,linewidth =0.5, color="r", label="Nel=4x4")
+        plt.loglog(Nelem[0], errors[0][i],marker='o' ,basey=10,linewidth =0.75, color="b", label=r"$N_{el} = 2 \times 2$")
+        plt.loglog(Nelem[1], errors[1][i],marker='o', basey=10,linewidth =0.75, color="r", label=r"$N_{el} = 4 \times 4$")
+        plt.loglog(totalNelem, errors_h[i],marker='o', basey=10,linewidth =0.75, color="k", label=r"refinamiento h")
         plt.xlabel(r'$N*$')
         plt.legend()
-        plt.ylabel(r'$||Error||_{\infty}$')
+        plt.ylabel(r'$||Error||_{2}$')
         plt.grid(True)
         plt.savefig(f"error-{names[i]}")
         plt.clf()
