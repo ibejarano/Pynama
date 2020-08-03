@@ -78,11 +78,11 @@ def generateChart(config, viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0
 
 def generateChartOperators(config):
     Nelem = [list(),list()]
-    totalNelem = []
+    totalNodes = []
     errors = [[list(), list(), list()],[list(), list(), list()]]
     errors_h = [list(), list(), list()]
     names = ["convective", "diffusive", "curl"]
-    totalNgl = 21
+    totalNgl = 7
     dim = len(config.get("domain").get("nelem"))
     for x, elem in enumerate(range(2,5,2)):
         for i, ngl in enumerate(range(3,totalNgl,1)):
@@ -94,30 +94,34 @@ def generateChartOperators(config):
             errors[x][1].append(errorDiff)
             errors[x][2].append(errorCurl)
             Nelem[x].append((ngl-1)*elem)
-            totalNelem.append((ngl-1) * (elem-1) * 2)
+            totalNodes.append(((ngl-1) * elem) + 1)
 
-    totalNelem = list(set(totalNelem))
-    for n in totalNelem:
-        fem = FemProblem(config, ngl=3, nelem=[n/2]*dim)
+    totalNodes = list(set(totalNodes))
+    Nelem_h = list()
+    print(totalNodes)
+    for n in totalNodes:
+        nelem = int((n - 1)/2)
+        fem = FemProblem(config, ngl=3, nelem=[nelem]*dim)
         fem.setUp()
         fem.setUpSolver()
         errorConv, errorDiff, errorCurl = fem.OperatorsTests()
         errors_h[0].append(errorConv)
         errors_h[1].append(errorDiff)
         errors_h[2].append(errorCurl)
+        Nelem_h.append(((3-1)* nelem ) )
 
     with open(f"out-operators-test-{config['name']}.yaml", "w") as f:
             data = dict()
             data["mesh-2x2"] = {"N": Nelem[0], "error-curl": errors[0][0], "error-diff": errors[0][1], "error-conv": errors[0][2]}
             data["mesh-4x4"] = {"N": Nelem[1], "error-curl": errors[1][0], "error-diff": errors[1][1], "error-conv": errors[1][2]}
-            data["mesh-href"] = {"N": totalNelem, "error-curl": errors_h[0], "error-diff": errors_h[1], "error-conv": errors_h[2]}
+            data["mesh-href"] = {"N": Nelem_h, "error-curl": errors_h[0], "error-diff": errors_h[1], "error-conv": errors_h[2]}
             f.write(yaml.dump(data))
 
     for i in range(3):
         plt.figure(figsize=(10,10))
-        plt.loglog(Nelem[0], errors[0][i],marker='o' ,basey=10,linewidth =0.75, color="b", label=r"$N_{el} = 2 \times 2$")
-        plt.loglog(Nelem[1], errors[1][i],marker='o', basey=10,linewidth =0.75, color="r", label=r"$N_{el} = 4 \times 4$")
-        plt.loglog(totalNelem, errors_h[i],marker='o', basey=10,linewidth =0.75, color="k", label=r"refinamiento h")
+        plt.loglog(Nelem[0], errors[0][i],marker='o', markersize=5 ,basey=10,linewidth =0.75, color="b", label=r"$N_{el} = 2 \times 2$")
+        plt.loglog(Nelem[1], errors[1][i],marker='o', markersize=5, basey=10,linewidth =0.75, color="r", label=r"$N_{el} = 4 \times 4$")
+        plt.loglog(Nelem_h, errors_h[i],marker='o', markersize=5, basey=10,linewidth =0.75, color="k", label=r"refinamiento h")
         plt.xlabel(r'$N*$')
         plt.legend()
         plt.ylabel(r'$||Error||_{2}$')
