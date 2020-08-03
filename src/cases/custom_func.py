@@ -124,7 +124,7 @@ class CustomFuncCase(FreeSlip):
         return exactVel, exactVort, exactConv, exactDiff
 
     def OperatorsTests(self):
-        time = 0.8
+        time = 1
         boundaryNodes = self.getBoundaryNodes()
         self.applyBoundaryConditions(time, boundaryNodes)
         step = 0
@@ -138,9 +138,12 @@ class CustomFuncCase(FreeSlip):
         self.operator.Curl.mult(exactVel, self.vort)
         self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort,exactConv,exactDiff,convective,diffusive )
         self.viewer.writeXmf(self.caseName)
-        errorConv = (convective - exactConv).norm(norm_type=2)
-        errorDiff = (diffusive - exactDiff).norm(norm_type=2)
-        errorCurl = (self.vort - exactVort).norm(norm_type=2)
+        err = convective - exactConv
+        errorConv = sqrt((err * err ).dot(self.operator.weigCurl))
+        err = diffusive - exactDiff
+        errorDiff = sqrt((err * err ).dot(self.operator.weigCurl))
+        err = self.vort - exactVort
+        errorCurl = sqrt((err * err ).dot(self.operator.weigCurl))
         self.logger.info("Operatores Tests")
         return errorConv, errorDiff, errorCurl
 
