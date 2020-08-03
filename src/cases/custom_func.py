@@ -124,11 +124,12 @@ class CustomFuncCase(FreeSlip):
         return exactVel, exactVort, exactConv, exactDiff
 
     def OperatorsTests(self):
-        time = 0.0
+        time = 0.8
         boundaryNodes = self.getBoundaryNodes()
         self.applyBoundaryConditions(time, boundaryNodes)
         step = 0
         exactVel, exactVort, exactConv, exactDiff = self.generateExactOperVecs(time)
+        exactDiff.scale(2*self.mu)
         self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
         convective = self.getConvective(exactVel, exactConv)
         convective.setName("convective")
@@ -289,7 +290,7 @@ class CustomFuncCase(FreeSlip):
     def flatplateVel(coord, nu , t=None):
         U_ref = 1
         vx = U_ref * erf(coord[1]/ sqrt(4*nu*t))
-        vy = 0
+        vy = 1
         return [vx, vy]
 
     @staticmethod
@@ -308,9 +309,8 @@ class CustomFuncCase(FreeSlip):
 
     @staticmethod
     def flatplateDiffusive(coord, nu, t=None):
-        c = 1
         tau = sqrt(4*nu*t)
         alpha = 4 / (sqrt(pi)* tau**3)
-        beta = ( 1 - 2 * coord[1]**2 / (tau**2) )
+        beta = ( 1 - 2 * coord[1]**2 / tau**2 )
         diffusive = alpha * beta * exp( -(coord[1]/tau)**2 )
         return [diffusive]
