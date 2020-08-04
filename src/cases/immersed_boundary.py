@@ -26,8 +26,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         name2= r'Coef. de empuje $C_{L}$'
         self.plotter = DualAxesPlotter(name1, name2)
 
-    def readBoundaryCondition(self):
-        bc = self.config.get("boundary-conditions")
+    def readBoundaryCondition(self, bc):
         try:
             re = bc['constant']['re']
             L = self.body.getCaracteristicLong()
@@ -251,7 +250,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
             self.operator.Curl.mult(self.vel, self.vort)
             self.ts.setSolution(self.vort)
             self.markAffectedNodes()
-            if step % 10 == 0:
+            if step % 5 == 0:
                 self.viewer.saveData(step, time, self.vort, self.vel, self.affectedNodes)
                 self.viewer.writeXmf(self.caseName)
                 self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} | Saved Step ")
