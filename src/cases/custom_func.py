@@ -12,6 +12,7 @@ from viewer.paraviewer import Paraviewer
 from viewer.plotter import Plotter
 
 class CustomFuncCase(FreeSlip):
+    # @profile
     def setUp(self):
         self.setUpGeneral()
         self.setUpBoundaryConditions()
@@ -150,16 +151,7 @@ class CustomFuncCase(FreeSlip):
 
     def getConvective(self,exactVel, exactConv):
         convective = exactConv.copy()
-        sK, eK = self.mat.K.getOwnershipRange()
-        for indN in range(sK, eK, self.dim):
-            indicesVV = [indN * self.dim_s / self.dim + d
-                         for d in range(self.dim_s)]
-            VelN = exactVel.getValues([indN + d for d in range(self.dim)])
-            if self.dim==2:
-                VValues = [VelN[0] ** 2, VelN[0] * VelN[1], VelN[1] ** 2]
-            elif self.dim==3:
-                VValues = [VelN[0] ** 2, VelN[0] * VelN[1] ,VelN[1] ** 2 , VelN[1] * VelN[2] , VelN[2] **2 , VelN[2] *VelN[0]]
-            self._VtensV.setValues(indicesVV, VValues, False)
+        self.computeVtensV()
         aux=self.vel.copy()
         self.operator.DivSrT.mult(self._VtensV, aux)
         self.operator.Curl.mult(aux,convective)

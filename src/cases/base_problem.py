@@ -158,23 +158,7 @@ class BaseProblem(object):
         # KLE spatial solution with vorticity given
         self.solveKLE(t, Vort)
         # FIXME: Generalize for dim = 3 also
-        sK, eK = self.mat.K.getOwnershipRange()
-
-        for indN in range(sK, eK, self.dim):
-            indicesVV = [indN * self.dim_s / self.dim + d
-                         for d in range(self.dim_s)]
-            VelN = self.vel.getValues([indN + d for d in range(self.dim)])
-            if self.dim==2:
-                VValues = [VelN[0] ** 2, VelN[0] * VelN[1], VelN[1] ** 2]
-            elif self.dim==3:
-                VValues = [VelN[0] ** 2, VelN[0] * VelN[1] ,VelN[1] ** 2 , VelN[1] * VelN[2] , VelN[2] **2 , VelN[2] *VelN[0]]
-            else:
-                raise Exception("Wrong dim")
-
-            self._VtensV.setValues(indicesVV, VValues, False)
-
-        self._VtensV.assemble()
-
+        self.computeVtensV()
         # self._Aux1 = self.SrT * self._Vel
         self.operator.SrT.mult(self.vel, self._Aux1)
 
@@ -190,6 +174,17 @@ class BaseProblem(object):
         rhs.scale(1/self.rho)
 
         self.operator.Curl.mult(rhs, f)
+
+    def computeVtensV(self):
+        sK, eK = self.mat.K.getOwnershipRange()
+        velArr = self.vel.getArray()
+        ind = np.arange(int(sK*self.dim_s/self.dim), int(eK*self.dim_s/self.dim), dtype=np.int32)
+        v_x = velArr[::self.dim]
+        v_y = velArr[1::self.dim]
+        self._VtensV.setValues(ind[::self.dim_s], v_x**2 , False)
+        self._VtensV.setValues(ind[1::self.dim_s], v_x * v_y , False)
+        self._VtensV.setValues(ind[2::self.dim_s], v_y**2 , False)
+        self._VtensV.assemble()
 
     def startSolver(self):
         initTime = self.ts.getTime()
