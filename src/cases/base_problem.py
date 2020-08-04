@@ -152,7 +152,7 @@ class BaseProblem(object):
             nodesSet |= set(nodes)
         return list(nodesSet)
 
-    # @profile
+    @profile
     def evalRHS(self, ts, t, Vort, f):
         """Evaluate the KLE right hand side."""
         # KLE spatial solution with vorticity given
@@ -184,6 +184,11 @@ class BaseProblem(object):
         self._VtensV.setValues(ind[::self.dim_s], v_x**2 , False)
         self._VtensV.setValues(ind[1::self.dim_s], v_x * v_y , False)
         self._VtensV.setValues(ind[2::self.dim_s], v_y**2 , False)
+        if self.dim == 3:
+            v_z = velArr[2::self.dim]
+            self._VtensV.setValues(ind[3::self.dim_s], v_y * v_z , False)
+            self._VtensV.setValues(ind[4::self.dim_s], v_z**2 , False)
+            self._VtensV.setValues(ind[5::self.dim_s], v_z * v_x , False)
         self._VtensV.assemble()
 
     def startSolver(self):
