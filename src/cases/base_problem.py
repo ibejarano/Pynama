@@ -152,7 +152,7 @@ class BaseProblem(object):
             nodesSet |= set(nodes)
         return list(nodesSet)
 
-    @profile
+    #@profile
     def evalRHS(self, ts, t, Vort, f):
         """Evaluate the KLE right hand side."""
         # KLE spatial solution with vorticity given
