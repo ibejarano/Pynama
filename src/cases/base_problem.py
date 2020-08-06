@@ -95,7 +95,7 @@ class BaseProblem(object):
         self.setUpDomain()
         self.setUpElement()
         self.createMesh()
-
+        self.bcNodes = self.getBoundaryNodes()
     # @profile
     def buildOperators(self):
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
@@ -152,7 +152,6 @@ class BaseProblem(object):
             nodesSet |= set(nodes)
         return list(nodesSet)
 
-    @profile
     def evalRHS(self, ts, t, Vort, f):
         """Evaluate the KLE right hand side."""
         # KLE spatial solution with vorticity given
@@ -401,8 +400,7 @@ class FreeSlip(BaseProblem):
             self.logger.info(f"Empty Operators created")
 
     def solveKLE(self, time, vort):
-        boundaryNodes = self.getBoundaryNodes()
-        self.applyBoundaryConditions(time, boundaryNodes)
+        self.applyBoundaryConditions(time, self.bcNodes)
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def getKLEError(self, viscousTimes=None ,startTime=0.0, endTime=1.0, steps=10):
@@ -425,10 +423,10 @@ class FreeSlip(BaseProblem):
     def buildKLEMats(self):
         indices2one = set() 
         boundaryNodes = self.mat.globalIndicesDIR 
-        cornerCoords = self.dom.getCellCornersCoords(cell=0)
-        locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
 
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
+            cornerCoords = self.dom.getCellCornersCoords(cell)
+            locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
             nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             # Build velocity and vorticity DoF indices
             indicesVel = self.dom.getVelocityIndex(nodes)
@@ -474,4 +472,4 @@ class FreeSlip(BaseProblem):
         self.mat.assembleAll()
         self.mat.setIndices2One(indices2one)
         if not self.comm.rank:
-            self.logger.info(f"KLE Matrices builded")
+            self.logger.info(f"KLE Matrices builded - NEW")
