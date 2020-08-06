@@ -34,6 +34,7 @@ class ImmersedBoundaryStatic(FreeSlip):
             self.U_ref = vel_x
             self.cteValue = [vel_x,0]
             self.re = re
+            self.body.saveVTK('.')
         except:
             vel = bc['constant']['vel']
             self.U_ref = (vel[0]**2 + vel[1]**2)**0.5
@@ -41,26 +42,23 @@ class ImmersedBoundaryStatic(FreeSlip):
 
     def readDomainData(self, kwargs):
         super().readDomainData(kwargs)
-        numElements = self.nelem[0]
-        self.h = (eval(self.upper[0]) - eval(self.lower[0]))/numElements
-        self.h /= (self.ngl-1)
-
+        self.h = 0.025
         bodies = self.config.get("body")
         for body in bodies:
             # ONLY for 1 body
             self.body = self.createBody(body)
 
     def buildOperators(self):
-        cornerCoords = self.dom.getCellCornersCoords(cell=0)
-        localOperators = self.elemType.getElemKLEOperators(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
+            cornerCoords = self.dom.getCellCornersCoords(cell)
+            localOperators = self.elemType.getElemKLEOperators(cornerCoords)
             nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             self.operator.setValues(localOperators, nodes)
         # self.operator.weigDivSrT.assemble()
         # self.weigArea = self.operator.weigDivSrT.copy()
         self.operator.assembleAll()
         if not self.comm.rank:
-            self.logger.info(f"Operators Matrices builded")
+            self.logger.info(f"Operators Matrices builded - IBM")
 
     def startSolver(self):
         self.computeInitialCondition(startTime= 0.0)
