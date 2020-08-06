@@ -9,7 +9,7 @@ from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
 from viewer.plotter import DualAxesPlotter
 from solver.ksp_solver import KspSolver
-from domain.immersed_body import Circle, Line
+from domain.immersed_body import Circle, Line, BodiesContainer
 import matplotlib.pyplot as plt
 import yaml
 # ibm imports
@@ -27,26 +27,28 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.plotter = DualAxesPlotter(name1, name2)
 
     def readBoundaryCondition(self, bc):
+        # print(bc)
         try:
             re = bc['constant']['re']
-            L = self.body.getCaracteristicLong()
+            L = 1
             vel_x = re*(self.mu/self.rho) / L
             self.U_ref = vel_x
             self.cteValue = [vel_x,0]
             self.re = re
-            self.body.saveVTK('.')
         except:
             vel = bc['constant']['vel']
             self.U_ref = (vel[0]**2 + vel[1]**2)**0.5
             self.cteValue = [vel_x,0]
 
-    def readDomainData(self, kwargs):
-        super().readDomainData(kwargs)
-        self.h = 0.025
-        bodies = self.config.get("body")
-        for body in bodies:
+    def setUpDomain(self):
+        super().setUpDomain()
+        # bodies = self.config.get("body")
+        self.h = 0.005
+        # for body in bodies:
             # ONLY for 1 body
-            self.body = self.createBody(body)
+            # self.body = self.createBody(body)
+        self.body = BodiesContainer('side-by-side')
+        self.body.createBodies(self.h)
 
     def buildOperators(self):
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
@@ -67,6 +69,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         clifts = list()
         times = list()
         maxSteps = self.ts.getMaxSteps()
+        self.body.viewBodies()
         for i in range(maxSteps):
             self.ts.step()
             step = self.ts.getStepNumber()
@@ -140,20 +143,21 @@ class ImmersedBoundaryStatic(FreeSlip):
     def computeVelocityCorrection(self, NF=1):
         fx = 0
         fy = 0
+        fs = 0
         aux = self.vel.copy()
-        bodyVel = self.body.getVelocity()
+        # bodyVel = self.body.getVelocity()
         for i in range(NF):
             self.H.mult(self.vel, self.ibm_rhs)
-            self.ksp.solve(bodyVel - self.ibm_rhs, self.virtualFlux)
+            self.ksp.solve( - self.ibm_rhs, self.virtualFlux)
             self.S.mult(self.virtualFlux, self.vel_correction)
             # fx += fx_part
             # fy += fy_part
             self.vel += self.vel_correction
             aux = self.virtualFlux
             # self.H.multTranspose(self.ibm_rhs, aux)
-            fx_part, fy_part, fs = self.body.computeForce(aux)
-            fx += fx_part
-            fy += fy_part
+            # fx_part, fy_part, fs = self.body.computeForce(aux)
+            # fx += fx_part
+            # fy += fy_part
         return -fx*self.h**2,  -fy*self.h**2, fs
 
     def createBody(self, body):
@@ -166,6 +170,7 @@ class ImmersedBoundaryStatic(FreeSlip):
             ibmBody.generateDMPlex(self.h)
             return ibmBody
 
+    # @profile
     def createEmptyIBMMatrix(self):
         rows = self.body.getTotalNodes() * self.dim
         cols = len(self.dom.getAllNodes()) * self.dim
@@ -180,19 +185,20 @@ class ImmersedBoundaryStatic(FreeSlip):
             comm=self.comm)
         self.H.setUp()
 
+    # @profile
     def buildIBMMatrix(self):
         lagNodes = self.body.getTotalNodes()
         eulerIndices = [node*self.dim+dof for node in self.ibmNodes for dof in range(self.dim)]
         eulerCoords = self.dom.getNodesCoordinates(self.ibmNodes)
         for lagNode in range(lagNodes):
             dirac = self.computeDirac(lagNode, eulerCoords)
-            totNNZ = 0
-            for i in dirac:
-                if i>0:
-                    totNNZ +=1
+            # totNNZ = 0
+            # for i in dirac:
+            #     if i>0:
+            #         totNNZ +=1
             for dof in range(self.dim):
                 self.H.setValues(lagNode*self.dim+dof, eulerIndices[dof::self.dim], dirac)
-            self.body.setEulerNodes(lagNode, totNNZ)
+            # self.body.setEulerNodes(lagNode, totNNZ)
 
         self.H.assemble()
         self.S = self.H.copy().transpose()
@@ -221,6 +227,7 @@ class ImmersedBoundaryStatic(FreeSlip):
                 cells.append(cell)
         return cells
 
+    # @profile
     def computeDirac(self, lagPoint, eulerCoords):
         diracs = list()
         coordBodyNode = self.body.getNodeCoordinates(lagPoint)
@@ -235,6 +242,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         return np.mean(corners, axis=0)
 
 class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
+    # @profile
     def startSolver(self):
         self.computeInitialCondition(startTime= 0.0)
         self.ts.setSolution(self.vort)
@@ -243,7 +251,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         for step in range(1,maxSteps+1):
             self.ts.step()
             time = self.ts.time
-            self.computeVelocityCorrection(time, NF=6)
+            self.computeVelocityCorrection(time, NF=1)
             position = self.body.getCenterBody()
             self.operator.Curl.mult(self.vel, self.vort)
             self.ts.setSolution(self.vort)
@@ -270,6 +278,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         nnodes = len(self.ibmNodes)
         self.affectedNodes.setValues(list(self.ibmNodes), [1]*nnodes, addv=False)
 
+    # @profile
     def computeVelocityCorrection(self, t, NF=1):
         self.body.updateBodyParameters(t)
         self.rebuildMatrix()
@@ -284,7 +293,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         rows = self.body.getTotalNodes() * self.dim
         cols = len(self.dom.getAllNodes()) * self.dim
         bodyRegion = self.body.getRegion()
-        cellsAffected = self.getAffectedCells(bodyRegion*6)
+        cellsAffected = self.getAffectedCells(bodyRegion*2.2)
         self.ibmNodes = self.dom.getGlobalNodesFromEntities(cellsAffected, shared=False)
         d_nnz_D = len(self.ibmNodes)
         o_nnz_D = 0
@@ -293,6 +302,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
             comm=self.comm)
         self.H.setUp()
 
+    # @profile
     def rebuildMatrix(self):
         self.H.destroy()
         self.S.destroy()
