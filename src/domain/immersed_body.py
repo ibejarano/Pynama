@@ -3,6 +3,58 @@ from math import sin, cos , pi , sqrt, ceil, floor
 from petsc4py import PETSc
 import logging
 
+class BodiesContainer:
+    types = ['side-by-side', 'tandem']
+    def __init__(self, type):
+        # centerDistance = 2
+        self.type = 'side-by-side'
+        self.bodies= list()
+
+    def createBodies(self, h):
+        # en -1 y 1 esta implicita la distancia entre los centros
+        if self.type == 'side-by-side':
+            for i in range(1,3):
+                body = Circle(vel=[0,0], center=[ 0.35*(-1)**i ,0], radius=0.5)
+                body.generateDMPlex(h)
+                self.bodies.append(body)
+            self.locTotalNodes = body.getTotalNodes()
+
+    def getTotalNodes(self):
+        nodes = 0
+        for body in self.bodies:
+            bodyNodes = body.getTotalNodes()
+            nodes += bodyNodes
+        return nodes
+
+    def getRegion(self):
+        radius = 0.5
+        distanceCenters = 2
+        hCeil = self.getElementLong()
+        tot = radius + distanceCenters + hCeil*4
+        return tot
+
+    def getNodeCoordinates(self, globNode):
+        # input is global
+        # necesito identificar a que cuerpo pertenece
+        numBody = 0
+        if globNode >= self.locTotalNodes:
+            globNode = globNode - self.locTotalNodes
+            numBody +=1
+        coord = self.bodies[numBody].getNodeCoordinates(globNode)
+        return coord
+
+    def getDiracs(self, dist):
+        return self.bodies[0].getDiracs(dist)
+
+    def getElementLong(self):
+        dl = self.bodies[0].getElementLong()
+        return dl
+
+    def viewBodies(self):
+        for i, body in enumerate(self.bodies):
+            print(f"Body num: {i}")
+            body.view()
+            body.viewState()
 
 class ImmersedBody:
     def __init__(self, vel=[0,0], center=[0,0]):
@@ -10,6 +62,7 @@ class ImmersedBody:
         self.__centerDisplacement = center
         self.__dl = None
         self.__vel = vel
+        self.__Uref = None
         self.logger = logging.getLogger("Body Immersed")
 
     def setVelRef(self, vel):
