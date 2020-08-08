@@ -2,6 +2,7 @@ import numpy as np
 from math import sin, cos , pi , sqrt, ceil, floor
 from petsc4py import PETSc
 import logging
+import yaml
 
 class BodiesContainer:
     types = ['side-by-side', 'tandem']
@@ -13,8 +14,8 @@ class BodiesContainer:
     def createBodies(self, h):
         # en -1 y 1 esta implicita la distancia entre los centros
         if self.type == 'side-by-side':
-            for i in range(1,3):
-                body = Circle(vel=[0,0], center=[ 0.35*(-1)**i ,0], radius=0.5)
+            for i in range(1,2):
+                body = Circle(vel=[0,0], center=[ 0,0], radius=0.5)
                 body.generateDMPlex(h)
                 self.bodies.append(body)
             self.locTotalNodes = body.getTotalNodes()
@@ -50,11 +51,26 @@ class BodiesContainer:
         dl = self.bodies[0].getElementLong()
         return dl
 
+    def setVelRef(self, vel):
+        for body in self.bodies:
+            body.setVelRef(vel)
+
+    def updateBodyParameters(self, t):
+        for body in self.bodies:
+            body.updateBodyParameters(t)
+
     def viewBodies(self):
         for i, body in enumerate(self.bodies):
             print(f"Body num: {i}")
-            body.view()
+            # body.view()
             body.viewState()
+            # body.viewCoordinates()
+
+    def getVelocity(self):
+        # hacer esto para varios cuerpos
+        body = self.bodies[0]
+        vel = body.getVelocity()
+        return vel
 
 class ImmersedBody:
     def __init__(self, vel=[0,0], center=[0,0]):
@@ -64,6 +80,7 @@ class ImmersedBody:
         self.__vel = vel
         self.__Uref = None
         self.logger = logging.getLogger("Body Immersed")
+        self.__history = {"times": [], "displ": [], "vel": [] } 
 
     def setVelRef(self, vel):
         self.__Uref = vel
@@ -73,6 +90,8 @@ class ImmersedBody:
 
     def viewState(self):
         self.logger.info(f"Body vel: {self.__vel} | Body position {self.__centerDisplacement}")
+        with open('body-history.yaml', 'w') as outfile:
+            yaml.dump(self.__history, outfile, default_flow_style=False)
     
     def setUpDimensions(self):
         self.firstNode, self.lastNode = self.__dom.getHeightStratum(1)
@@ -157,6 +176,16 @@ class ImmersedBody:
             self.coordSection, self.coordinates, node + self.firstNode
             ) + self.__centerDisplacement
     
+    def viewCoordinates(self):
+        # self.__dom.view()
+        print(self.firstNode, self.lastNode)
+        a = np.zeros(2)
+        for i in range(self.lastNode-self.firstNode):
+            coord = self.getNodeCoordinates(i)
+            # self.logger.info(f" Node: {i} | Coord {coord}")
+            a += coord
+        print("final" , a)
+
     def getRegion(self):
         return None
 
@@ -172,13 +201,16 @@ class ImmersedBody:
         velX = 0
         displX = 0
         f = 7.5
+        Te = f / self.__Uref
         A = 1
-        alpha = 2 * pi * self.__Uref / f  
-        displY = A * sin(alpha * t)
-        velY = A * alpha * cos(alpha * t)
+        displY = A * sin(2 * pi * t / Te)
+        velY = 2* pi * A * cos(2 * pi * t / Te)/Te
         self.__vel = [velX, velY]
         self.__centerDisplacement = [displX, displY]
         self.updateVelocity()
+        self.__history["times"].append(t)
+        self.__history["displ"].append(self.__centerDisplacement)
+        self.__history["vel"].append(self.__vel)
 
     def updateVelocity(self):
         points = self.getTotalNodes()
@@ -220,15 +252,13 @@ class Circle(ImmersedBody):
 
     def generateBody(self, dh):
         r = self.__radius
-        center = self.getCenterBody()
         longTotal = 2*pi*r
-        print(dh)
         points = floor(longTotal/dh) + 2
         assert points > 4
         startAng = pi/1000
         angles = np.linspace(0, 2*pi , points)
-        x = r * np.cos(angles + startAng) + center[0]
-        y = r * np.sin(angles + startAng) + center[1]
+        x = r * np.cos(angles + startAng)
+        y = r * np.sin(angles + startAng)
         coords = list()
         cone = list()
         for i in range(len(x)-1):
@@ -331,3 +361,9 @@ class EulerNode:
         
     def getDiracComputed(self):
         return self.__diracs
+
+if __name__ == '__main__':
+    logging.basicConfig(level='INFO' )
+    bodies = BodiesContainer('side-by-side')
+    bodies.createBodies(0.1)
+    bodies.viewBodies()
