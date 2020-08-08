@@ -29,7 +29,7 @@ class BaseProblem(object):
         self.logger = logging.getLogger(self.config.get("name"))
         self.case = case
         self.caseName = self.config.get("name")
-        self.readDomainData(kwargs)
+        self.opts = kwargs
         self.readMaterialData()
         if 'time-solver' in self.config:
             self.setUpTimeSolver()
@@ -45,7 +45,24 @@ class BaseProblem(object):
         self.buildOperators()
 
     def setUpDomain(self):
-        self.dom = DMPlexDom(self.lower, self.upper, self.nelem)
+        domain = self.config.get("domain")
+
+        if "box-mesh" in domain:
+            meshData = domain.get('box-mesh')
+            self.dom = DMPlexDom(boxMesh=meshData, **self.opts)
+        elif "gmsh-file" in domain:
+            meshData = domain.get('gmsh-file')
+            self.dom = DMPlexDom(fileName=meshData)
+
+        self.dim = self.dom.getDimension()
+        self.dim_w = 1 if self.dim == 2 else 3
+        self.dim_s = 3 if self.dim == 2 else 6
+
+        if "ngl" in self.opts:
+            self.ngl = self.opts['ngl']
+        else:
+            self.ngl = domain['ngl']
+
         self.dom.setFemIndexing(self.ngl)
         if not self.comm.rank:
             self.logger.info(f"DMPlex dom created")
@@ -66,22 +83,6 @@ class BaseProblem(object):
         self.rho = materialData['rho']
         self.mu = materialData['mu']
 
-    def readDomainData(self, kwargs):
-        domain = self.config.get("domain")
-        if "nelem" in kwargs:
-            self.nelem = kwargs['nelem']
-        else:
-            self.nelem = domain['nelem']
-        self.dim = len(self.nelem)
-        self.dim_w = 1 if self.dim == 2 else 3
-        self.dim_s = 3 if self.dim == 2 else 6
-        self.lower = domain['lower']
-        self.upper = domain['upper']
-        if "ngl" in kwargs:
-            self.ngl = kwargs['ngl']
-        else:
-            self.ngl = domain['ngl']
-
     def createMesh(self, saveMesh=True):
         saveDir = self.config.get("save-dir")
         self.viewer = Paraviewer(self.dim ,self.comm, saveDir)
@@ -89,7 +90,7 @@ class BaseProblem(object):
         if saveMesh:
             self.viewer.saveMesh(self.dom.fullCoordVec)
         if not self.comm.rank:
-            self.logger.info(f"Mesh of {self.nelem} created")
+            self.logger.info(f"Mesh created")
 
     def setUpGeneral(self):
         self.setUpDomain()
@@ -423,7 +424,8 @@ class FreeSlip(BaseProblem):
     def buildKLEMats(self):
         indices2one = set() 
         boundaryNodes = self.mat.globalIndicesDIR 
-
+        # cornerCoords = self.dom.getCellCornersCoords(cell=0)
+        # locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             cornerCoords = self.dom.getCellCornersCoords(cell)
             locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
