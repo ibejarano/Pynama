@@ -19,6 +19,8 @@ class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
         super().setUp()
         self.boundaryNodes = self.getBoundaryNodes()
+        cells = self.getAffectedCells(6)
+        self.collectedNodes, self.maxNodesPerLag = self.collectNodes(cells)
         self.createEmptyIBMMatrix()
         self.buildIBMMatrix()
 
@@ -43,14 +45,16 @@ class ImmersedBoundaryStatic(FreeSlip):
     def setUpDomain(self):
         super().setUpDomain()
         # bodies = self.config.get("body")
-        self.h = 0.005
+        self.h = 0.03636
+        # self.h = (20/50)
         # for body in bodies:
-            # ONLY for 1 body
             # self.body = self.createBody(body)
         self.body = BodiesContainer('side-by-side')
         self.body.createBodies(self.h)
 
     def buildOperators(self):
+        # cornerCoords = self.dom.getCellCornersCoords(cell=0)
+        # localOperators = self.elemType.getElemKLEOperators(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             cornerCoords = self.dom.getCellCornersCoords(cell)
             localOperators = self.elemType.getElemKLEOperators(cornerCoords)
@@ -174,10 +178,7 @@ class ImmersedBoundaryStatic(FreeSlip):
     def createEmptyIBMMatrix(self):
         rows = self.body.getTotalNodes() * self.dim
         cols = len(self.dom.getAllNodes()) * self.dim
-        bodyRegion = self.body.getRegion()
-        cellsAffected = self.getAffectedCells(bodyRegion)
-        self.ibmNodes = self.dom.getGlobalNodesFromEntities(cellsAffected, shared=False)
-        d_nnz_D = len(self.ibmNodes)
+        d_nnz_D = self.maxNodesPerLag
         o_nnz_D = 0
 
         self.H = PETSc.Mat().createAIJ(size=(rows, cols), 
@@ -187,18 +188,17 @@ class ImmersedBoundaryStatic(FreeSlip):
 
     # @profile
     def buildIBMMatrix(self):
-        lagNodes = self.body.getTotalNodes()
-        eulerIndices = [node*self.dim+dof for node in self.ibmNodes for dof in range(self.dim)]
-        eulerCoords = self.dom.getNodesCoordinates(self.ibmNodes)
-        for lagNode in range(lagNodes):
-            dirac = self.computeDirac(lagNode, eulerCoords)
-            # totNNZ = 0
-            # for i in dirac:
-            #     if i>0:
-            #         totNNZ +=1
+        nodes = set()
+        for lagNode in self.collectedNodes.keys():
+            data = self.collectedNodes[lagNode]
+            coords = data['coords']
+            eulerNodes = data['nodes']
+            eulerIndices = [node*self.dim+dof for node in eulerNodes for dof in range(self.dim)]
+            dirac = self.computeDirac(lagNode, coords)
             for dof in range(self.dim):
                 self.H.setValues(lagNode*self.dim+dof, eulerIndices[dof::self.dim], dirac)
-            # self.body.setEulerNodes(lagNode, totNNZ)
+
+            nodes |= set(eulerNodes[np.array(dirac) > 0])
 
         self.H.assemble()
         self.S = self.H.copy().transpose()
@@ -210,6 +210,27 @@ class ImmersedBoundaryStatic(FreeSlip):
         A = self.H.matMult(self.S)
         self.ksp = KspSolver()
         self.ksp.createSolver(A, self.comm)
+        self.logger.info("IBM Matrices builded")
+        return list(nodes)
+
+    def collectNodes(self, cells):
+        ibmNodes = self.dom.getGlobalNodesFromEntities(cells, shared=False)
+        lagNodes = self.body.getTotalNodes()
+        eulerCoords = self.dom.getNodesCoordinates(ibmNodes)
+        ibmNodes = np.array(list(ibmNodes), dtype=np.int32)
+        nodes = dict()
+        maxFound = 0
+        for lagNode in range(lagNodes):
+            nodesFound = self.computeClose(lagNode, eulerCoords)
+            coords = eulerCoords[nodesFound>0]
+            nodesFound = ibmNodes[nodesFound>0]
+            nodes[lagNode] = { "nodes" :nodesFound, "coords" :coords }
+            if not len(nodesFound):
+                raise Exception("Lag Node without Euler")
+            if len(nodesFound) > maxFound:
+                maxFound = len(nodesFound)
+        self.eulerCoords = eulerCoords
+        return nodes, maxFound
 
     def getAffectedCells(self, xSide, ySide=None , center=[0,0]):
         try:
@@ -237,6 +258,18 @@ class ImmersedBoundaryStatic(FreeSlip):
             diracs.append(d)
         return diracs
 
+    def computeClose(self, lagPoint, eulerCoords):
+        close = list()
+        coordBodyNode = self.body.getNodeCoordinates(lagPoint)
+        for coords in eulerCoords:
+            dist = coords - coordBodyNode
+            dist /= self.body.getElementLong()
+            if abs(dist[0]) < 2 and abs(dist[1]) < 2:
+                close.append(1)
+            else:
+                close.append(0)
+        return np.array(close)
+
     @staticmethod
     def computeCentroid(corners):
         return np.mean(corners, axis=0)
@@ -247,60 +280,79 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         self.computeInitialCondition(startTime= 0.0)
         self.ts.setSolution(self.vort)
         maxSteps = self.ts.getMaxSteps()
-        self.body.view()
+        self.body.viewBodies()
+        markNodes = self.getMarkedNodes()
+        self.markZone(markNodes)
         for step in range(1,maxSteps+1):
             self.ts.step()
             time = self.ts.time
-            self.computeVelocityCorrection(time, NF=1)
-            position = self.body.getCenterBody()
+            nods = self.computeVelocityCorrection(time, NF=4)
+            self.markAffectedNodes(nods)
             self.operator.Curl.mult(self.vel, self.vort)
             self.ts.setSolution(self.vort)
-            self.markAffectedNodes()
-            if step % 5 == 0:
-                self.viewer.saveData(step, time, self.vort, self.vel, self.affectedNodes)
+            if step % 10 == 0:
+                self.viewer.saveData(step, time, self.vort, self.vel, self.ibmZone ,self.affectedNodes)
                 self.viewer.writeXmf(self.caseName)
-                self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} | Saved Step ")
-                dm = self.body.regenerateDMPlex(self.h)
-                self.viewer.writeVTK("body", dm, step)
+                self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Saved Step ")
+                self.body.viewBodies()
             else:
-                self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Current Y Position: {position[1]:.4f} ")
+                self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} ")
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
-        self.affectedNodes = self.vort.copy()
-        self.affectedNodes.setName("ibmNodes")
+        self.ibmZone = self.vort.copy()
+        self.ibmZone.setName("ibm-zone")
+        self.affectedNodes = self.ibmZone.copy()
+        self.affectedNodes.setName("affected-nodes")
         self.body.setVelRef(self.U_ref)
         self.solveKLE(startTime, self.vort)
         self.computeVelocityCorrection(startTime, NF=1)
         self.operator.Curl.mult(self.vel, self.vort)
 
-    def markAffectedNodes(self):
-        nnodes = len(self.ibmNodes)
-        self.affectedNodes.setValues(list(self.ibmNodes), [1]*nnodes, addv=False)
+    def computeClose(self, lagPoint, eulerCoords):
+        # TODO: mejorar el if para acotar los nodos guardados en y
+        close = list()
+        coordBodyNode = self.body.getNodeCoordinates(lagPoint)
+        for coords in eulerCoords:
+            dist = coords - coordBodyNode
+            dl = self.body.getElementLong()
+            dist /= dl
+            if abs(dist[0]) < 2 and abs(dist[1]*dl) < (1+2*dl):
+                close.append(1)
+            else:
+                close.append(0)
+        return np.array(close)
+
+    def markAffectedNodes(self, nodes):
+        nnodes = len(nodes)
+        self.affectedNodes.set(0.0)
+        self.affectedNodes.setValues(nodes, [1]*nnodes, addv=False)
+
+    def markZone(self, nodes):
+        nnodes = len(nodes)
+        self.ibmZone.setValues(nodes, [1]*nnodes, addv=False)
 
     # @profile
     def computeVelocityCorrection(self, t, NF=1):
         self.body.updateBodyParameters(t)
-        self.rebuildMatrix()
+        affNodes = self.rebuildMatrix()
         bodyVel = self.body.getVelocity()
+        # TODO Ver cuando son dos cuerpos como hacer esto!
         for i in range(NF):
             self.H.mult(self.vel, self.ibm_rhs)
-            self.ksp.solve(bodyVel - self.ibm_rhs, self.virtualFlux)
+            self.ksp.solve( bodyVel - self.ibm_rhs, self.virtualFlux)
             self.S.mult(self.virtualFlux, self.vel_correction)
             self.vel += self.vel_correction
+        return affNodes
 
-    def createEmptyIBMMatrix(self):
-        rows = self.body.getTotalNodes() * self.dim
-        cols = len(self.dom.getAllNodes()) * self.dim
-        bodyRegion = self.body.getRegion()
-        cellsAffected = self.getAffectedCells(bodyRegion*2.2)
-        self.ibmNodes = self.dom.getGlobalNodesFromEntities(cellsAffected, shared=False)
-        d_nnz_D = len(self.ibmNodes)
-        o_nnz_D = 0
-        self.H = PETSc.Mat().createAIJ(size=(rows, cols), 
-            nnz=(d_nnz_D, o_nnz_D), 
-            comm=self.comm)
-        self.H.setUp()
+    def getMarkedNodes(self):
+        nodes = set()
+        for lagNode in self.collectedNodes.keys():
+            data = self.collectedNodes[lagNode]
+            # coords = data['coords']
+            eulerNodes = data['nodes']
+            nodes |= set(eulerNodes)
+        return list(nodes)
 
     # @profile
     def rebuildMatrix(self):
@@ -308,4 +360,5 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         self.S.destroy()
         self.ksp.destroy()
         self.createEmptyIBMMatrix()
-        self.buildIBMMatrix()
+        nodes = self.buildIBMMatrix()
+        return nodes
