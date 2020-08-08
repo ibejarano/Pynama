@@ -5,14 +5,22 @@ import logging
 from mpi4py import MPI
 from math import pi
 class DMPlexDom(PETSc.DMPlex):
-    def __init__(self, lower, upper, faces):
+    def __init__(self, **kwargs):
         comm = MPI.COMM_WORLD
         try:
-            self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
-        except TypeError:
-            lower = [eval(lower[0]) , eval(lower[1])]
-            upper = [eval(upper[0]) , eval(upper[1])]
-            self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
+            meshData = kwargs['boxMesh']
+            lower = meshData.get('lower')
+            upper = meshData.get('upper')
+            faces = meshData.get('nelem')
+            try:
+                self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
+            except TypeError:
+                lower = [eval(lower[0]) , eval(lower[1])]
+                upper = [eval(upper[0]) , eval(upper[1])]
+                self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
+        except:
+            fileName = kwargs['fileName']
+            self.createFromFile(fileName, comm=comm)
 
         self.logger = logging.getLogger(f"[{self.comm.rank}] Class")
         self.logger.debug("Domain Instance Created")
