@@ -5,20 +5,31 @@ import logging
 import yaml
 
 class BodiesContainer:
-    types = ['side-by-side', 'tandem']
+    types = ['side-by-side', 'single', 'tandem']
     def __init__(self, type):
         # centerDistance = 2
-        self.type = 'side-by-side'
+        if type not in self.types:
+            raise Exception("not defined")
+        self.type = type
         self.bodies= list()
 
-    def createBodies(self, h):
-        # en -1 y 1 esta implicita la distancia entre los centros
-        if self.type == 'side-by-side':
-            for i in range(1,2):
-                body = Circle(vel=[0,0], center=[ 0,0], radius=0.5)
+    def createBodies(self, h, radius=0.5, D=2):
+        # D es la distancia entre centros
+        if self.type == 'single':
+            body = Circle(vel=[0,0], center=[ 0,0], radius=radius)
+            body.generateDMPlex(h)
+            self.bodies.append(body)
+        else:
+            D /= 2
+            if self.type == 'side-by-side':
+                centers = [[0,-D],[0,D]]
+            elif self.type == 'tandem':
+                centers = [[-D,0],[D,0]] 
+            for center in centers:
+                body = Circle(vel=[0,0], center=center, radius=radius)
                 body.generateDMPlex(h)
                 self.bodies.append(body)
-            self.locTotalNodes = body.getTotalNodes()
+        self.locTotalNodes = body.getTotalNodes()
 
     def getTotalNodes(self):
         nodes = 0
@@ -50,6 +61,12 @@ class BodiesContainer:
     def getElementLong(self):
         dl = self.bodies[0].getElementLong()
         return dl
+
+    def getCenters(self):
+        centers = list()
+        for i in self.bodies:
+            centers.append(i.getCenterBody())
+        return centers
 
     def setVelRef(self, vel):
         for body in self.bodies:
@@ -123,7 +140,7 @@ class ImmersedBody:
     def saveVTK(self, dir, step=None):
         viewer = PETSc.Viewer()
         if step == None:
-            viewer.createVTK('body.vtk', mode=PETSc.Viewer.Mode.WRITE)
+            viewer.createVTK('body-testing.vtk', mode=PETSc.Viewer.Mode.WRITE)
         else:
             viewer.createVTK(f"body-{step:05d}", mode=PETSc.Viewer.Mode.WRITE)
         viewer.view(self.__dom)
@@ -253,25 +270,22 @@ class Circle(ImmersedBody):
     def generateBody(self, dh):
         r = self.__radius
         longTotal = 2*pi*r
-        points = floor(longTotal/dh) + 2
+        points =  ceil(longTotal/dh)
         assert points > 4
+        dh = longTotal/points
         startAng = pi/1000
-        angles = np.linspace(0, 2*pi , points)
+        angles = np.linspace(0, 2*pi , points, endpoint=False)
         x = r * np.cos(angles + startAng)
         y = r * np.sin(angles + startAng)
         coords = list()
         cone = list()
-        for i in range(len(x)-1):
+        for i in range(len(x)):
             localCone = [i,i+1]
             coords.append([x[i] , y[i]])
             cone.append(localCone)
         cone[-1][-1] = 0
-        dl = sqrt((coords[0][0]-coords[1][0])**2 + (coords[0][1]-coords[1][1])**2)
-        # self.generateDMPlex(coords, cone)
+        dl = dh
         return coords, cone, dl
-
-    def getRadius(self):
-        return self.__radius
 
     def getLong(self):
         return self.__radius*2
