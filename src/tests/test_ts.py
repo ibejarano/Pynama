@@ -1,5 +1,5 @@
 import unittest
-from cases.taylor_green import TaylorGreen
+from cases.custom_func import CustomFuncCase
 import numpy as np
 import numpy.testing as np_test
 import h5py
@@ -7,7 +7,7 @@ from petsc4py import PETSc
 
 class TaylorGreenTest(unittest.TestCase):
     def setUp(self):
-        self.fem = TaylorGreen()
+        self.fem = CustomFuncCase()
         self.fem.setUp()
         self.fem.setUpSolver()
 
