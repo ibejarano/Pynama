@@ -11,7 +11,8 @@ class DMPlexDom(PETSc.DMPlex):
             meshData = kwargs['boxMesh']
             lower = meshData.get('lower')
             upper = meshData.get('upper')
-            faces = meshData.get('nelem')
+            faces = kwargs['nelem'] if 'nelem' in kwargs else meshData.get('nelem')
+            print(kwargs)
             try:
                 self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
             except TypeError:
