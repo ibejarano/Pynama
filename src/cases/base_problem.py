@@ -31,8 +31,11 @@ class BaseProblem(object):
         self.caseName = self.config.get("name")
         self.readDomainData(kwargs)
         self.readMaterialData()
-        if 'time-solver' in self.config:
+        if "chart" in kwargs:
+            self.setUpTimeSolverTest()
+        elif 'time-solver' in self.config:
             self.setUpTimeSolver()
+
         if 'boundary-conditions' in self.config:
             boundaryConditions = self.config.get("boundary-conditions")
             self.readBoundaryCondition(boundaryConditions)
@@ -116,6 +119,17 @@ class BaseProblem(object):
         self.ts.setUpTimes(sTime, eTime, maxSteps)
         self.ts.initSolver(self.evalRHS, self.convergedStepFunction)
 
+    def setUpTimeSolverTest(self):
+        options = self.config.get("time-solver")
+        self.ts = TsSolver(self.comm)
+        sTime = options['start-time']
+        eTime = options['end-time']
+        maxSteps = options['max-steps']
+        self.ts.setUpTimes(sTime, eTime, maxSteps)
+        self.velSave = []
+        self.timeSave = []
+        self.ts.initSolver(self.evalRHS, self.convergedStepFunctionKLET)
+
     def createNumProcVec(self, step):
         proc = self.vort.copy()
         proc.setName("num proc")
@@ -135,6 +149,23 @@ class BaseProblem(object):
         self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
+
+    def convergedStepFunctionKLET(self, ts):
+        time = ts.time
+        step = ts.step_number
+        incr = ts.getTimeStep()
+        # self.viewer.newSaveVec([self.vel, self.vort], step)
+        if step%40 == 0: 
+            exactVel, exactVort = self.generateExactVecs(time)
+            self.velSave.append((exactVel - self.vel).norm(norm_type=2))
+            self.timeSave.append(time)
+        self.viewer.saveData(step, time, self.vel, self.vort)
+        self.viewer.writeXmf(self.caseName)        
+        if not self.comm.rank:
+            self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
+
+    
+
 
     def createVtkFile(self):
         viewer = PETSc.Viewer()
