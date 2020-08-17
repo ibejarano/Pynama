@@ -2,7 +2,7 @@ import sys
 import petsc4py
 from math import pi, sin, cos, exp, erf, sqrt
 petsc4py.init(sys.argv)
-
+import matplotlib.pyplot as plt
 from cases.base_problem import FreeSlip
 import numpy as np
 import yaml
@@ -82,7 +82,7 @@ class CustomFuncCase(FreeSlip):
         startTime = self.ts.getTime()
         endTime = self.ts.getMaxTime()
         times = np.linspace(startTime, endTime, steps)
-        viscousTimes=[0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+        viscousTimes=[0.01,0.4,0.9]
         times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
         nodesToPlot, coords = self.dom.getNodesOverline("x", 0.5)
         boundaryNodes = self.getBoundaryNodes()
@@ -102,6 +102,14 @@ class CustomFuncCase(FreeSlip):
         plotter.plt.legend()
         plotter.show()
         self.viewer.writeXmf(self.caseName)
+
+    def getChartKLE(self):
+        plt.figure(figsize=(10,10))
+        plt.xlabel(r'time')
+        plt.ylabel(r'$||Error_{vel}||_{2}$')
+        plt.loglog(self.timeSave, self.velSave ,marker='o', markersize=3 ,basey=10,linewidth =0.75, color="b")
+        plt.title(r'Error de la velocidad en el tiempo')
+        plt.savefig(f"Error-Velocidad")
 
     def generateExactOperVecs(self,time):
         exactVel = self.mat.K.createVecRight()
