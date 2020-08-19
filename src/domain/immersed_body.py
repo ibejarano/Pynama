@@ -45,6 +45,15 @@ class BodiesContainer:
         tot = radius + distanceCenters + hCeil*4
         return tot
 
+    def mapGlobToLocal(self, globNode):
+        numBody = 0
+        locNode = None
+        if globNode >= self.locTotalNodes:
+            globNode = globNode - self.locTotalNodes
+            numBody +=1
+        locNode = globNode
+        return locNode, numBody
+
     def getNodeCoordinates(self, globNode):
         # input is global
         # necesito identificar a que cuerpo pertenece
@@ -67,6 +76,13 @@ class BodiesContainer:
         for i in self.bodies:
             centers.append(i.getCenterBody())
         return centers
+
+    def setEulerNodes(self, glNode, eulerNodesNum):
+        locNode, numBody = self.mapGlobToLocal(glNode)
+        self.bodies[numBody].setEulerNodes(locNode, eulerNodesNum)
+
+    def computeForce(self, vec):
+        return self.bodies[0].computeForce(vec)
 
     def setVelRef(self, vel):
         for body in self.bodies:
@@ -160,8 +176,8 @@ class ImmersedBody:
         points = self.getTotalNodes()
         for poi in range(points):
             nodes = self.__lagNodes[poi]
-            fx += q[poi*2] * nodes
-            fy += q[poi*2+1] * nodes
+            fx += q[poi*2]
+            fy += q[poi*2+1]
             if 16 - nodes < 0:
                 print("HAY MAS NODOS!")
             fouris += 16 - nodes
