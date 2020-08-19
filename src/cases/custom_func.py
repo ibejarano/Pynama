@@ -124,8 +124,8 @@ class CustomFuncCase(FreeSlip):
         exactDiff = self.dom.applyFunctionVecToVec(allNodes, fdiff_coords, exactDiff, self.dim_w )
         return exactVel, exactVort, exactConv, exactDiff
 
-    def OperatorsTests(self):
-        time = 1
+    def OperatorsTests(self, viscousTime=1):
+        time = (viscousTime**2)/(4*self.nu)
         boundaryNodes = self.getBoundaryNodes()
         self.applyBoundaryConditions(time, boundaryNodes)
         step = 0
