@@ -83,13 +83,14 @@ def generateChartOperators(config):
     errors_h = [list(), list(), list()]
     names = ["convective", "diffusive", "curl"]
     totalNgl = 21
-    dim = len(config.get("domain").get("nelem"))
+    dim = len(config.get("domain").get("box-mesh").get("nelem"))
+    viscousTime = 0.3
     for x, elem in enumerate(range(2,5,2)):
         for i, ngl in enumerate(range(3,totalNgl,1)):
             fem = FemProblem(config, ngl=ngl, nelem=[elem]*dim)
             fem.setUp()
             fem.setUpSolver()
-            errorConv, errorDiff, errorCurl = fem.OperatorsTests()
+            errorConv, errorDiff, errorCurl = fem.OperatorsTests(viscousTime)
             errors[x][0].append(errorConv)
             errors[x][1].append(errorDiff)
             errors[x][2].append(errorCurl)
@@ -104,7 +105,7 @@ def generateChartOperators(config):
         fem = FemProblem(config, ngl=3, nelem=[nelem]*dim)
         fem.setUp()
         fem.setUpSolver()
-        errorConv, errorDiff, errorCurl = fem.OperatorsTests()
+        errorConv, errorDiff, errorCurl = fem.OperatorsTests(viscousTime)
         errors_h[0].append(errorConv)
         errors_h[1].append(errorDiff)
         errors_h[2].append(errorCurl)

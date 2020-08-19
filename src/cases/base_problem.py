@@ -46,7 +46,8 @@ class BaseProblem(object):
 
     def setUpDomain(self):
         domain = self.config.get("domain")
-
+        self.dom = None
+        self.logger.info("Setting dom with box Mesh")
         if "box-mesh" in domain:
             meshData = domain.get('box-mesh')
             self.dom = DMPlexDom(boxMesh=meshData, **self.opts)
