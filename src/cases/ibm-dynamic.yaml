@@ -3,16 +3,18 @@ name: IBM-Dynamic
 save-dir: run-A1
 
 domain:
-  dim: 2
-  nelem: [480, 200]
   ngl: 3
-  lower: [-2*pi,-2.5*pi]
-  upper: [10*pi,2.5*pi]
+  # box-mesh:
+  #   nelem: [50, 25]
+  #   lower: [-2*pi,-2.5*pi]
+  #   upper: [8*pi,2.5*pi]
+  gmsh-file: dynamic-h025.msh
+  h-min: 0.025
 
 body:
   -
     vel: [0,0]
-    type: "circle"
+    type: "single"
     radius: 0.5
     center: [0,0]
 
@@ -27,4 +29,4 @@ material-properties:
 time-solver:
   max-steps: 25000
   start-time: 0
-  end-time: 200
+  end-time: 250
