@@ -45,11 +45,13 @@ class ImmersedBoundaryStatic(FreeSlip):
     def setUpDomain(self):
         super().setUpDomain()
         # bodies = self.config.get("body")
-        self.h = 0.03636
+        self.h = self.config['domain']['h-min']
+        self.h /= 2
         # self.h = (20/50)
         # for body in bodies:
             # self.body = self.createBody(body)
-        self.body = BodiesContainer('side-by-side')
+        bodyType = self.config['body'][0]['type']
+        self.body = BodiesContainer(bodyType)
         self.body.createBodies(self.h)
 
     def buildOperators(self):
@@ -73,14 +75,15 @@ class ImmersedBoundaryStatic(FreeSlip):
         clifts = list()
         times = list()
         maxSteps = self.ts.getMaxSteps()
+        runName = f"{self.caseName}-{self.re}"
         self.body.viewBodies()
-        for i in range(maxSteps):
+        for i in range(maxSteps+1):
             self.ts.step()
             step = self.ts.getStepNumber()
             time = self.ts.time
             dt = self.ts.getTimeStep()
             qx , qy, fs = self.computeVelocityCorrection(NF=1)
-            cd, cl = self.computeDragForce(qx / dt, qy / dt)
+            cd, cl = self.computeDragForce( 2* qx / dt,  2*qy / dt)
             cds.append(cd)
             clifts.append(cl)
             times.append(time)
@@ -89,15 +92,15 @@ class ImmersedBoundaryStatic(FreeSlip):
             self.logger.info(f"Nodos Off {fs}  Converged: Step {step:4} | Time {time:.4e} | Cd {cd:.6f} | Cl {cl:.3f}")
             if time > self.ts.getMaxTime():
                 break
-            elif i % 10 == 0:
+            elif i % 20 == 0:
                 self.viewer.saveData(step, time, self.vort, self.vel)
                 self.viewer.writeXmf(self.caseName)
+                data = {"times": times, "cd": cds, "cl": clifts}
+                with open(runName+'.yaml', 'w') as outfile:
+                    yaml.dump(data, outfile, default_flow_style=False)
+
 
         self.plotter.updatePlot(times, cds, clifts, realTimePlot=False)
-        data = {"times": times, "cd": cds, "cl": clifts}
-        runName = f"{self.caseName}-{self.re}"
-        with open(runName+'.yaml', 'w') as outfile:
-            yaml.dump(data, outfile, default_flow_style=False)
         self.plotter.savePlot(runName)
 
     def computeDragForce(self, fd, fl):
@@ -159,10 +162,11 @@ class ImmersedBoundaryStatic(FreeSlip):
             self.vel += self.vel_correction
             aux = self.virtualFlux
             # self.H.multTranspose(self.ibm_rhs, aux)
-            # fx_part, fy_part, fs = self.body.computeForce(aux)
-            # fx += fx_part
-            # fy += fy_part
-        return -fx*self.h**2,  -fy*self.h**2, fs
+            fx_part, fy_part, fs = self.body.computeForce(aux)
+            fx += fx_part
+            fy += fy_part
+        area = (self.h*4)**2
+        return -fx*area,  -fy*area, fs
 
     def createBody(self, body):
         vel = body['vel']
@@ -225,6 +229,7 @@ class ImmersedBoundaryStatic(FreeSlip):
             coords = eulerCoords[nodesFound>0]
             nodesFound = ibmNodes[nodesFound>0]
             nodes[lagNode] = { "nodes" :nodesFound, "coords" :coords }
+            self.body.setEulerNodes(lagNode, len(nodesFound))
             if not len(nodesFound):
                 raise Exception("Lag Node without Euler")
             if len(nodesFound) > maxFound:
@@ -283,20 +288,23 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         self.body.viewBodies()
         markNodes = self.getMarkedNodes()
         self.markZone(markNodes)
+        # self.ts.setTimeStep(1e-4)
         for step in range(1,maxSteps+1):
             self.ts.step()
+            convergedReason = self.ts.getConvergedReason()
             time = self.ts.time
-            nods = self.computeVelocityCorrection(time, NF=4)
+            incr = self.ts.getTimeStep()
+            nods = self.computeVelocityCorrection(time, NF=1)
             self.markAffectedNodes(nods)
             self.operator.Curl.mult(self.vel, self.vort)
             self.ts.setSolution(self.vort)
-            if step % 10 == 0:
+            if step % 20 == 0:
                 self.viewer.saveData(step, time, self.vort, self.vel, self.ibmZone ,self.affectedNodes)
                 self.viewer.writeXmf(self.caseName)
                 self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Saved Step ")
                 self.body.viewBodies()
             else:
-                self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} ")
+                self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment {incr:.3e} | CONVERGED REASON {convergedReason} ")
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
