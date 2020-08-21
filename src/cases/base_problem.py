@@ -128,6 +128,7 @@ class BaseProblem(object):
         self.ts.setUpTimes(sTime, eTime, maxSteps)
         self.velSave = []
         self.timeSave = []
+        self.stepSave = []
         self.ts.initSolver(self.evalRHS, self.convergedStepFunctionKLET)
 
     def createNumProcVec(self, step):
@@ -155,11 +156,17 @@ class BaseProblem(object):
         step = ts.step_number
         incr = ts.getTimeStep()
         # self.viewer.newSaveVec([self.vel, self.vort], step)
-        if step%40 == 0: 
-            exactVel, exactVort = self.generateExactVecs(time)
-            self.velSave.append((exactVel - self.vel).norm(norm_type=2))
-            self.timeSave.append(time)
-        self.viewer.saveData(step, time, self.vel, self.vort)
+        exactVel, exactVort = self.generateExactVecs(time)
+        errorVel = exactVel - self.vel
+        errorVort = exactVort - self.vort
+        self.velSave.append((errorVel).norm(norm_type=2))
+        self.timeSave.append(time)
+        self.stepSave.append(step)
+        errorVort.setName("ErrorVort")
+        errorVel.setName("ErrorVel")
+        exactVort.setName("ExactVort")
+        exactVel.setName("ExactVel")
+        self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort,errorVel,errorVort)
         self.viewer.writeXmf(self.caseName)        
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")

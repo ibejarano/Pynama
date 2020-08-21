@@ -31,6 +31,9 @@ class CustomFuncCase(FreeSlip):
                 self.vortFunction = self.taylorGreenVort_3D
                 self.diffusiveFunction = self.taylorGreen3dDiffusive
                 self.convectiveFunction = self.taylorGreen3dConvective
+        elif self.case == 'taylor-green2d-3d':
+            self.velFunction = self.taylorGreenVel_2D_3D
+            self.vortFunction = self.taylorGreenVort_2D_3D
         elif self.case == 'senoidal':
             if self.dim == 2:
                 self.velFunction = self.senoidalVel_2D
@@ -105,11 +108,17 @@ class CustomFuncCase(FreeSlip):
 
     def getChartKLE(self):
         plt.figure(figsize=(10,10))
-        plt.xlabel(r'time')
+        plt.xlabel(r'tiempo')
         plt.ylabel(r'$||Error_{vel}||_{2}$')
-        plt.loglog(self.timeSave, self.velSave ,marker='o', markersize=3 ,basey=10,linewidth =0.75, color="b")
+        plt.plot(self.timeSave, self.velSave ,marker='o', markersize=3 ,color="b")
         plt.title(r'Error de la velocidad en el tiempo')
-        plt.savefig(f"Error-Velocidad")
+        plt.savefig(f"Error-Velocidad-NoLog")
+        plt.figure(figsize=(10,10))
+        plt.xlabel(r'step')
+        plt.ylabel(r'tiempo')
+        plt.plot(self.stepSave, self.timeSave ,marker='o', markersize=3 ,color="b")
+        plt.title(r'Tiempo vs pasos')
+        plt.savefig(f"tiempos-pasos")
 
     def generateExactOperVecs(self,time):
         exactVel = self.mat.K.createVecRight()
@@ -209,6 +218,28 @@ class CustomFuncCase(FreeSlip):
         expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2+ 1.0 / Lz ** 2))
         vel = [cos(x_) * sin(y_) *sin(z_)*Lx* expon, sin(x_) * cos(y_) *sin(z_)*Ly *expon,-2*sin(x_)* sin(y_) * cos(z_) *Lz* expon]
         return vel
+
+    @staticmethod
+    def taylorGreenVort_2D_3D(coord, nu,t=None):
+        Lx= 1
+        Ly= 1
+        Uref = 1
+        x_ = 2 * pi * coord[0] / Lx
+        y_ = 2 * pi * coord[1] / Ly
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
+        vort = -2 * pi * (1.0 / Lx + 1.0 / Ly) * cos(x_) * cos(y_) * expon
+        return [0,0,vort]
+    
+    @staticmethod
+    def taylorGreenVel_2D_3D(coord, nu,t=None):
+        Lx= 1
+        Ly= 1
+        Uref = 1
+        x_ = 2 * pi * coord[0] / Lx
+        y_ = 2 * pi * coord[1] / Ly
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
+        vel = [cos(x_) * sin(y_) * expon, -sin(x_) * cos(y_) * expon]
+        return [vel[0], vel[1],0]
 
     @staticmethod
     def taylorGreenVort_3D(coord, nu ,t=None):
