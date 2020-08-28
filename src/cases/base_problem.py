@@ -126,9 +126,10 @@ class BaseProblem(object):
         eTime = options['end-time']
         maxSteps = options['max-steps']
         self.ts.setUpTimes(sTime, eTime, maxSteps)
-        self.velSave = []
-        self.timeSave = []
-        self.stepSave = []
+        self.saveError2 = []
+        self.saveError8 = []
+        self.saveStep = []
+        self.saveTime = []
         self.ts.initSolver(self.evalRHS, self.convergedStepFunctionKLET)
 
     def createNumProcVec(self, step):
@@ -145,6 +146,7 @@ class BaseProblem(object):
         time = ts.time
         step = ts.step_number
         incr = ts.getTimeStep()
+        self.solveKLE(time, self.vort)
         self.viewer.saveData(step, time, self.vel, self.vort)
         # self.viewer.newSaveVec([self.vel, self.vort], step)
         self.viewer.writeXmf(self.caseName)
@@ -154,14 +156,16 @@ class BaseProblem(object):
     def convergedStepFunctionKLET(self, ts):
         time = ts.time
         step = ts.step_number
+        self.solveKLE(time, self.vort)
         incr = ts.getTimeStep()
         # self.viewer.newSaveVec([self.vel, self.vort], step)
         exactVel, exactVort = self.generateExactVecs(time)
         errorVel = exactVel - self.vel
         errorVort = exactVort - self.vort
-        self.velSave.append((errorVel).norm(norm_type=2))
-        self.timeSave.append(time)
-        self.stepSave.append(step)
+        self.saveError2.append((errorVel).norm(norm_type=2))
+        self.saveError8.append((errorVel).norm(norm_type=3))
+        self.saveTime.append(time)
+        self.saveStep.append(step)
         errorVort.setName("ErrorVort")
         errorVel.setName("ErrorVel")
         exactVort.setName("ExactVort")
