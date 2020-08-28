@@ -1,6 +1,6 @@
 ---
-name: ibm-static
-save-dir: test-sidebyside
+name: ibm-sidebyside-d15
+save-dir: run-sidebyside-d15
 
 domain:
   ngl: 3
@@ -8,7 +8,7 @@ domain:
   #   nelem: [100, 50]
   #   lower: [-20,-10]
   #   upper: [20,10]
-  gmsh-file: side-by-side.msh
+  gmsh-file: side-by-side-h05-d15.msh
   h-min: 0.05
 
 body:
@@ -20,13 +20,13 @@ body:
 
 boundary-conditions:
   constant:
-    re: 100
+    re: 200
 
 material-properties:
   rho: 0.5
   mu: 0.01
 
 time-solver:
-  max-steps: 60000
+  max-steps: 80000
   start-time: 0
   end-time: 150

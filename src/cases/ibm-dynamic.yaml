@@ -1,6 +1,6 @@
 ---
-name: IBM-Dynamic
-save-dir: run-A1
+name: dynamic-H04-f60
+save-dir: run-A1-h04-f60
 
 domain:
   ngl: 3
@@ -8,8 +8,8 @@ domain:
   #   nelem: [50, 25]
   #   lower: [-2*pi,-2.5*pi]
   #   upper: [8*pi,2.5*pi]
-  gmsh-file: dynamic-h025.msh
-  h-min: 0.025
+  gmsh-file: ibm-dynamic-h04.msh
+  h-min: 0.04
 
 body:
   -
@@ -24,9 +24,9 @@ boundary-conditions:
 
 material-properties:
   rho: 0.5
-  mu: 0.01
+  mu: 0.1
 
 time-solver:
-  max-steps: 25000
+  max-steps: 30000
   start-time: 0
   end-time: 250

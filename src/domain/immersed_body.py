@@ -13,7 +13,7 @@ class BodiesContainer:
         self.type = type
         self.bodies= list()
 
-    def createBodies(self, h, radius=0.5, D=2):
+    def createBodies(self, h, radius=0.5, D=1.5):
         # D es la distancia entre centros
         if self.type == 'single':
             body = Circle(vel=[0,0], center=[ 0,0], radius=radius)
@@ -82,7 +82,17 @@ class BodiesContainer:
         self.bodies[numBody].setEulerNodes(locNode, eulerNodesNum)
 
     def computeForce(self, vec):
-        return self.bodies[0].computeForce(vec)
+        offset = 0
+        forces_x = list()
+        forces_y = list()
+        vec = vec.getArray()
+        for body in self.bodies:
+            nodes = body.getTotalNodes()
+            fx_local, fy_local = body.computeForce(vec[offset*2:(nodes+offset)*2])
+            forces_x.append(fx_local)
+            forces_y.append(fy_local)
+            offset += nodes
+        return forces_x, forces_y
 
     def setVelRef(self, vel):
         for body in self.bodies:
@@ -172,16 +182,11 @@ class ImmersedBody:
     def computeForce(self, q):
         fx = 0
         fy = 0
-        fouris = 0
         points = self.getTotalNodes()
         for poi in range(points):
-            nodes = self.__lagNodes[poi]
             fx += q[poi*2]
             fy += q[poi*2+1]
-            if 16 - nodes < 0:
-                print("HAY MAS NODOS!")
-            fouris += 16 - nodes
-        return fx, fy, fouris
+        return fx, fy
 
     def getVelocity(self):
         return self.__velVec
@@ -233,11 +238,11 @@ class ImmersedBody:
         # A1 : f/D = 7.5 & A=D = 1 => f=7.5 & A =1
         velX = 0
         displX = 0
-        f = 7.5
+        f = 6
         Te = f / self.__Uref
         A = 1
         displY = A * sin(2 * pi * t / Te)
-        velY = 2* pi * A * cos(2 * pi * t / Te)/Te
+        velY = 2 * pi * A * cos(2 * pi * t / Te)/Te
         self.__vel = [velX, velY]
         self.__centerDisplacement = [displX, displY]
         self.updateVelocity()
