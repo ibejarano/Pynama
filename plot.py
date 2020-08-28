@@ -1,9 +1,10 @@
 import yaml
 import numpy as np
 from scipy import fftpack
-from src.viewer.plotter import Plotter, DualAxesPlotter
+# from src.viewer.plotter import Plotter
 import pandas as pd
 from math import sqrt
+# from matplotlib.pyplot import plt
 
 def createPlotData(name, data):
     a = {"name": name,"data": data}
@@ -19,8 +20,8 @@ def generateWithYaml(name):
     t = yamlData["times"]
     cd_data = yamlData["cd"]
     cl_data = yamlData["cl"]
-    cds = createPlotData(r"$C_D$", cd_data)
-    clifts = createPlotData(r"$C_L$", cl_data)
+    cds = createPlotData(r"$C_D$", np.array(cd_data))
+    clifts = createPlotData(r"$C_L$", np.array(cl_data))
     return t, [cds, clifts]
 
 def generateWithText(textName):
@@ -80,8 +81,11 @@ def threeGrid(r):
 
 if __name__ == "__main__":
     # plot("salida-re80")
-    a = np.linspace(-1.6,1.6,50)
-    t = np.fromiter((threeGrid(xi) for xi in a), a.dtype)
-    plt = Plotter("r", "d")
-    T = createPlotData("v", t)
-    plt.updatePlot(a, [T])
+    # a = np.linspace(-1.6,1.6,50)
+    # t = np.fromiter((threeGrid(xi) for xi in a), a.dtype)
+    # T = createPlotData("v", t)
+    # plt.updatePlot(a, [T])
+    t, data= generateWithYaml("ibm-sidebyside-d15-200")
+    plt = Plotter("r", "d", t , data)
+    
+    # print(data)

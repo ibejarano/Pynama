@@ -9,7 +9,7 @@ import yaml
 from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
-from viewer.plotter import Plotter
+# from viewer.plotter import Plotter
 
 class CustomFuncCase(FreeSlip):
     # @profile
@@ -95,12 +95,12 @@ class CustomFuncCase(FreeSlip):
             self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort)
             exact_x , _ = self.dom.getVecArrayFromNodes(exactVel, nodesToPlot)
             calc_x, _ = self.dom.getVecArrayFromNodes(self.vel, nodesToPlot)
-            plotter.updatePlot(exact_x, [{"name": fr"$\tau$ = ${viscousTimes[step]}$" ,"data":coords}], step )
+            # plotter.updatePlot(exact_x, [{"name": fr"$\tau$ = ${viscousTimes[step]}$" ,"data":coords}], step )
             # plotter.scatter(calc_x , coords, "calc")
             # plotter.plt.pause(0.001)
             self.logger.info(f"Saving time: {time:.1f} | Step: {step}")
-        plotter.plt.legend()
-        plotter.show()
+        # plotter.plt.legend()
+        # plotter.show()
         self.viewer.writeXmf(self.caseName)
 
     def generateExactOperVecs(self,time):

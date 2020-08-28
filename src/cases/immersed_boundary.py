@@ -7,10 +7,10 @@ import yaml
 from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
-from viewer.plotter import DualAxesPlotter
+# from viewer.plotter import DualAxesPlotter
 from solver.ksp_solver import KspSolver
 from domain.immersed_body import Circle, Line, BodiesContainer
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import yaml
 # ibm imports
 from math import sqrt, sin, pi, ceil
@@ -26,7 +26,7 @@ class ImmersedBoundaryStatic(FreeSlip):
 
         name1= r'Coef. de arrastre $C_D$'
         name2= r'Coef. de empuje $C_{L}$'
-        self.plotter = DualAxesPlotter(name1, name2)
+        # self.plotter = DualAxesPlotter(name1, name2)
 
     def readBoundaryCondition(self, bc):
         # print(bc)
@@ -82,32 +82,36 @@ class ImmersedBoundaryStatic(FreeSlip):
             step = self.ts.getStepNumber()
             time = self.ts.time
             dt = self.ts.getTimeStep()
-            qx , qy, fs = self.computeVelocityCorrection(NF=1)
-            cd, cl = self.computeDragForce( 2* qx / dt,  2*qy / dt)
+            qx , qy = self.computeVelocityCorrection(NF=1)
+            cd, cl = self.computeDragForce( qx, qy, dt)
             cds.append(cd)
             clifts.append(cl)
             times.append(time)
             self.operator.Curl.mult(self.vel, self.vort)
+            # corrVort = self.operator.Curl * self.vel
+            # self.vort += corrVort
             self.ts.setSolution(self.vort)
-            self.logger.info(f"Nodos Off {fs}  Converged: Step {step:4} | Time {time:.4e} | Cd {cd:.6f} | Cl {cl:.3f}")
+            self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Cd {cd} | Cl {cl}")
             if time > self.ts.getMaxTime():
                 break
-            elif i % 20 == 0:
+            elif i % 100 == 0:
                 self.viewer.saveData(step, time, self.vort, self.vel)
                 self.viewer.writeXmf(self.caseName)
                 data = {"times": times, "cd": cds, "cl": clifts}
                 with open(runName+'.yaml', 'w') as outfile:
                     yaml.dump(data, outfile, default_flow_style=False)
 
+        # self.plotter.updatePlot(times, cds, clifts, realTimePlot=False)
+        # self.plotter.savePlot(runName)
 
-        self.plotter.updatePlot(times, cds, clifts, realTimePlot=False)
-        self.plotter.savePlot(runName)
-
-    def computeDragForce(self, fd, fl):
+    def computeDragForce(self, fd, fl , dt):
         U = self.U_ref
         denom = 0.5 * (U**2)
-        cd = fd/denom
-        return float(cd), float(fl/denom)
+        for i, f in enumerate(fd):
+            fd[i] = float((f * 2 / dt) / denom)
+        for i, f in enumerate(fl):
+            fl[i] = float((f * 2 / dt) / denom)
+        return fd, fl
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
@@ -148,25 +152,22 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.vort.setValues( self.boundaryNodes, np.zeros(len(self.boundaryNodes)) , addv=False )
 
     def computeVelocityCorrection(self, NF=1):
-        fx = 0
-        fy = 0
-        fs = 0
         aux = self.vel.copy()
-        # bodyVel = self.body.getVelocity()
         for i in range(NF):
             self.H.mult(self.vel, self.ibm_rhs)
             self.ksp.solve( - self.ibm_rhs, self.virtualFlux)
             self.S.mult(self.virtualFlux, self.vel_correction)
-            # fx += fx_part
-            # fy += fy_part
             self.vel += self.vel_correction
             aux = self.virtualFlux
-            # self.H.multTranspose(self.ibm_rhs, aux)
-            fx_part, fy_part, fs = self.body.computeForce(aux)
-            fx += fx_part
-            fy += fy_part
+            fx_part, fy_part = self.body.computeForce(aux)
+
         area = (self.h*4)**2
-        return -fx*area,  -fy*area, fs
+        for i , f in enumerate(fx_part):
+            fx_part[i] = -f * area
+
+        for i , f in enumerate(fy_part):
+            fy_part[i] = -f * area
+        return fx_part,  fy_part
 
     def createBody(self, body):
         vel = body['vel']
