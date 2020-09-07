@@ -5,7 +5,7 @@ import logging
 import yaml
 
 class BodiesContainer:
-    types = ['side-by-side', 'single', 'tandem']
+    types = ['side-by-side', 'single', 'tandem', 'line']
     def __init__(self, type):
         # centerDistance = 2
         if type not in self.types:
@@ -17,6 +17,10 @@ class BodiesContainer:
         # D es la distancia entre centros
         if self.type == 'single':
             body = Circle(vel=[0,0], center=[ 0,0], radius=radius)
+            body.generateDMPlex(h)
+            self.bodies.append(body)
+        elif self.type == 'line':
+            body = Line(vel=[0,0], center=[0,0])
             body.generateDMPlex(h)
             self.bodies.append(body)
         else:
@@ -238,9 +242,9 @@ class ImmersedBody:
         # A1 : f/D = 7.5 & A=D = 1 => f=7.5 & A =1
         velX = 0
         displX = 0
-        f = 6
+        f = 7.5
         Te = f / self.__Uref
-        A = 1
+        A = 0.5
         displY = A * sin(2 * pi * t / Te)
         velY = 2 * pi * A * cos(2 * pi * t / Te)/Te
         self.__vel = [velX, velY]
@@ -260,22 +264,19 @@ class ImmersedBody:
         return None, None ,None
 
 class Line(ImmersedBody):
-    def generateBody(self, div, **kwargs):
+    def generateBody(self, dl , longitud=1):
         # this can be improved with lower & upper
-        longitud = kwargs['long']
+        div = ceil(longitud/dl) 
         coords_x = np.linspace(0, longitud, div)
-        coords_y = np.array([1]*div)
-        coords = np.array([coords_x.T, coords_y.T])
-        dl = longitud / (div-1)
+        coords_y = np.array([0]*div)
         cone= list()
+        coords = list()
         for i in range(div-1):
             localCone = [i,i+1]
             cone.append(localCone)
-
-        self.generateDMPlex(coords.T, cone)
-        self.setCenter(np.array([0,1]))
-        self.setCaracteristigLong(longitud)
-        self.setElementLong(dl, normals=[1])
+            coords.append([coords_x[i], coords_y[i]])
+        coords.append([coords_x[i+1], coords_y[i+1]])
+        return coords, cone, dl
 
     def getLong(self):
         return 1
