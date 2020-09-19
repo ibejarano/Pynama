@@ -3,42 +3,35 @@ from math import sin, cos , pi , sqrt, ceil, floor
 from petsc4py import PETSc
 import logging
 import yaml
+import logging
 
 class BodiesContainer:
-    types = ['side-by-side', 'single', 'tandem', 'line', 'box']
-    def __init__(self, body):
-        if body['type'] not in self.types:
-            raise Exception("not defined")
-        self.type = body['type']
-        self.velType = body['vel']
+    types = ['circle', 'line', 'box']
+    def __init__(self, bodies):
+        self.logger = logging.getLogger("Bodies Container")
         self.bodies= list()
-
-    def createBodies(self, h, radius=0.5, D=1.5):
-        # D es la distancia entre centros
-        if self.type == 'single':
-            body = Circle(vel=[0,0], center=[ 0,0], radius=radius)
-            body.generateDMPlex(h)
-            self.bodies.append(body)
-        elif self.type == 'line':
-            body = Line(vel=[0,0], center=[0,0])
-            body.generateDMPlex(h)
-            self.bodies.append(body)
-        elif self.type == 'box':
-            body = OpenBox(vel=[0,0], center=[0,0])
-            body.generateDMPlex(h)
+        for cfgBody in bodies:
+            center = cfgBody['center']
+            if cfgBody['type'] == 'circle':
+                body = Circle(vel=[0,0], center=center, radius=cfgBody['radius'])
+            elif cfgBody['type'] == 'line':
+                body = Line(vel=[0,0], center=center)
+            elif cfgBody['type'] =='box':
+                body = OpenBox(vel=[0,0], center=center)
+            else:
+                raise Exception("not defined")
+            
             self.bodies.append(body)
 
-        else:
-            D /= 2
-            if self.type == 'side-by-side':
-                centers = [[0,-D],[0,D]]
-            elif self.type == 'tandem':
-                centers = [[-D,0],[D,0]] 
-            for center in centers:
-                body = Circle(vel=[0,0], center=center, radius=radius)
-                body.generateDMPlex(h)
-                self.bodies.append(body)
+            self.velType = cfgBody['vel']
+
+    def createBodies(self, h):
+        for i, body in enumerate(self.bodies):
+            body.generateDMPlex(h)
+            self.logger.info(f"Body number: {i}")
+            body.viewState()
         self.locTotalNodes = body.getTotalNodes()
+        # exit()
 
     def getTotalNodes(self):
         nodes = 0
@@ -127,9 +120,13 @@ class BodiesContainer:
 
     def getVelocity(self):
         # hacer esto para varios cuerpos
-        body = self.bodies[0]
-        vel = body.getVelocity()
-        return vel
+        vels = list()
+        for body in self.bodies:
+        # body = self.bodies[0]
+            vel = body.getVelocity()
+            vels.append(vel)
+        # vel = PETSc.Vec().createNest(vels)
+        return PETSc.Vec().createNest(vels)
 
     def updateVelocity(self):
         for body in self.bodies:
@@ -155,7 +152,7 @@ class ImmersedBody:
         self.logger.info(f"Arc len: {self.__dl} | Dirac Type: {self.dirac.__name__} | Vel Fluid Reference: {self.__Uref} ")
 
     def viewState(self):
-        self.logger.info(f"Body vel: {self.__vel} | Body position {self.__centerDisplacement}")
+        self.logger.info(f"{self.__class__.__name__} vel: {self.__vel} | Body center position {self.__centerDisplacement}")
         with open('body-history.yaml', 'w') as outfile:
             yaml.dump(self.__history, outfile, default_flow_style=False)
     

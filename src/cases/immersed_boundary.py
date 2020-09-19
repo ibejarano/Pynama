@@ -52,8 +52,8 @@ class ImmersedBoundaryStatic(FreeSlip):
         else:
             self.h = self.config['domain']['h-min'] / (self.ngl-1)
 
-        bodyType = self.config['body']
-        self.body = BodiesContainer(bodyType)
+        bodies = self.config['bodies']
+        self.body = BodiesContainer(bodies)
         self.body.createBodies(self.h)
         self.body.setVelRef(self.U_ref)
 
@@ -187,7 +187,8 @@ class ImmersedBoundaryStatic(FreeSlip):
     def computeVelocityCorrection(self):
         bodyVel = self.body.getVelocity()
         self.H.mult(self.vel, self.ibm_rhs)
-        self.ksp.solve(bodyVel - self.ibm_rhs, self.virtualFlux)
+        self.ibm_rhs.axpy(-1, bodyVel)
+        self.ksp.solve( -self.ibm_rhs, self.virtualFlux)
         self.S.mult(self.virtualFlux, self.vel_correction)
         self.vel += self.vel_correction
 
