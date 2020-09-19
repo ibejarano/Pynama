@@ -424,7 +424,7 @@ class FreeSlip(BaseProblem):
 
     def buildKLEMats(self):
         indices2one = set() 
-        boundaryNodes = self.mat.globalIndicesDIR 
+        boundaryNodes = self.mat.globalIndicesDIR
         # cornerCoords = self.dom.getCellCornersCoords(cell=0)
         # locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
@@ -475,4 +475,4 @@ class FreeSlip(BaseProblem):
         self.mat.assembleAll()
         self.mat.setIndices2One(indices2one)
         if not self.comm.rank:
-            self.logger.info(f"KLE Matrices builded - NEW")
+            self.logger.info(f"KLE Matrices builded")
