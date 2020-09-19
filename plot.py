@@ -17,12 +17,7 @@ def removeString(val):
 def generateWithYaml(name):
     with open(f'{name}.yaml') as f:
         yamlData = yaml.load(f, Loader=yaml.Loader)
-    t = yamlData["times"]
-    cd_data = yamlData["cd"]
-    cl_data = yamlData["cl"]
-    cds = createPlotData(r"$C_D$", np.array(cd_data))
-    clifts = createPlotData(r"$C_L$", np.array(cl_data))
-    return t, [cds, clifts]
+    return yamlData
 
 def generateWithText(textName):
     df_raw = pd.read_table(f"{textName}.txt", delimiter="|", names=["-","Time" , "cd", "cl"])
