@@ -2,6 +2,7 @@ from petsc4py import PETSc
 import logging
 from viewer.xml_generator import XmlGenerator
 import os
+import yaml
 
 access_rights = 0o755
 
@@ -70,3 +71,8 @@ class Paraviewer:
 
     def writeXmf(self, name):
         self.xmlWriter.writeFile(f"./{self.saveDir}/{name}")
+
+    def writeYaml(self, name, data):
+        data['dir'] = self.saveDir
+        with open(self.saveDir+'.yaml', 'w') as outfile:
+                yaml.dump(data, outfile, default_flow_style=False)
