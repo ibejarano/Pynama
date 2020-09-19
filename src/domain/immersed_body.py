@@ -21,9 +21,9 @@ class BodiesContainer:
             else:
                 raise Exception("not defined")
             
+            if cfgBody['vel'] == 'dynamic':
+                body.setIsMoving()
             self.bodies.append(body)
-
-            self.velType = cfgBody['vel']
 
     def createBodies(self, h):
         for i, body in enumerate(self.bodies):
@@ -83,7 +83,7 @@ class BodiesContainer:
         locNode, numBody = self.mapGlobToLocal(glNode)
         self.bodies[numBody].setEulerNodes(locNode, eulerNodesNum)
 
-    def computeForce(self, vec):
+    def computeForce(self, vec, dt):
         offset = 0
         forces_x = list()
         forces_y = list()
@@ -91,18 +91,14 @@ class BodiesContainer:
         for body in self.bodies:
             nodes = body.getTotalNodes()
             fx_local, fy_local = body.computeForce(vec[offset*2:(nodes+offset)*2])
-            forces_x.append(fx_local)
-            forces_y.append(fy_local)
+            forces_x.append(float(fx_local/dt))
+            forces_y.append(float(fy_local/dt))
             offset += nodes
         return forces_x, forces_y
 
     def setVelRef(self, vel):
-        if self.velType == 'static':
-            for body in self.bodies:
-                body.setVelRef(0.0)
-        else:
-            for body in self.bodies:
-                body.setVelRef(vel)
+        for body in self.bodies:
+            body.setVelRef(vel)
 
     def getVelRef(self, bodyNum=0):
         return self.bodies[bodyNum].getVelRef()
@@ -132,21 +128,29 @@ class BodiesContainer:
         for body in self.bodies:
             body.updateVelocity()
 
+    def bodyNumbers(self):
+        return len(self.bodies)
+
 class ImmersedBody:
     def __init__(self, vel=[0,0], center=[0,0]):
         self.dirac = fourGrid
         self.__centerDisplacement = center
+        self.__startCenter = center
         self.__dl = None
         self.__vel = vel
         self.__Uref = None
         self.logger = logging.getLogger("Body Immersed")
         self.__history = {"times": [], "displ": [], "vel": [] } 
+        self.__isStatic = True
 
     def setVelRef(self, vel):
         self.__Uref = vel
 
     def getVelRef(self):
         return self.__Uref
+
+    def setIsMoving(self):
+        self.__isStatic = False
 
     def view(self):
         self.logger.info(f"Arc len: {self.__dl} | Dirac Type: {self.dirac.__name__} | Vel Fluid Reference: {self.__Uref} ")
@@ -260,14 +264,17 @@ class ImmersedBody:
 
     def updateBodyParameters(self, t):
         # A1 : f/D = 7.5 & A=D = 1 => f=7.5 & A =1
-        velX = 0
-        displX = 0
+        if self.__isStatic:
+            return
+        velX = 0 
+        displX = 0  + self.__startCenter[0]
         f = 8.5
         Te = f / self.__Uref
         A = 0.3
-        displY = A * sin(2 * pi * t / Te)
+        displY = A * sin(2 * pi * t / Te) + self.__startCenter[1]
         velY = 2 * pi * A * cos(2 * pi * t / Te)/Te
         self.__vel = [velX, velY]
+        prevX, prevY = self.__centerDisplacement  
         self.__centerDisplacement = [displX, displY]
         self.updateVelocity()
         self.__history["times"].append(t)
