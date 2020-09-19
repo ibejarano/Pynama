@@ -5,7 +5,7 @@ from functools import reduce
 import operator
 from elements.element import Element
 from elements.utilities import generateGaussPoints2D, generateGaussPoints3D, lobattoPoints, gaussPoints
-
+from math import sqrt
 class Spectral(Element):
     """Spectral element.
     :synopsis: Define a spectral element. Inherits from class:`~Element`.
@@ -35,6 +35,9 @@ class Spectral(Element):
             self.setUpSpectralMats3D(ngl)
         else:
             raise Exception
+
+        self.initElemMatricesKLE()
+        self.initElemMatricesOperators()
 
     def setUpSpectralMats2D(self, ngl):
         nodes1D, operWei = lobattoPoints(ngl)
@@ -86,9 +89,22 @@ class Spectral(Element):
             self.computeMats3D(cnodes1D, nodes1D, operWei)
         (self.HCoo1D, _) = self.interpFun1D(cnodes1D, nodes1D)
 
+    def initElemMatricesKLE(self):
+        elTotNodes = self.nnode
+        self.elStiffMat = np.mat(np.zeros((self.dim*elTotNodes,
+                                      self.dim*elTotNodes)))
+        self.elR_wMat = np.mat(np.zeros((self.dim*elTotNodes,
+                                    self.dim_w*elTotNodes)))
+        self.elR_dMat = np.mat(np.zeros((self.dim*elTotNodes, elTotNodes)))
+
+    def clearElemMatricesKLE(self):
+        self.elStiffMat.fill(0)
+        self.elR_wMat.fill(0)
+        self.elR_dMat.fill(0)
+
     def getElemKLEMatrices(self, coords):
         """Get the elementary matrices of the KLE Method."""
-        # self.logger.debug("getElemKLEMatrices")
+        self.clearElemMatricesKLE()
         coords.shape = (int(len(coords)/self.dim), self.dim)
         alpha_w = 1e2
         alpha_d = 1e3
@@ -96,12 +112,6 @@ class Spectral(Element):
         # FIXME Parametrize in terms of total element nodes and for the
         # geometry use a reduced set
         elTotNodes = self.nnode
-
-        elStiffMat = np.mat(np.zeros((self.dim*elTotNodes,
-                                      self.dim*elTotNodes)))
-        elR_wMat = np.mat(np.zeros((self.dim*elTotNodes,
-                                    self.dim_w*elTotNodes)))
-        elR_dMat = np.mat(np.zeros((self.dim*elTotNodes, elTotNodes)))
 
         # Velocity interpolation
         Hvel = np.mat(np.zeros((self.dim, self.dim*elTotNodes)))
@@ -113,11 +123,10 @@ class Spectral(Element):
         B_curl = np.mat(np.zeros((self.dim_w, self.dim*elTotNodes)))
         # Vorticty curl
         Bw_curl = np.mat(np.zeros((self.dim, self.dim_w*elTotNodes)))
-
         for idx, gp in enumerate(self.gps):
             Hrs = self.Hrs[idx]
             H = self.H[idx]
-            J = self.HrsCoo[idx] * coords #coords
+            J = self.HrsCoo[idx] * coords
             Hxy = inv(J) * Hrs
             detJ = det(J)
 
@@ -128,10 +137,9 @@ class Spectral(Element):
             for i,ind in enumerate (self.indWCurl):
                 Bw_curl[ind[0],ind[1]::self.dim_w]= (-1)**(i)*Hxy[ind[2]]
             
-            elStiffMat += gp.w * detJ * B_gr.T * B_gr
-            elR_wMat += gp.w * detJ * Hvel.T * Bw_curl
-            elR_dMat -= gp.w * detJ * Hvel.T * Hxy
-        
+            self.elStiffMat += gp.w * detJ * B_gr.T * B_gr
+            self.elR_wMat += gp.w * detJ * Hvel.T * Bw_curl
+            self.elR_dMat -= gp.w * detJ * Hvel.T * Hxy
         Hvel = np.zeros((self.dim_w, self.dim_w*elTotNodes))
         # Reduced integration of penalizations
         for idx, gp in enumerate(self.gpsRed):
@@ -149,25 +157,33 @@ class Spectral(Element):
             for nd in range(self.dim_w):
                 Hvel[nd, nd::self.dim_w] = H
             
-            elStiffMat += gp.w * detJ * (alpha_d * B_div.T * B_div +
+            self.elStiffMat += gp.w * detJ * (alpha_d * B_div.T * B_div +
                                          + alpha_w * B_curl.T * B_curl)
 
-            elR_wMat += gp.w * detJ * alpha_w * B_curl.T * Hvel
-            elR_dMat += gp.w * detJ * alpha_d * Hxy.flatten('F').T * H
-        return (elStiffMat, elR_wMat, elR_dMat)
+            self.elR_wMat += gp.w * detJ * alpha_w * B_curl.T * Hvel
+            self.elR_dMat += gp.w * detJ * alpha_d * Hxy.flatten('F').T * H
+        return (self.elStiffMat, self.elR_wMat, self.elR_dMat)
+
+    def initElemMatricesOperators(self):
+        elTotNodes = self.nnode
+        self.elSTensorMat = np.mat(np.zeros((self.dim_s*elTotNodes,
+                                        self.dim*elTotNodes)))
+        self.elDivSTMat = np.mat(np.zeros((self.dim*elTotNodes,
+                                      self.dim_s*elTotNodes)))
+        self.elCurlMat = np.mat(np.zeros((self.dim_w*elTotNodes,
+                                     self.dim*elTotNodes)))
+        self.elWeigMat = np.mat(np.zeros((elTotNodes, elTotNodes)))
+
+    def clearElemMatricesOperators(self):
+        self.elSTensorMat.fill(0)
+        self.elDivSTMat.fill(0)
+        self.elCurlMat.fill(0)
+        self.elWeigMat.fill(0)
 
     def getElemKLEOperators(self, coords):
+        self.clearElemMatricesOperators()
         coords.shape = (int(len(coords)/self.dim), self.dim)
         elTotNodes = self.nnode
-        elSTensorMat = np.mat(np.zeros((self.dim_s*elTotNodes,
-                                        self.dim*elTotNodes)))
-        # The strain rate tensor is symmetric, thus we work with reduced
-        # number of components
-        elDivSTMat = np.mat(np.zeros((self.dim*elTotNodes,
-                                      self.dim_s*elTotNodes)))
-        elCurlMat = np.mat(np.zeros((self.dim_w*elTotNodes,
-                                     self.dim*elTotNodes)))
-        elWeigMat = np.mat(np.zeros((elTotNodes, elTotNodes)))
         # Strain rate Tensor
         B_srt = np.mat(np.zeros((self.dim_s, self.dim*elTotNodes)))
         Hsrt = np.mat(np.zeros((self.dim_s, self.dim_s*elTotNodes)))
@@ -181,8 +197,7 @@ class Spectral(Element):
         for idx, gp in enumerate(self.gpsOp):
             Hrs = self.HrsOp[idx]
             H = self.HOp[idx]
-
-            J = self.HrsCooOp[idx].dot( coords )
+            J = self.HrsCooOp[idx] * coords 
             Hxy = inv(J) * Hrs
             detJ = det(J)
 
@@ -209,13 +224,12 @@ class Spectral(Element):
             for i in range(self.dim_w):
                 Hcurl[i,i::self.dim_w] = H
 
-            elSTensorMat += gp.w * detJ * Hsrt.T.dot( B_srt )
-            elDivSTMat += gp.w * detJ * Hdiv.T.dot( B_div )
-            elCurlMat += gp.w * detJ * Hcurl.T.dot( B_curl )
-            elWeigMat += gp.w * detJ * H.T.dot( H ) 
+            self.elSTensorMat += gp.w * detJ * Hsrt.T.dot( B_srt )
+            self.elDivSTMat += gp.w * detJ * Hdiv.T.dot( B_div )
+            self.elCurlMat += gp.w * detJ * Hcurl.T.dot( B_curl )
+            self.elWeigMat += gp.w * detJ * H.T.dot( H )
 
-        elWeigVec = elWeigMat.sum(1)
-        return (elSTensorMat, elDivSTMat, elCurlMat, elWeigVec)
+        return (self.elSTensorMat, self.elDivSTMat, self.elCurlMat, self.elWeigMat.sum(1))
 
     def computeMats2D(self, nodes1D, gps1D, gps1Dwei):
         (h1D, dh1D) = self.interpFun1D(nodes1D, gps1D)
