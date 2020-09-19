@@ -5,12 +5,12 @@ import logging
 import yaml
 
 class BodiesContainer:
-    types = ['side-by-side', 'single', 'tandem', 'line']
-    def __init__(self, type):
-        # centerDistance = 2
-        if type not in self.types:
+    types = ['side-by-side', 'single', 'tandem', 'line', 'box']
+    def __init__(self, body):
+        if body['type'] not in self.types:
             raise Exception("not defined")
-        self.type = type
+        self.type = body['type']
+        self.velType = body['vel']
         self.bodies= list()
 
     def createBodies(self, h, radius=0.5, D=1.5):
@@ -23,6 +23,11 @@ class BodiesContainer:
             body = Line(vel=[0,0], center=[0,0])
             body.generateDMPlex(h)
             self.bodies.append(body)
+        elif self.type == 'box':
+            body = OpenBox(vel=[0,0], center=[0,0])
+            body.generateDMPlex(h)
+            self.bodies.append(body)
+
         else:
             D /= 2
             if self.type == 'side-by-side':
@@ -68,8 +73,8 @@ class BodiesContainer:
         coord = self.bodies[numBody].getNodeCoordinates(globNode)
         return coord
 
-    def getDiracs(self, dist):
-        return self.bodies[0].getDiracs(dist)
+    def getDiracs(self, dist, h):
+        return self.bodies[0].getDiracs(dist, h)
 
     def getElementLong(self):
         dl = self.bodies[0].getElementLong()
@@ -99,8 +104,15 @@ class BodiesContainer:
         return forces_x, forces_y
 
     def setVelRef(self, vel):
-        for body in self.bodies:
-            body.setVelRef(vel)
+        if self.velType == 'static':
+            for body in self.bodies:
+                body.setVelRef(0.0)
+        else:
+            for body in self.bodies:
+                body.setVelRef(vel)
+
+    def getVelRef(self, bodyNum=0):
+        return self.bodies[bodyNum].getVelRef()
 
     def updateBodyParameters(self, t):
         for body in self.bodies:
@@ -119,6 +131,10 @@ class BodiesContainer:
         vel = body.getVelocity()
         return vel
 
+    def updateVelocity(self):
+        for body in self.bodies:
+            body.updateVelocity()
+
 class ImmersedBody:
     def __init__(self, vel=[0,0], center=[0,0]):
         self.dirac = fourGrid
@@ -131,6 +147,9 @@ class ImmersedBody:
 
     def setVelRef(self, vel):
         self.__Uref = vel
+
+    def getVelRef(self):
+        return self.__Uref
 
     def view(self):
         self.logger.info(f"Arc len: {self.__dl} | Dirac Type: {self.dirac.__name__} | Vel Fluid Reference: {self.__Uref} ")
@@ -195,6 +214,10 @@ class ImmersedBody:
     def getVelocity(self):
         return self.__velVec
 
+    def setVelocity(self, inds, values ):
+        self.__velVec.setValues( inds , values )
+        self.__velVec.assemble()
+
     def getElementLong(self):
         return self.__dl
 
@@ -231,20 +254,20 @@ class ImmersedBody:
     def getRegion(self):
         return None
 
-    def getDiracs(self, dist):
+    def getDiracs(self, dist, h):
         dirac = 1
         for r in dist:   
-            dirac *= self.dirac(abs(r)/self.__dl)
-            dirac /= self.__dl
+            dirac *= self.dirac(abs(r)/h)
+            dirac /= h
         return dirac
 
     def updateBodyParameters(self, t):
         # A1 : f/D = 7.5 & A=D = 1 => f=7.5 & A =1
         velX = 0
         displX = 0
-        f = 7.5
+        f = 8.5
         Te = f / self.__Uref
-        A = 0.5
+        A = 0.3
         displY = A * sin(2 * pi * t / Te)
         velY = 2 * pi * A * cos(2 * pi * t / Te)/Te
         self.__vel = [velX, velY]
@@ -284,6 +307,57 @@ class Line(ImmersedBody):
     def getRegion(self):
         return 1
 
+class OpenBox(ImmersedBody):
+    def generateBody(self, dl , longitud=1):
+        # this can be improved with lower & upper
+        cone= list()
+        coords = list()
+        div = ceil(sqrt(2)/dl)
+        x1 , y1 = 0, longitud
+        x2 , y2 = -longitud, 0
+        x3 , y3 = 0, - longitud
+        x4 , y4 = longitud, 0
+        x1Tox2 =  np.linspace(x1, x2, div, endpoint=False)
+        x2Tox3 = np.linspace(x2, x3, div, endpoint=False)
+        x3Tox4 = np.linspace(x3, x4, div, endpoint=False)
+        xfinal = np.linspace(x4, x1, div, endpoint=False)
+
+        coords_x = np.append(x1Tox2, [x2Tox3, x3Tox4, xfinal])
+
+        y1Toy2 =  np.linspace(y1, y2, div, endpoint=False)
+        y2Toy3 = np.linspace(y2, y3, div, endpoint=False)
+        y3Toy4 = np.linspace(y3, y4, div, endpoint=False)
+        yfinal = np.linspace(y4, y1, div, endpoint=False)
+
+        coords_y = np.append(y1Toy2, [y2Toy3, y3Toy4, yfinal])
+
+        for i in range(len(coords_x)):
+            localCone = [i,i+1]
+            cone.append(localCone)
+            coords.append([coords_x[i], coords_y[i]])
+        cone[-1][-1] = 0
+
+        return coords, cone, dl
+
+    def updateVelocity(self):
+        self.logger.info("setting Lid Driven Cavity Velocity")
+        points = self.getTotalNodes()
+        velRef = self.getVelRef()
+        velValues = np.zeros(points*2)
+        for poi in range(points):
+            coord = self.getNodeCoordinates(poi)
+            if coord[0] >= 0 and coord[1] >= 0:
+                velValues[poi*2] = velRef / sqrt(2)
+                velValues[poi*2+1] = - velRef / sqrt(2)
+        ind = [poi*2+dof for poi in range(points) for dof in range(2)]
+        self.setVelocity(ind, velValues)
+
+    def getLong(self):
+        return 1
+
+    def getRegion(self):
+        return 1
+
 class Circle(ImmersedBody):
     def __init__(self, vel, center, radius):
         super().__init__(vel, center)
@@ -293,7 +367,7 @@ class Circle(ImmersedBody):
         r = self.__radius
         longTotal = 2*pi*r
         points =  ceil(longTotal/dh)
-        assert points > 4
+        # assert points > 4
         dh = longTotal/points
         startAng = pi/1000
         angles = np.linspace(0, 2*pi , points, endpoint=False)
@@ -306,7 +380,7 @@ class Circle(ImmersedBody):
             coords.append([x[i] , y[i]])
             cone.append(localCone)
         cone[-1][-1] = 0
-        dl = dh
+        dl = 2 * pi * r / len(coords)
         return coords, cone, dl
 
     def getLong(self):
