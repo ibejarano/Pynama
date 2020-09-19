@@ -58,11 +58,11 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.body.setVelRef(self.U_ref)
 
     def buildOperators(self):
-        # cornerCoords = self.dom.getCellCornersCoords(cell=0)
-        # localOperators = self.elemType.getElemKLEOperators(cornerCoords)
+        cornerCoords = self.dom.getCellCornersCoords(cell=0)
+        localOperators = self.elemType.getElemKLEOperators(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
-            cornerCoords = self.dom.getCellCornersCoords(cell)
-            localOperators = self.elemType.getElemKLEOperators(cornerCoords)
+            # cornerCoords = self.dom.getCellCornersCoords(cell)
+            # localOperators = self.elemType.getElemKLEOperators(cornerCoords)
             nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             self.operator.setValues(localOperators, nodes)
         self.operator.assembleAll()
@@ -134,11 +134,17 @@ class ImmersedBoundaryStatic(FreeSlip):
         U = self.U_ref
         denom = 0.5 * (U**2)
 
-        forces = self.vel_correction
-        fx_velCorr = forces[::2].sum() / dt
-        fy_velCorr = forces[1::2].sum() / dt
+        # numOfBodies = self.body.bodyNumbers()
+        # if numOfBodies == 1:
+        #     forces = self.vel_correction
+        #     fx_velCorr = forces[::2].sum() / dt
+        #     fy_velCorr = forces[1::2].sum() / dt
+        #     return float(fx_velCorr/denom), float(fy_velCorr/denom)
 
-        return float(fx_velCorr/denom), float(fy_velCorr/denom)
+        # else:
+        forces_x, forces_y = self.body.computeForce(self.virtualFlux, denom*dt)
+        return forces_x, forces_y
+
 
     def computeInitialCondition(self):
         startTime = self.ts.getTime()
@@ -149,7 +155,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.affectedNodes.setName("affected-nodes")
         self.body.setVelRef(self.U_ref)
         self.solveKLE(startTime, self.vort)
-        self.computeVelocityCorrection()
+        self.computeVelocityCorrection(t=startTime)
         self.operator.Curl.mult(self.vel, self.vort)
 
     def setUpSolver(self):
@@ -184,7 +190,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.vel.setValues(velDofs, np.tile(self.cteValue, len(self.boundaryNodes)))
         self.vort.setValues( self.boundaryNodes, np.zeros(len(self.boundaryNodes)) , addv=False )
 
-    def computeVelocityCorrection(self):
+    def computeVelocityCorrection(self, **kwargs):
         bodyVel = self.body.getVelocity()
         self.H.mult(self.vel, self.ibm_rhs)
         self.ibm_rhs.axpy(-1, bodyVel)
@@ -268,11 +274,11 @@ class ImmersedBoundaryStatic(FreeSlip):
     def getMarkedNodes(self):
         nodes = set()
         for lagNode in self.collectedNodes.keys():
-            if lagNode == 0 or lagNode == 43 or lagNode == 86 or lagNode == 189:
-                data = self.collectedNodes[lagNode]
-                # coords = data['coords']
-                eulerNodes = data['nodes']
-                nodes |= set(eulerNodes)
+            # if lagNode == 0 or lagNode == 43 or lagNode == 86 or lagNode == 189:
+            data = self.collectedNodes[lagNode]
+            # coords = data['coords']
+            eulerNodes = data['nodes']
+            nodes |= set(eulerNodes)
         return list(nodes)
 
     # @profile
@@ -318,33 +324,60 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         maxSteps = self.ts.getMaxSteps()
         self.body.viewBodies()
         markNodes = self.getMarkedNodes()
+        saveSteps = self.config['save-n-steps']
         self.markZone(markNodes)
+
         cds = list()
         clifts = list()
         times = list()
-        # self.ts.setTimeStep(1e-4)
+        dts = list()
+        steps = list()
+        timer = Timer()
+        elapsedTimes = list()
         for step in range(1,maxSteps+1):
+            timer.tic()
             self.ts.step()
             time = self.ts.time
-            incr = self.ts.getTimeStep()
-            nods, qx , qy = self.computeVelocityCorrection(time)
-            cd, cl = self.computeDragForce( qx, qy)
-            cds.append(cd)
-            clifts.append(cl)
-            times.append(time)
+            dt = self.ts.getTimeStep()
+            nods = self.computeVelocityCorrection(time)
             self.markAffectedNodes(nods)
             self.operator.Curl.mult(self.vel, self.vort)
             self.ts.setSolution(self.vort)
-            if step % 100 == 0:
+
+            self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment {dt:.3e}")
+            self.body.viewBodies()
+
+
+            if time > self.ts.getMaxTime():
+                break
+            elif step % saveSteps == 0:
                 self.viewer.saveData(step, time, self.vort, self.vel, self.ibmZone ,self.affectedNodes)
                 self.viewer.writeXmf(self.caseName)
-                self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Saved Step ")
-                self.body.viewBodies()
-                data = {"times": times, "cd": cds, "cl": clifts}
-                with open(self.caseName+'.yaml', 'w') as outfile:
-                    yaml.dump(data, outfile, default_flow_style=False)
-            else:
-                self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment {incr:.3e}")
+                self.H.mult(self.vel, self.ibm_rhs)
+            # if step % int(saveSteps/10) == 0:
+                cd, cl = self.computeDragForce(dt)
+                cds.append(cd)
+                clifts.append(cl)
+                times.append(time)
+                dl = self.body.getElementLong()
+                dts.append(dt)
+                steps.append(step)
+                elTimes = timer.toc()
+                elapsedTimes.append(elTimes.total_seconds())
+                data = {
+                        "dh": self.h,
+                        "dl": dl,
+                        "lagPoints":self.body.getTotalNodes(),
+                        "eulerNodes": self.vort.getSizes()[0] ,
+                        "ngl": self.ngl,
+                        "times": times, 
+                        "cd": cds,
+                        "cl": clifts,
+                        "dt": dts,
+                        "steps": steps,
+                        "elapsedTimes": elapsedTimes
+                        }
+                self.viewer.writeYaml(self.caseName, data)
 
     def computeClose(self, lagPoint, eulerCoords):
         # TODO: mejorar el if para acotar los nodos guardados en y
@@ -366,22 +399,13 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
         self.body.updateBodyParameters(t)
         affNodes = self.rebuildMatrix()
         bodyVel = self.body.getVelocity()
-
         self.H.mult(self.vel, self.ibm_rhs)
-        self.ksp.solve( bodyVel - self.ibm_rhs, self.virtualFlux)
+        self.ibm_rhs.axpy(-1, bodyVel)
+        self.ksp.solve( - self.ibm_rhs, self.virtualFlux)
         self.S.mult(self.virtualFlux, self.vel_correction)
         self.vel += self.vel_correction
-        fx_rhs, fy_rhs = self.body.computeForce(self.ibm_rhs)
 
-        dl = self.body.getElementLong()
-        area = (self.h * dl)
-        for i , f in enumerate(fx_rhs):
-            fx_rhs[i] = -f * area * 2
-
-        for i , f in enumerate(fy_rhs):
-            fy_rhs[i] = -f * area * 2
-
-        return affNodes , fx_rhs , fy_rhs
+        return affNodes
 
     # @profile
     def rebuildMatrix(self):
