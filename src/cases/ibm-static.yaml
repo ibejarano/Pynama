@@ -1,32 +1,51 @@
 ---
-name: ibm-sidebyside-d15
-save-dir: run-sidebyside-d15
+name: static-cil-re100
+save-dir: static-cil-re100
+save-n-steps: 200
 
+# cylinder
 domain:
   ngl: 3
   # box-mesh:
-  #   nelem: [100, 50]
-  #   lower: [-20,-10]
-  #   upper: [20,10]
-  gmsh-file: side-by-side-h05-d15.msh
-  h-min: 0.05
-
-body:
-  -
-    vel: [0,0]
-    type: "side-by-side"
-    radius: 0.5
-    center: [0,0]
-
+  #   nelem: [60, 90]
+  #   lower: [-3,-3]
+  #   upper: [6,3]
+  gmsh-file: static-cil-h04.msh
+  h-min: 0.04
 boundary-conditions:
   constant:
-    re: 200
+    re: 100
+    direction: 0
+    longRef: '1'
+body:
+  vel: 'static'
+  type: "single"
+  longitud: 0.5
+  center: [0,0]
+
+# cavity
+# domain:
+#   ngl: 3
+#   box-mesh:
+#     nelem: [90, 90]
+#     lower: [-3,-3]
+#     upper: [3,3]
+# boundary-conditions:
+#   constant:
+#     re: 100
+#     direction: -45
+#     longRef: "1/sqrt(2)"
+# body:
+#   vel: 'upper'
+#   type: "box"
+#   longitud: 0.5
+#   center: [0,0]
 
 material-properties:
   rho: 0.5
   mu: 0.01
 
 time-solver:
-  max-steps: 80000
+  max-steps: 60000
   start-time: 0
-  end-time: 150
+  end-time: 120
