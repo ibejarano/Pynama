@@ -5,3 +5,8 @@
 *png
 re*
 toplot/
+*.msh
+*.png
+*.yaml
+*.csv
+*.ipynb
