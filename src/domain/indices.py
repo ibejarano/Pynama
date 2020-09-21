@@ -10,6 +10,9 @@ class IndicesManager:
         self.dim = dim
         self.reorderEntities = self.reorderEntities2D if dim ==2 else self.reorderEntities3D
         self._ngl = ngl
+        self.__dirNodes = set()
+        self.__nsNodes = set()
+         
         if not comm.rank:
             self.logger.debug("IndicesManager Seteado")
 
@@ -39,31 +42,23 @@ class IndicesManager:
     def getGlobalIndicesSection(self):
         return self._globalIndicesSection
 
-    def setDirichletIndices(self, bcInput: set):
-        self.__bcNodes = bcInput
+    def setDirichletNodes(self, nodes: set):
+        self.__dirNodes |= nodes
 
-    def getDirichletIndices(self):
+    def getDirichletNodes(self):
         self.globalIndicesDIR = set()
-        for remoteIndices in self.comm.tompi4py().allgather(self.__bcNodes):
+        for remoteIndices in self.comm.tompi4py().allgather(self.__dirNodes):
             self.globalIndicesDIR |= remoteIndices
+        return self.__dirNodes
 
-        return self.__bcNodes
+    def setNoSlipNodes(self, nodes: set):
+        self.__nsNodes |= nodes
 
-    def getNoSlipIndices(self, bcInput):
-        indicesNS = set()
-        if 'no-slip-border' in bcInput:
-            noSlipBorders = bcInput['no-slip-border']
-            for border in noSlipBorders:
-                indices = []
-                # self.logger.debug("border con ns: %s", 2**border)
-                # self.logger.debug("indices encontrados (nodos?): %s", indices)
-
-            # if self.BCdict[bc]['ns'] is not None:
-            #     indicesNS |= self.BC2nodedict[bc]
-
-        # global indices for DIR and NS BC are allgathered amondg processes
-        globIndices = self.comm.tompi4py().allgather([indicesNS])
-        return globIndices
+    def getNoSlipNodes(self):
+        self.globalIndicesNS = set()
+        for remoteIndices in self.comm.tompi4py().allgather(self.__nsNodes):
+            self.globalIndicesNS |= remoteIndices
+        return self.__nsNodes
 
     def mapEntitiesToNodes(self, entities, orientations, getShared = True):
         entitites = self.reorderEntities(entities)

@@ -14,12 +14,14 @@ class MatNS(Mat):
         self.Rd.assemble()
         self.Krhs.assemble()
 
-    def createEmptyKLEMats(self,rStart, rEnd ,  d_nnz_ind , o_nnz_ind, ind_d, ind_o, indicesNS):
+    def createEmptyKLEMats(self,rStart, rEnd ,  d_nnz_ind , o_nnz_ind, ind_d, ind_o, indicesDIR , indicesNS):
+        self.globalIndicesDIR =set()
         self.globalIndicesNS =set()
 
-        collectIndices = self.comm.allgather([indicesNS])
+        collectIndices = self.comm.allgather([indicesDIR, indicesNS])
         for remoteIndices in collectIndices:
-            self.globalIndicesNS |= remoteIndices[0]
+            self.globalIndicesDIR |= remoteIndices[0]
+            self.globalIndicesNS |= remoteIndices[1]
 
         locElRow = rEnd - rStart
         vel_dofs = locElRow * self.dim
@@ -44,8 +46,13 @@ class MatNS(Mat):
         orhs_nnz_ind = [0] * (rEnd - rStart)
 
         for indRow, indSet in enumerate(ind_d):
-            drhs_nnz_ind[indRow] = len(indSet & self.globalIndicesNS)
-            orhs_nnz_ind[indRow] = len(indSet & self.globalIndicesNS)
+            if (indRow + rStart) in self.globalIndicesDIR:
+                drhs_nnz_ind[indRow] = 1
+            else:
+                drhs_nnz_ind[indRow] = len(indSet & (self.globalIndicesDIR | self.globalIndicesNS))
+
+        for indRow, indSet in enumerate(ind_o):
+                orhs_nnz_ind[indRow] = len(indSet & (self.globalIndicesDIR | self.globalIndicesNS))
 
         # FIXME: This reserves self.dim nonzeros for each node with
         # Dirichlet conditions despite the number of DoF conditioned
@@ -54,16 +61,18 @@ class MatNS(Mat):
         dns_nnz_ind = [0] * (rEnd - rStart)
         ons_nnz_ind = [0] * (rEnd - rStart)
         for ind, indSet in enumerate(ind_d):
-            if (ind + rStart) not in (self.globalIndicesNS):
+            if (ind + rStart) not in (self.globalIndicesNS | self.globalIndicesDIR ):
                 dns_nnz_ind[ind] = len(indSet & self.globalIndicesNS)
             elif (ind + rStart) in self.globalIndicesNS:
                 # FIXME: len() can be distributed on each set operation
-                dns_nnz_ind[ind] = len(indSet | (indSet & self.globalIndicesNS))
+                dns_nnz_ind[ind] = len((indSet - self.globalIndicesDIR) | 
+                                        (indSet & self.globalIndicesNS))
         for ind, indSet in enumerate(ind_o):
-            if (ind + rStart) not in (self.globalIndicesNS):
+            if (ind + rStart) not in (self.globalIndicesNS | self.globalIndicesDIR):
                 ons_nnz_ind[ind] = len(indSet & self.globalIndicesNS)
             elif (ind + rStart) in self.globalIndicesNS:
-                ons_nnz_ind[ind] = len(indSet | (indSet & self.globalIndicesNS))
+                ons_nnz_ind[ind] = len((indSet - self.globalIndicesDIR) | 
+                                        (indSet & self.globalIndicesNS))
 
         dns_nnz, ons_nnz =self.createNonZeroIndex (dns_nnz_ind, ons_nnz_ind, self.dim, self.dim)
 
@@ -76,8 +85,13 @@ class MatNS(Mat):
         drhsns_nnz_ind = [0] * (rEnd - rStart)
         orhsns_nnz_ind = [0] * (rEnd - rStart)
         for indRow, indSet in enumerate(ind_d):
-            drhsns_nnz_ind[indRow] = len(indSet & self.globalIndicesNS)
-            orhsns_nnz_ind[indRow] = len(indSet &  self.globalIndicesNS)
+            if (indRow + rStart) in (self.globalIndicesDIR - self.globalIndicesNS):
+                drhsns_nnz_ind[indRow] = 1
+            else:
+                drhsns_nnz_ind[indRow] = len(indSet & (self.globalIndicesNS | self.globalIndicesDIR))
+                
+        for indRow, indSet in enumerate(ind_o):
+                orhsns_nnz_ind[indRow] = len(indSet & (self.globalIndicesNS | self.globalIndicesDIR))
 
         drhsns_nnz, orhsns_nnz = self.createNonZeroIndex(drhsns_nnz_ind,orhsns_nnz_ind, self.dim,self.dim)
 

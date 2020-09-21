@@ -7,20 +7,21 @@ material-properties:
 
 domain:
   dim: 2 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [30,30]
+  nelem: [3,3]
   ngl: 3
   lower: [0,0]
   upper: [1,1]
   
 time-solver:
   max-steps: 150
-  start-time: 0
+  start-time: 0.001
   end-time: 1
 
 boundary-conditions:
-  border-name:
-    upperY:
-      coord: 1
-      vel: [ 1 , 0]
-  no-slip:
-    up: [1 ,0 ]
+  # no-slip:
+  #   up: [1,0]
+  free-slip:
+    left: [ 'flatPlateX' , 'flatPlateY' ]
+    right: [ 'flatPlateX' , 'flatPlateY' ]
+    # down: [ 'flatPlateX' , 'flatPlateY' ]
+    up: [ 'flatPlateX' , 'flatPlateY' ]

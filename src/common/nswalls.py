@@ -3,7 +3,7 @@ from domain.dmplex import DMPlexDom
 import sys
 
 class NoSlipWalls:
-    def __init__(self, lower, upper, sides=["left", "right", "up", "down"]):
+    def __init__(self, lower, upper, exclude=[] ):
         dim = len(lower)
         self.dim = dim
 
@@ -19,31 +19,31 @@ class NoSlipWalls:
         # wallNumbering = [0, 1, 2, 3]
         self.walls = dict()
 
-        for num, side in enumerate(sides):
-            if side == "left":
-                vertexs = self.left()
-            elif side == "right":
-                vertexs = self.right()
-            elif side == "up":
-                vertexs = self.up()
-            elif side == "down":
-                vertexs = self.down()
-            else:
-                raise Exception("Unknown side")
-            self.walls[side] = Wall(num=num, vertexs=vertexs)
-            self.walls[side].setWallName(side)
+        if self.dim == 2:
+            sides=[ "left", "right", "up", "down" ]
+        else:
+            sides=[ "left", "right", "up", "down", "back", "front" ]
 
-        if self.dim == 3:
-            walls_3d = ["front", "back"]
-            for num, side in enumerate(walls_3d):
-                if side == "front":
+        for num, side in enumerate(sides):
+            if not side in exclude:
+                if side == "left":
+                    vertexs = self.left()
+                elif side == "right":
+                    vertexs = self.right()
+                elif side == "up":
+                    vertexs = self.up()
+                elif side == "down":
+                    vertexs = self.down()
+                elif side == "front":
                     vertexs = self.front()
-                else:
+                elif side == "back":
                     vertexs = self.back()
-                self.walls[side] = Wall(num=num+4, vertexs=vertexs)
+                else:
+                    raise Exception("Unknown side")
+                self.walls[side] = Wall(num=num, vertexs=vertexs)
                 self.walls[side].setWallName(side)
 
-        self.staticWalls = self.walls.keys()
+        self.staticWalls = list(self.walls.keys())
         self.wallsWithVelocity = list()
         self.computeWallsNormals()
 

@@ -1,11 +1,15 @@
-from cases.base_problem import NoSlip
+from cases.base_problem import NoSlipFreeSlip
 from common.nswalls import NoSlipWalls
 import numpy as np
+from math import sqrt, erf, exp, pi
 
-class Cavity(NoSlip):
+class Cavity(NoSlipFreeSlip):
     def setUp(self):
         super().setUp()
         self.collectCornerNodes()
+
+        self.velFunction = self.flatplateVel
+        self.vortFunction = self.flatplateVort
 
     def collectCornerNodes(self):
         cornerNodes = set()
@@ -24,26 +28,44 @@ class Cavity(NoSlip):
             self.logger.info("Corner Nodes collected")
 
     def readBoundaryCondition(self,inputData):
-        bcdict = inputData['border-name']
-        wallsWithVelocity = inputData['no-slip']
         self.BoundaryCondition = list()
+        try:
+            self.nsWalls = NoSlipWalls(self.lower, self.upper, exclude=inputData['free-slip'].keys())
+        except:
+            self.nsWalls = NoSlipWalls(self.lower, self.upper)
+        
+        if 'no-slip' in inputData:
+            for wallName, wallVelocity in inputData['no-slip'].items():
+                self.nsWalls.setWallVelocity(wallName, wallVelocity)
 
-        for bc in bcdict.keys():
-            if bc[:5]=="upper":
-                self.BoundaryCondition.append((self.upper,bcdict[bc]["coord"],bcdict[bc]["vel"]))
-            if bc[:5]=="lower":
-                self.BoundaryCondition.append((self.lower,bcdict[bc]["coord"],bcdict[bc]["vel"]))
+    def setUpBoundaryConditions(self):
+        self.dom.setLabelToBorders()
 
-        # Otra alternativa
-        self.nsWalls = NoSlipWalls(self.lower, self.upper)
-        for wallName, wallVelocity in wallsWithVelocity.items():
-            self.nsWalls.setWallVelocity(wallName, wallVelocity)
+        bc = self.config.get("boundary-conditions")
+        if 'free-slip' in bc:
+            fsFaces = bc['free-slip'].keys()
+        else:
+            fsFaces = list()
+        nsFaces = self.nsWalls.getWallsNames()
+        self.dom.setBoundaryCondition(fsFaces, list(nsFaces))
+        if not self.comm.rank:
+            self.logger.info(f"Boundary Conditions setted up")
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
+        allNodes = self.dom.getAllNodes()
+        fvort_coords = lambda coords: self.vortFunction(coords, self.nu,t=startTime)
+        self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort, self.dim_w)
+        self.vort.assemble()
 
-    def applyBoundaryConditions(self):
+    def applyBoundaryConditions(self, time):
         self.vel.set(0.0)
+        # self.vort.view()
+        if self.globalNodesDIR:
+            fvel_coords = lambda coords: self.velFunction(coords, self.nu, t=time)
+            fvort_coords = lambda coords: self.vortFunction(coords, self.nu, t=time)
+            self.vel = self.dom.applyFunctionVecToVec(self.globalNodesDIR, fvel_coords, self.vel, self.dim)
+            self.vort = self.dom.applyFunctionVecToVec(self.globalNodesDIR, fvort_coords, self.vort, self.dim_w)
 
         wallsWithVel = self.nsWalls.getWallsWithVelocity()
         for wallName in wallsWithVel:
@@ -74,12 +96,14 @@ class Cavity(NoSlip):
         self.velFS.assemble()
 
     @staticmethod
-    def VelCavity(coord,BoundaryConditions,dim,t=None):
-        for bc in BoundaryConditions:
-            if coord[bc[1]] == bc[0][1]:
-                vel= bc[2]
-                return vel
-        vel=[0]*dim 
-        return vel
+    def flatplateVel(coord, nu , t=None):
+        U_ref = 1
+        vx = U_ref * erf(coord[1]/ sqrt(4*nu*t))
+        vy = 1
+        return [vx, vy]
 
-
+    @staticmethod
+    def flatplateVort(coord, nu, t=None):
+        tau = sqrt(4*nu*t)
+        vort = (-2/(tau * sqrt(pi))) * exp(-(coord[1]/tau)**2)
+        return [vort]
