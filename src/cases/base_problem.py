@@ -295,12 +295,9 @@ class NoSlipFreeSlip(BaseProblem):
 
     def solveKLE(self, time, vort):
         self.applyBoundaryConditions(time)
-        # vort.view()
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
              + self.mat.Krhsfs * self.vel , self.velFS)
         self.applyBoundaryConditionsFS()
-        # self.logger.info(f"time {time} Vort: {vort.view()} ")
-        self.logger.info(f"time {time} Vort: {self.velFS.getArray()} ")
         vort = self.operator.Curl * self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
@@ -362,7 +359,7 @@ class NoSlipFreeSlip(BaseProblem):
             gldof2beSet = [indicesVel[ii] for ii in dof2beSet]
             gldofFree = [indicesVel[ii] for ii in dofFree]
             
-            if nodeBCintersectNS:
+            if nodeBCintersectNS | nodeBCintersectDIR:
                 self.mat.Krhs.setValues(
                 gldofFree, gldof2beSet,
                 -locK[np.ix_(dofFree, dof2beSet)], addv=True)
