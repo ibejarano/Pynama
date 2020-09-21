@@ -152,12 +152,24 @@ class DMPlexDom(PETSc.DMPlex):
         return self.createMat()
 
     def getGlobalIndicesDirichlet(self):
-        indicesDIR = self.indicesManager.getDirichletIndices()
+        indicesDIR = self.indicesManager.getDirichletNodes()
         return indicesDIR
 
-    def setBoundaryCondition(self):
-        allBorderNodes = self.getBordersNodes()
-        self.indicesManager.setDirichletIndices(allBorderNodes)
+    def getGlobalIndicesNoSlip(self):
+        indicesNS = self.indicesManager.getNoSlipNodes()
+        return indicesNS
+
+    def setBoundaryCondition(self, freeSlipFaces: list, noSlipFaces: list):
+        # 1. pasarle parametros no slip y free slip
+        # el parametro tiene que ser el nombre de la cara correspondiente
+        # 2. agregar setNSIndices() al indicesManager
+        # allBorderNodes = self.getBordersNodes()
+        for fsFace in freeSlipFaces:
+            faceNodes = self.getBorderNodes(fsFace)
+            self.indicesManager.setDirichletNodes(set(faceNodes))
+        for nsFace in noSlipFaces:
+            faceNodes = self.getBorderNodes(nsFace)
+            self.indicesManager.setNoSlipNodes(set(faceNodes))
 
     def getGlobalNodesFromCell(self, cell, shared):
         entities, orientations = self.getTransitiveClosure(cell)
@@ -201,20 +213,22 @@ class DMPlexDom(PETSc.DMPlex):
         arr = self.fullCoordVec.getValues(indices).reshape((len(nodes),dim))
         return arr
 
-    def getBorderNodesWithNormal(self, cell):
+    def getBorderNodesWithNormal(self, cell, intersect):
         nodes = list()
         normals = list()
-        faces = set(self.getTransitiveClosure(cell)[0])
+        localEntities = set(self.getTransitiveClosure(cell)[0])
         for faceName in self.namingConvention:
-            entities = set(self.getBorderEntities(faceName))
-            borderFace = entities & faces
-            if borderFace:
-                borderFace = list(borderFace)
-                borderNodes = self.getGlobalNodesFromEntities(borderFace, shared=True)
-                normal = self.computeCellGeometryFVM(borderFace[0])[2]
-                indexNormal = list(np.abs(normal)).index(1)
-                normals.append(indexNormal)
-                nodes.append(borderNodes)
+            globalEntitiesBorders = set(self.getBorderEntities(faceName))
+            localEntitiesBorders = globalEntitiesBorders & localEntities 
+            if localEntitiesBorders:
+                localEntitiesBorders = list(localEntitiesBorders)
+                borderNodes = self.getGlobalNodesFromEntities(localEntitiesBorders, shared=True)
+                # Si el conjunto borderNodes de la cara no esta completamente contenido en intersect, entonces pertenece a otro tipo de Boundary cond.
+                if not (set(borderNodes) - intersect):
+                    normal = self.computeCellGeometryFVM(localEntitiesBorders[0])[2]
+                    indexNormal = list(np.abs(normal)).index(1)
+                    normals.append(indexNormal)
+                    nodes.append(borderNodes)
         return nodes, normals
 
     def applyFunctionVecToVec(self, nodes, f_vec, vec, dof):

@@ -68,6 +68,7 @@ class BaseProblem(object):
         materialData = self.config.get("material-properties")
         self.rho = materialData['rho']
         self.mu = materialData['mu']
+        self.nu = self.mu/self.rho
 
     def readDomainData(self, kwargs):
         domain = self.config.get("domain")
@@ -175,9 +176,6 @@ class BaseProblem(object):
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
 
-    
-
-
     def createVtkFile(self):
         viewer = PETSc.Viewer()
         viewer.createVTK('immersed-body.vtk', mode=PETSc.Viewer.Mode.WRITE)
@@ -274,17 +272,17 @@ class BaseProblem(object):
         self.mat = None
         self.operator = None
 
-class NoSlip(BaseProblem):
+class NoSlipFreeSlip(BaseProblem):
     def setUpEmptyMats(self):
         self.mat = MatNS(self.dim, self.comm)
         self.operator = Operators(self.dim, self.comm)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
-        globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
-
-        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)
+        self.globalNodesDIR = self.dom.getGlobalIndicesDirichlet()
+        globalNodesNS = self.dom.getGlobalIndicesNoSlip()
+        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, self.globalNodesDIR, globalNodesNS )
         if not self.comm.rank:
             self.logger.info(f"Empty KLE Matrices created")
-        
+
         self.operator.createAll(rStart, rEnd, d_nnz_ind, o_nnz_ind)
         if not self.comm.rank:
             self.logger.info(f"Empty Operators created")
@@ -296,18 +294,23 @@ class NoSlip(BaseProblem):
         self.velFS = self.vel.copy()
 
     def solveKLE(self, time, vort):
-        self.applyBoundaryConditions()
+        self.applyBoundaryConditions(time)
+        # vort.view()
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
              + self.mat.Krhsfs * self.vel , self.velFS)
         self.applyBoundaryConditionsFS()
+        # self.logger.info(f"time {time} Vort: {vort.view()} ")
+        self.logger.info(f"time {time} Vort: {self.velFS.getArray()} ")
         vort = self.operator.Curl * self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def buildKLEMats(self):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
-        boundaryNodes = self.mat.globalIndicesNS
+        boundaryNodesNS = self.mat.globalIndicesNS
+        boundaryNodesDIR =  self.mat.globalIndicesDIR
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
         locK, locRw, locRd = self.elemType.getElemKLEMatrices(cornerCoords)
+        indices2one = set()
         indices2onefs = set()
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
@@ -315,7 +318,8 @@ class NoSlip(BaseProblem):
             indicesVel = self.dom.getVelocityIndex(nodes)
             indicesW = self.dom.getVorticityIndex(nodes)
            
-            nodeBCintersect = boundaryNodes & set(nodes)
+            nodeBCintersectNS = boundaryNodesNS & set(nodes)
+            nodeBCintersectDIR = boundaryNodesDIR & set(nodes)
             dofFreeFSSetNS = set()  # local dof list free at FS sol
             dofSetFSNS = set()  # local dof list set at both solutions
             # for node in nodeBCintersect:
@@ -330,8 +334,8 @@ class NoSlip(BaseProblem):
             #     dofFreeFSSetNS.update([localBoundaryNode*self.dim + d
             #                             for d in (set(range(self.dim)) - nsNorm)])
 
-            if nodeBCintersect:
-                borderNodes, normals = self.dom.getBorderNodesWithNormal(cell)
+            if nodeBCintersectNS:
+                borderNodes, normals = self.dom.getBorderNodesWithNormal(cell, nodeBCintersectNS)
                 for i, globBorderNodes in enumerate(borderNodes):
                     tangentialDofs = list(range(self.dim))
                     tangentialDofs.pop(normals[i])
@@ -341,6 +345,12 @@ class NoSlip(BaseProblem):
                     dofSetFSNS.update( [locNode * self.dim + normalDof for locNode in localNodes ]  )
                     dofFreeFSSetNS.update( [locNode * self.dim + dof for locNode in localNodes for dof in tangentialDofs] )
                 dofFreeFSSetNS -= dofSetFSNS
+
+            if nodeBCintersectDIR:
+                borderNodes, _ = self.dom.getBorderNodesWithNormal(cell, nodeBCintersectDIR)
+                for i, globBorderNodes in enumerate(borderNodes):
+                    localNodes = [ nodes.index(node) for node in globBorderNodes ]
+                    dofSetFSNS.update( [locNode*self.dim + dof for locNode in localNodes for dof in range(self.dim)])
 
             dofFree = list(set(range(len(indicesVel)))
                            - dofFreeFSSetNS - dofSetFSNS)
@@ -352,7 +362,7 @@ class NoSlip(BaseProblem):
             gldof2beSet = [indicesVel[ii] for ii in dof2beSet]
             gldofFree = [indicesVel[ii] for ii in dofFree]
             
-            if nodeBCintersect:
+            if nodeBCintersectNS:
                 self.mat.Krhs.setValues(
                 gldofFree, gldof2beSet,
                 -locK[np.ix_(dofFree, dof2beSet)], addv=True)
