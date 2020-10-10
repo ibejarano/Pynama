@@ -20,8 +20,9 @@ class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
         super().setUp()
         self.boundaryNodes = self.getBoundaryNodes()
-        cells = self.getAffectedCells(5)
+        cells = self.getAffectedCells(10)
         self.collectedNodes, self.maxNodesPerLag = self.collectNodes(cells)
+        self.totalEulerNodes = len(self.dom.getAllNodes())
         self.createEmptyIBMMatrix()
         self.mNodes = self.buildIBMMatrix()
 
@@ -36,12 +37,13 @@ class ImmersedBoundaryStatic(FreeSlip):
             velRef = re*(self.mu/self.rho) / L
             self.U_ref = velRef
             self.cteValue = [cos(angleRadian)*velRef,sin(angleRadian)*velRef]
-            self.logger.info(f"Velocity Free Stream: {self.cteValue}")
             self.re = re
         except:
             vel = bc['constant']['vel']
             self.U_ref = vel[0]
-            self.cteValue = [vel, 0]
+            self.cteValue = [self.U_ref, 0]
+            self.re = self.U_ref / self.nu
+        self.logger.info(f"Velocity Free Stream: {self.cteValue}")
 
     def setUpDomain(self):
         super().setUpDomain()
@@ -54,6 +56,7 @@ class ImmersedBoundaryStatic(FreeSlip):
 
         bodies = self.config['bodies']
         self.body = BodiesContainer(bodies)
+        self.logger.info(f"Node separation: {self.h}")
         self.body.createBodies(self.h)
         self.body.setVelRef(self.U_ref)
 
@@ -103,30 +106,30 @@ class ImmersedBoundaryStatic(FreeSlip):
                 self.viewer.saveData(step, time, self.vort, self.vel, self.ibmZone ,self.affectedNodes)
                 self.viewer.writeXmf(self.caseName)
                 self.H.mult(self.vel, self.ibm_rhs)
-            if i % int(saveSteps/10) == 0:
-                cd, cl = self.computeDragForce(dt)
-                cds.append(cd)
-                clifts.append(cl)
-                times.append(time)
-                dl = self.body.getElementLong()
-                dts.append(dt)
-                steps.append(step)
-                elTimes = timer.toc()
-                elapsedTimes.append(elTimes.total_seconds())
-                data = {
-                        "dh": self.h,
-                        "dl": dl,
-                        "lagPoints":self.body.getTotalNodes(),
-                        "eulerNodes": self.vort.getSizes()[0] ,
-                        "ngl": self.ngl,
-                        "times": times, 
-                        "cd": cds,
-                        "cl": clifts,
-                        "dt": dts,
-                        "steps": steps,
-                        "elapsedTimes": elapsedTimes
-                        }
-                self.viewer.writeYaml(self.caseName, data)
+            # if i % int(saveSteps/20) == 0:
+            #     cd, cl = self.computeDragForce(dt)
+            #     cds.append(cd)
+            #     clifts.append(cl)
+            #     times.append(time)
+            #     dl = self.body.getElementLong()
+            #     dts.append(dt)
+            #     steps.append(step)
+            #     elTimes = timer.toc()
+            #     elapsedTimes.append(elTimes.total_seconds())
+            #     data = {
+            #             "dh": self.h,
+            #             "dl": dl,
+            #             "lagPoints":self.body.getTotalNodes(),
+            #             "eulerNodes": self.vort.getSizes()[0] ,
+            #             "ngl": self.ngl,
+            #             "times": times, 
+            #             "cd": cds,
+            #             "cl": clifts,
+            #             "dt": dts,
+            #             "steps": steps,
+            #             "elapsedTimes": elapsedTimes
+            #             }
+            #     self.viewer.writeYaml(self.caseName, data)
 
                 
 
@@ -198,10 +201,9 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.S.mult(self.virtualFlux, self.vel_correction)
         self.vel += self.vel_correction
 
-    # @profile
     def createEmptyIBMMatrix(self):
         rows = self.body.getTotalNodes() * self.dim
-        cols = len(self.dom.getAllNodes()) * self.dim
+        cols = self.totalEulerNodes * self.dim
         d_nnz_D = self.maxNodesPerLag
         o_nnz_D = 0
 
@@ -210,19 +212,23 @@ class ImmersedBoundaryStatic(FreeSlip):
             comm=self.comm)
         self.H.setUp()
 
-    # @profile
     def buildIBMMatrix(self):
         nodes = set()
+        # self.dirs = list()
+        # self.markedNodes = list()
         for lagNode in self.collectedNodes.keys():
             data = self.collectedNodes[lagNode]
             coords = data['coords']
             eulerNodes = data['nodes']
-            eulerIndices = [node*self.dim+dof for node in eulerNodes for dof in range(self.dim)]
-            dirac = self.computeDirac(lagNode, coords)
+            eulerIndices = data['indices']
+            dirac = np.array(self.computeDirac(lagNode, coords))
             for dof in range(self.dim):
                 self.H.setValues(lagNode*self.dim+dof, eulerIndices[dof::self.dim], dirac)
 
-            nodes |= set(eulerNodes[np.array(dirac) > 0])
+            # if lagNode == 0 or lagNode == 43:
+            nodes |= set(eulerNodes[dirac > 0])
+                # self.markedNodes.append(eulerNodes[dirac > 0])
+                # self.dirs.append(dirac[dirac>0])
 
         self.H.assemble()
         self.S = self.H.copy().transpose()
@@ -241,12 +247,13 @@ class ImmersedBoundaryStatic(FreeSlip):
         eulerCoords = self.dom.getNodesCoordinates(ibmNodes)
         ibmNodes = np.array(list(ibmNodes), dtype=np.int32)
         nodes = dict()
+        indices = dict()
         maxFound = 0
         for lagNode in range(lagNodes):
             nodesFound = self.computeClose(lagNode, eulerCoords)
             coords = eulerCoords[nodesFound>0]
             nodesFound = ibmNodes[nodesFound>0]
-            nodes[lagNode] = { "nodes" :nodesFound, "coords" :coords }
+            nodes[lagNode] = { "nodes" :nodesFound, "coords" :coords, "indices": [node*self.dim+dof for node in nodesFound for dof in range(self.dim)]}
             self.body.setEulerNodes(lagNode, len(nodesFound))
             if not len(nodesFound):
                 raise Exception("Lag Node without Euler")
@@ -317,6 +324,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.ibmZone.setValues(nodes, [1]*nnodes, addv=False)
 
 class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
+
     # @profile
     def startSolver(self):
         self.computeInitialCondition()
@@ -354,7 +362,7 @@ class ImmersedBoundaryDynamic(ImmersedBoundaryStatic):
                 self.viewer.saveData(step, time, self.vort, self.vel, self.ibmZone ,self.affectedNodes)
                 self.viewer.writeXmf(self.caseName)
                 self.H.mult(self.vel, self.ibm_rhs)
-            # if step % int(saveSteps/10) == 0:
+            if step % int(saveSteps/10) == 0:
                 cd, cl = self.computeDragForce(dt)
                 cds.append(cd)
                 clifts.append(cl)
