@@ -255,6 +255,7 @@ class ImmersedBody:
     def getRegion(self):
         return None
 
+    # @profile
     def getDiracs(self, dist, h):
         dirac = 1
         for r in dist:   
@@ -268,13 +269,12 @@ class ImmersedBody:
             return
         velX = 0 
         displX = 0  + self.__startCenter[0]
-        f = 8.5
+        f = 5
         Te = f / self.__Uref
         A = 0.3
         displY = A * sin(2 * pi * t / Te) + self.__startCenter[1]
         velY = 2 * pi * A * cos(2 * pi * t / Te)/Te
         self.__vel = [velX, velY]
-        prevX, prevY = self.__centerDisplacement  
         self.__centerDisplacement = [displX, displY]
         self.updateVelocity()
         self.__history["times"].append(t)
@@ -291,8 +291,9 @@ class ImmersedBody:
         return None, None ,None
 
 class Line(ImmersedBody):
-    def generateBody(self, dl , longitud=1):
+    def generateBody(self, dl , longitud=2):
         # this can be improved with lower & upper
+        self.__region = longitud
         div = ceil(longitud/dl) 
         coords_x = np.linspace(0, longitud, div)
         coords_y = np.array([0]*div)
@@ -309,7 +310,7 @@ class Line(ImmersedBody):
         return 1
 
     def getRegion(self):
-        return 1
+        return self.__region
 
 class OpenBox(ImmersedBody):
     def generateBody(self, dl , longitud=1):
@@ -344,9 +345,9 @@ class OpenBox(ImmersedBody):
         return coords, cone, dl
 
     def updateVelocity(self):
-        self.logger.info("setting Lid Driven Cavity Velocity")
         points = self.getTotalNodes()
         velRef = self.getVelRef()
+        self.logger.info(f"setting Lid Driven Cavity Velocity: {velRef}")
         velValues = np.zeros(points*2)
         for poi in range(points):
             coord = self.getNodeCoordinates(poi)
@@ -410,6 +411,7 @@ def linear(r):
     else:
         return 0
 
+# @profile
 def fourGrid(r):
     if r <=  1:
         return (3 - 2*r + sqrt(1 + 4*r - 4*r**2))/8
