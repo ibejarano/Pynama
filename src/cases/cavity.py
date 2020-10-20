@@ -2,9 +2,10 @@ from cases.base_problem import NoSlipFreeSlip
 from common.nswalls import NoSlipWalls
 import numpy as np
 from math import sqrt, erf, exp, pi
+import pandas as pd
 import matplotlib.pyplot as plt
 import csv
-import pandas as pd
+
 
 class Cavity(NoSlipFreeSlip):
     def setUp(self):

@@ -2,6 +2,7 @@ import sys
 import petsc4py
 from math import pi, sin, cos, exp, erf, sqrt
 petsc4py.init(sys.argv)
+import pandas as pd
 import matplotlib.pyplot as plt
 from cases.base_problem import FreeSlip
 import numpy as np
@@ -11,7 +12,7 @@ from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
 from viewer.plotter import Plotter
 import csv
-import pandas as pd
+
 
 class CustomFuncCase(FreeSlip):
     # @profile
