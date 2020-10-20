@@ -1,27 +1,30 @@
 ---
 name: Cavity
+save-dir: cativy100time25elem3ngl
 
 material-properties:
   rho: 0.5
-  mu: 0.01
+  mu: 0.005
 
 domain:
-  dim: 2 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [3,3]
+  dim: 3 # no es necesario dim = 2, es implicito con nelem + lower + upper
+  nelem: [25,25,25]
   ngl: 3
-  lower: [0,0]
-  upper: [1,1]
+  lower: [0,0,0]
+  upper: [1,1,1]
   
 time-solver:
-  max-steps: 150
+  max-steps: 500
   start-time: 0.001
-  end-time: 1
+  end-time: 100
 
 boundary-conditions:
-  # no-slip:
-  #   up: [1,0]
-  free-slip:
-    left: [ 'flatPlateX' , 'flatPlateY' ]
-    right: [ 'flatPlateX' , 'flatPlateY' ]
-    # down: [ 'flatPlateX' , 'flatPlateY' ]
-    up: [ 'flatPlateX' , 'flatPlateY' ]
+   no-slip:
+      front: [1,0,0]
+  # free-slip:
+  #   left: [ 'flatPlateX' , 'flatPlateY' ]
+  #   right: [ 'flatPlateX' , 'flatPlateY' ]
+  #   # down: [ 'flatPlateX' , 'flatPlateY' ]
+  #   up: [ 'flatPlateX' , 'flatPlateY' ]
+  #   front: [ 'flatPlateX' , 'flatPlateY' ]
+  #   back: [ 'flatPlateX' , 'flatPlateY' ]

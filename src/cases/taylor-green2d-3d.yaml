@@ -1,6 +1,6 @@
 ---
 name: Taylor Green 2d3d
-save-dir: tg-2d3d
+save-dir: tg-2d3d-nel20ngl3
 
 material-properties:
   rho: 0.5
@@ -8,12 +8,12 @@ material-properties:
 
 domain:
   dim: 5 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [9,9,9]
+  nelem: [20,20,20]
   ngl: 3
   lower: [0,0,0]
   upper: [1,1,1]
 
 time-solver:
-  max-steps: 201
+  max-steps: 1000
   start-time: 0
-  end-time: 300
+  end-time: 5

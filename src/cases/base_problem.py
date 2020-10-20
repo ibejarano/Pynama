@@ -14,6 +14,7 @@ from math import sqrt
 import logging
 import numpy as np
 
+
 class BaseProblem(object):
     def __init__(self, config,**kwargs):
         """
@@ -160,18 +161,26 @@ class BaseProblem(object):
         self.solveKLE(time, self.vort)
         incr = ts.getTimeStep()
         # self.viewer.newSaveVec([self.vel, self.vort], step)
-        exactVel, exactVort = self.generateExactVecs(time)
-        errorVel = exactVel - self.vel
-        errorVort = exactVort - self.vort
-        self.saveError2.append((errorVel).norm(norm_type=2))
-        self.saveError8.append((errorVel).norm(norm_type=3))
-        self.saveTime.append(time)
-        self.saveStep.append(step)
-        errorVort.setName("ErrorVort")
-        errorVel.setName("ErrorVel")
-        exactVort.setName("ExactVort")
-        exactVel.setName("ExactVel")
-        self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort,errorVel,errorVort)
+        if time<=5:
+            exactVel, exactVort = self.generateExactVecs(time)
+            errorVel = exactVel - self.vel
+            print(errorVel)
+            self.saveError8.append((errorVel).norm(norm_type=3))
+            self.saveTime.append(time)
+        else:
+            if step%10 == 0: 
+                exactVel, exactVort = self.generateExactVecs(time)
+                errorVel = exactVel - self.vel
+                #errorVort = exactVort - self.vort
+                #self.saveError2.append((errorVel).norm(norm_type=2))
+                self.saveError8.append((errorVel).norm(norm_type=3))
+                self.saveTime.append(time)
+        # self.saveStep.append(step)
+        # errorVort.setName("ErrorVort")
+        # errorVel.setName("ErrorVel")
+        # exactVort.setName("ExactVort")
+        # exactVel.setName("ExactVel")
+        self.viewer.saveData(step, time, self.vel, self.vort)#, exactVel, exactVort,errorVel,errorVort)
         self.viewer.writeXmf(self.caseName)        
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
@@ -271,6 +280,8 @@ class BaseProblem(object):
     def setUpEmptyMats(self):
         self.mat = None
         self.operator = None
+
+
 
 class NoSlipFreeSlip(BaseProblem):
     def setUpEmptyMats(self):

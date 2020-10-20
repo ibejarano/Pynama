@@ -159,17 +159,21 @@ class DMPlexDom(PETSc.DMPlex):
         indicesNS = self.indicesManager.getNoSlipNodes()
         return indicesNS
 
-    def setBoundaryCondition(self, freeSlipFaces: list, noSlipFaces: list):
+    def setBoundaryCondition(self, freeSlipFaces=[], noSlipFaces=[]):
         # 1. pasarle parametros no slip y free slip
         # el parametro tiene que ser el nombre de la cara correspondiente
         # 2. agregar setNSIndices() al indicesManager
         # allBorderNodes = self.getBordersNodes()
-        for fsFace in freeSlipFaces:
-            faceNodes = self.getBorderNodes(fsFace)
-            self.indicesManager.setDirichletNodes(set(faceNodes))
-        for nsFace in noSlipFaces:
-            faceNodes = self.getBorderNodes(nsFace)
-            self.indicesManager.setNoSlipNodes(set(faceNodes))
+        if (not freeSlipFaces) and (not noSlipFaces):
+            allBorderNodes = self.getBordersNodes()
+            self.indicesManager.setDirichletNodes(allBorderNodes)
+        else:
+            for fsFace in freeSlipFaces:
+                faceNodes = self.getBorderNodes(fsFace)
+                self.indicesManager.setDirichletNodes(set(faceNodes))
+            for nsFace in noSlipFaces:
+                faceNodes = self.getBorderNodes(nsFace)
+                self.indicesManager.setNoSlipNodes(set(faceNodes))
 
     def getGlobalNodesFromCell(self, cell, shared):
         entities, orientations = self.getTransitiveClosure(cell)

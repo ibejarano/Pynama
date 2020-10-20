@@ -10,6 +10,8 @@ from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
 from viewer.plotter import Plotter
+import csv
+import pandas as pd
 
 class CustomFuncCase(FreeSlip):
     # @profile
@@ -58,18 +60,7 @@ class CustomFuncCase(FreeSlip):
         self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort, self.dim_w)
         self.vort.assemble()
 
-    def generateExactVecs(self, time):
-        exactVel = self.mat.K.createVecRight()
-        exactVort = self.mat.Rw.createVecRight()
-        exactVel.setName(f"{self.caseName}-exact-vel")
-        exactVort.setName(f"{self.caseName}-exact-vort")
-        allNodes = self.dom.getAllNodes()
-        # generate a new function with t=constant and coords variable
-        fvel_coords = lambda coords: self.velFunction(coords, self.nu, t=time)
-        fvort_coords = lambda coords: self.vortFunction(coords, self.nu, t=time)
-        exactVel = self.dom.applyFunctionVecToVec(allNodes, fvel_coords, exactVel, self.dim)
-        exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort, self.dim_w)
-        return exactVel, exactVort
+
 
     def applyBoundaryConditions(self, time, bcNodes):
         self.vel.set(0.0)
@@ -106,31 +97,7 @@ class CustomFuncCase(FreeSlip):
         plotter.show()
         self.viewer.writeXmf(self.caseName)
 
-    def getChartKLE(self):
-        plt.figure(figsize=(10,10))
-        plt.xlabel(r'tiempo')
-        plt.ylabel(r'$||Error_{vel}||_{2}$')
-        plt.loglog(self.saveTime, self.saveError2 ,marker='o', markersize=3 ,color="b")
-        plt.title(r'Error norma 2 de la velocidad en el tiempo')
-        plt.savefig(f"Error-Velocidad-Log")
-        plt.figure(figsize=(10,10))
-        plt.xlabel(r'tiempo')
-        plt.ylabel(r'$||Error_{vel}||_{\infty}$')
-        plt.plot(self.saveTime, self.saveError8 ,marker='o', markersize=3 ,color="b")
-        plt.title(r'Error Infinito de la velocidad en el tiempo')
-        plt.savefig(f"Error-Velocidad-NormaInfinito")
-        plt.figure(figsize=(10,10))
-        plt.xlabel(r'tiempo')
-        plt.ylabel(r'$||Error_{vel}||_{2}$')
-        plt.plot(self.saveTime, self.saveError2 ,marker='o', markersize=3 ,color="b")
-        plt.title(r'Error de la velocidad en el tiempo')
-        plt.savefig(f"Error-Velocidad-NOLog")
-        plt.figure(figsize=(10,10))
-        plt.xlabel(r'step')
-        plt.ylabel(r'tiempo')
-        plt.plot(self.saveStep, self.saveTime ,marker='o', markersize=3 ,color="b")
-        plt.title(r'Tiempo vs pasos')
-        plt.savefig(f"tiempos-pasos")
+
 
     def generateExactOperVecs(self,time):
         exactVel = self.mat.K.createVecRight()
@@ -177,6 +144,49 @@ class CustomFuncCase(FreeSlip):
         errorCurl = sqrt((err * err ).dot(self.operator.weigCurl))
         self.logger.info("Operatores Tests")
         return errorConv, errorDiff, errorCurl
+
+    def generateExactVecs(self, time):
+        exactVel = self.mat.K.createVecRight()
+        exactVort = self.mat.Rw.createVecRight()
+        exactVel.setName(f"{self.caseName}-exact-vel")
+        exactVort.setName(f"{self.caseName}-exact-vort")
+        allNodes = self.dom.getAllNodes()
+        # generate a new function with t=constant and coords variable
+        fvel_coords = lambda coords: self.velFunction(coords, self.nu, t=time)
+        fvort_coords = lambda coords: self.vortFunction(coords, self.nu, t=time)
+        exactVel = self.dom.applyFunctionVecToVec(allNodes, fvel_coords, exactVel, self.dim)
+        exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort, self.dim_w)
+        return exactVel, exactVort
+
+    def getChartKLE(self):
+        plt.figure(figsize=(10,10))
+        plt.xlabel(r'tiempo')
+        plt.ylabel(r'$||Error_{vel}||_{2}$')
+        plt.loglog(self.saveTime, self.saveError2 ,marker='o', markersize=3 ,color="b")
+        plt.title(r'Error norma 2 de la velocidad en el tiempo')
+        plt.savefig(f"Error-Velocidad-Log")
+        plt.figure(figsize=(10,10))
+        plt.xlabel(r'tiempo')
+        plt.ylabel(r'$||Error_{vel}||_{\infty}$')
+        plt.plot(self.saveTime, self.saveError8 ,marker='o', markersize=3 ,color="b")
+        plt.title(r'Error Infinito de la velocidad en el tiempo')
+        plt.savefig(f"Error-Velocidad-NormaInfinito")
+        plt.figure(figsize=(10,10))
+        plt.xlabel(r'tiempo')
+        plt.ylabel(r'$||Error_{vel}||_{2}$')
+        plt.plot(self.saveTime, self.saveError2 ,marker='o', markersize=3 ,color="b")
+        plt.title(r'Error de la velocidad en el tiempo')
+        plt.savefig(f"Error-Velocidad-NOLog")
+        plt.figure(figsize=(10,10))
+        plt.xlabel(r'step')
+        plt.ylabel(r'tiempo')
+        plt.plot(self.saveStep, self.saveTime ,marker='o', markersize=3 ,color="b")
+        plt.title(r'Tiempo vs pasos')
+        plt.savefig(f"tiempos-pasos")
+        with open ("large.csv","a") as f:#save csv Error8 and time
+             file_csv=csv.writer(f)
+             file_csv.writerows([self.saveTime,self.saveError8])
+
 
     def getConvective(self,exactVel, exactConv):
         convective = exactConv.copy()

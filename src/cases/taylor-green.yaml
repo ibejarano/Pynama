@@ -1,6 +1,6 @@
 ---
 name: Taylor Green
-save-dir: tg-test
+save-dir: tg-blablabla
 
 material-properties:
   rho: 0.5
@@ -8,12 +8,12 @@ material-properties:
 
 domain:
   dim: 5 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [5,5,5]
-  ngl: 3
+  nelem: [1,1,1]
+  ngl: 4
   lower: [0,0,0]
   upper: [1,1,1]
 
 time-solver:
-  max-steps: 200
+  max-steps: 3
   start-time: 0
   end-time: 5
