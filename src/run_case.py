@@ -37,7 +37,7 @@ def generateChart(config, viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0
     viscousTime = [0.2,0.4,0.6,0.8,0.9]
     hAx = list()
     vAx = list()
-    totalNgl = 21
+    totalNgl = 11
     plt.figure(figsize=(10,10))
     plt.legend()
     plt.xlabel(r'$N*$')
@@ -45,7 +45,7 @@ def generateChart(config, viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0
     plt.grid(True)
     plt.tight_layout(pad=3)
     for i, ngl in enumerate(range(3,totalNgl,1)):
-        fem = FemProblem(config, ngl=ngl)
+        fem = FemProblem(config, ngl=ngl, nelem=[2,2,2])
         fem.setUp()
         fem.setUpSolver()
         vAx.append(fem.getKLEError(viscousTimes=viscousTime))
@@ -61,7 +61,7 @@ def generateChart(config, viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0
     vAx = list()
     viscousTime = [viscousTime[0], viscousTime[-1]]
     for i, ngl in enumerate(range(3,totalNgl,1)):
-        fem = FemProblem(config, ngl=3, nelem=[ngl-1, ngl-1])
+        fem = FemProblem(config, ngl=3, nelem=[ngl-1, ngl-1, ngl-1])
         fem.setUp()
         fem.setUpSolver()
         vAx.append(fem.getKLEError(viscousTimes=viscousTime))
@@ -73,7 +73,7 @@ def generateChart(config, viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0
     for i in range(vAxArray.shape[1]):
         plt.loglog(hAx, vAxArray[:,i],'b'+'-'*(i+1), basey=10,label=fr"$\tau = {viscousTime[i]} - Q_2 $", linewidth =1.25)
     plt.legend()
-    plt.savefig("test-kle.png")
+    plt.savefig("test-kle-n.png")
     # plt.show()
 
 def generateChartOperators(config):
