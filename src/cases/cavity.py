@@ -82,23 +82,24 @@ class Cavity(NoSlipFreeSlip):
             dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
             self.vel.setValues(dofVelToSet, np.repeat(vel, len(nodes)))
         # set vel to zero in corner nodes
-        #self.vel.setValues(self.cornerDofs, np.repeat(0, len(self.cornerDofs)) )
+        self.vel.setValues(self.cornerDofs, np.repeat(0, len(self.cornerDofs)) )
         self.vel.assemble()
 
     def applyBoundaryConditionsFS(self):
         wallsWithVel = self.nsWalls.getWallsWithVelocity()
         staticWalls = self.nsWalls.getStaticWalls()
+
         for wallName in wallsWithVel:
             nodes = self.dom.getBorderNodes(wallName)
             vel, velDofs = self.nsWalls.getWallVelocity(wallName)
             dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
             self.velFS.setValues(dofVelToSet, np.repeat(vel, len(nodes)))
-
         for staticWall in staticWalls:
             nodes = self.dom.getBorderNodes(staticWall)
             velDofs = self.nsWalls.getStaticDofsByName(staticWall)
             dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
             self.velFS.setValues(dofVelToSet, np.repeat(0, len(nodes)*len(velDofs)))
+
         # set velfs to zero in corner nodes
         #self.velFS.setValues(self.cornerDofs, np.repeat(0, len(self.cornerDofs)) )
         self.velFS.assemble()
@@ -144,6 +145,10 @@ class Cavity(NoSlipFreeSlip):
         with open ("data3dflateplate20.csv","a") as f:#save csv Error8 and time
              file_csv=csv.writer(f)
              file_csv.writerows([self.saveTime,self.saveError8])
+
+
+
+
 
     @staticmethod
     def flatplateVel(coord, nu , t=None):
