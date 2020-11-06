@@ -191,7 +191,7 @@ class CustomFuncCase(FreeSlip):
 
     def getConvective(self,exactVel, exactConv):
         convective = exactConv.copy()
-        self.computeVtensV()
+        self.computeVtensV(velocity=exactVel)
         aux=self.vel.copy()
         self.operator.DivSrT.mult(self._VtensV, aux)
         self.operator.Curl.mult(aux,convective)
@@ -301,7 +301,7 @@ class CustomFuncCase(FreeSlip):
         x_ = 2 * pi * coord[0] / Lx
         y_ = 2 * pi * coord[1] / Ly
         z_ = 2 * pi * coord[2] / Lz
-        expon = Uref * nu* exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2+ 1.0 / Lz ** 2))
+        expon = Uref *nu * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2+ 1.0 / Lz ** 2))
         diff = [(2*pi)**3*expon*sin(x_)*cos(y_)*cos(z_)*(2*(Lz/(Lx*Lx*Ly)+Lz/(Ly*Ly*Ly)+Lz/(Lz*Lz*Ly))+Ly/(Lx*Lx*Lz)+Ly/(Ly*Ly*Lz)+Ly/(Lz*Lz*Lz)),\
             -(2*pi)**3*expon*cos(x_)*sin(y_)*cos(z_)*(2*(Lz/(Lx*Lx*Lx)+Lz/(Ly*Ly*Lx)+Lz/(Lz*Lz*Lx))+Lx/(Lx*Lx*Lz)+Lx/(Ly*Ly*Lz)+Lx/(Lz*Lz*Lz)),\
              (2*pi)**3*expon*cos(x_)*cos(y_)*sin(z_)*(Lx/(Lx*Lx*Ly)+Lx/(Ly*Ly*Ly)+Lx/(Lz*Lz*Ly)-Ly/(Lx*Lx*Lx)-Ly/(Ly*Ly*Lx)-Ly/(Lz*Lz*Lx))]

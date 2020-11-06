@@ -13,6 +13,7 @@ from common.timer import Timer
 from math import sqrt
 import logging
 import numpy as np
+import csv
 
 
 class BaseProblem(object):
@@ -149,7 +150,10 @@ class BaseProblem(object):
         step = ts.step_number
         incr = ts.getTimeStep()
         self.solveKLE(time, self.vort)
-        self.viewer.saveData(step, time, self.vel, self.vort)
+        #exactVel, exactVort = self.generateExactVecs(time)
+        #exactVort.setName("ExactVort")
+        #exactVel.setName("ExactVel")
+        self.viewer.saveData(step, time, self.vel, self.vort)#,exactVel, exactVort)
         # self.viewer.newSaveVec([self.vel, self.vort], step)
         self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
@@ -224,9 +228,12 @@ class BaseProblem(object):
 
         self.operator.Curl.mult(rhs, f)
 
-    def computeVtensV(self):
+    def computeVtensV(self,velocity=None):
         sK, eK = self.mat.K.getOwnershipRange()
-        velArr = self.vel.getArray()
+        if not velocity:
+            velArr = self.vel.getArray()
+        else:
+            velArr = velocity.getArray()
         ind = np.arange(int(sK*self.dim_s/self.dim), int(eK*self.dim_s/self.dim), dtype=np.int32)
         v_x = velArr[::self.dim]
         v_y = velArr[1::self.dim]
@@ -281,7 +288,10 @@ class BaseProblem(object):
         self.mat = None
         self.operator = None
 
-
+    def getErrorCsv(self,file):
+        with open (file,"a") as f:#save csv Error8 and time
+             file_csv=csv.writer(f)
+             file_csv.writerows([self.saveTime,self.saveError8])
 
 class NoSlipFreeSlip(BaseProblem):
     def setUpEmptyMats(self):
@@ -350,7 +360,7 @@ class NoSlipFreeSlip(BaseProblem):
                     localNodes = [ nodes.index(node) for node in globBorderNodes ]
                     normalDof = normals[i]
                     # print(f"{[self.comm.rank]} {nodes = } {globBorderNodes = } {normals = } {localNodes = } ")
-                    dofSetFSNS.update( [locNode * self.dim + normalDof for locNode in localNodes ]  )
+                    dofSetFSNS.update( [locNode * self.dim + normalDof for locNode in localNodes ]  ) 
                     dofFreeFSSetNS.update( [locNode * self.dim + dof for locNode in localNodes for dof in tangentialDofs] )
                 dofFreeFSSetNS -= dofSetFSNS
 
@@ -471,7 +481,7 @@ class FreeSlip(BaseProblem):
         except:
             viscousTimes = np.arange(startTime, endTime, (endTime - startTime)/steps)
 
-        times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
+        times = viscousTimes #[(tau**2)/(4*self.nu) for tau in viscousTimes]
         boundaryNodes = self.getBoundaryNodes()
         errors = list()
         for time in times:
