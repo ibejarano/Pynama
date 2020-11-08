@@ -150,10 +150,12 @@ class BaseProblem(object):
         step = ts.step_number
         incr = ts.getTimeStep()
         self.solveKLE(time, self.vort)
-        #exactVel, exactVort = self.generateExactVecs(time)
-        #exactVort.setName("ExactVort")
-        #exactVel.setName("ExactVel")
-        self.viewer.saveData(step, time, self.vel, self.vort)#,exactVel, exactVort)
+        exactVel, exactVort = self.generateExactVecs(time)
+        errorVel = exactVel - self.vel
+        errorVel.setName("ErrorVel")
+        exactVort.setName("ExactVort")
+        exactVel.setName("ExactVel")
+        self.viewer.saveData(step, time, self.vel, self.vort,exactVel, exactVort, errorVel)
         # self.viewer.newSaveVec([self.vel, self.vort], step)
         self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
