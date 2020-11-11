@@ -10,7 +10,7 @@ import csv
 OptDB = petsc4py.PETSc.Options()
 case = OptDB.getString('case', False)
 
-customFunctions = ['taylor-green','taylor-green2d-3d', 'senoidal', 'flat-plate']
+customFunctions = ['taylor-green','taylor-green2d-3d', 'taylor-green3dN', 'senoidal', 'flat-plate']
 
 if case in customFunctions:
     from cases.custom_func import CustomFuncCase as FemProblem

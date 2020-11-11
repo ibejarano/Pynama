@@ -34,6 +34,13 @@ class CustomFuncCase(FreeSlip):
                 self.vortFunction = self.taylorGreenVort_3D
                 self.diffusiveFunction = self.taylorGreen3dDiffusive
                 self.convectiveFunction = self.taylorGreen3dConvective
+
+        elif self.case == 'taylor-green3dN':
+                self.velFunction = self.taylorGreenVel_3DN
+                self.vortFunction = self.taylorGreenVort_3DN
+                self.diffusiveFunction = self.taylorGreen3DNDiffusive
+                self.convectiveFunction = self.taylorGreen3DNConvective
+
         elif self.case == 'taylor-green2d-3d':
             self.velFunction = self.taylorGreenVel_2D_3D
             self.vortFunction = self.taylorGreenVort_2D_3D
@@ -305,6 +312,62 @@ class CustomFuncCase(FreeSlip):
         diff = [(2*pi)**3*expon*sin(x_)*cos(y_)*cos(z_)*(2*(Lz/(Lx*Lx*Ly)+Lz/(Ly*Ly*Ly)+Lz/(Lz*Lz*Ly))+Ly/(Lx*Lx*Lz)+Ly/(Ly*Ly*Lz)+Ly/(Lz*Lz*Lz)),\
             -(2*pi)**3*expon*cos(x_)*sin(y_)*cos(z_)*(2*(Lz/(Lx*Lx*Lx)+Lz/(Ly*Ly*Lx)+Lz/(Lz*Lz*Lx))+Lx/(Lx*Lx*Lz)+Lx/(Ly*Ly*Lz)+Lx/(Lz*Lz*Lz)),\
              (2*pi)**3*expon*cos(x_)*cos(y_)*sin(z_)*(Lx/(Lx*Lx*Ly)+Lx/(Ly*Ly*Ly)+Lx/(Lz*Lz*Ly)-Ly/(Lx*Lx*Lx)-Ly/(Ly*Ly*Lx)-Ly/(Lz*Lz*Lx))]
+        return diff
+
+    @staticmethod
+    def taylorGreenVel_3DN(coord, nu ,t=None):
+        Lx= 1
+        Ly= 1
+        Lz = 1
+        Uref = 1
+        x_ = 2 * pi * coord[0] / Lx
+        y_ = 2 * pi * coord[1] / Ly
+        z_ = 2 * pi * coord[2] / Lz
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2+ 1.0 / Lz ** 2))
+        vel = [cos(x_) * sin(y_) *sin(z_)*Lx* expon, -sin(x_) * cos(y_) *sin(z_)*Ly *expon,0]
+        return vel
+
+    @staticmethod
+    def taylorGreenVort_3DN(coord, nu,t=None):
+        Lx= 1
+        Ly= 1
+        Lz=1
+        Uref = 1
+        x_ = 2 * pi * coord[0] / Lx
+        y_ = 2 * pi * coord[1] / Ly
+        z_ = 2 * pi * coord[2] / Lz
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2+ 1.0 / Lz ** 2))
+        vort = [2 * pi * (Ly / Lz ) * sin(x_) * cos(y_) *cos(z_)* expon,2 * pi * (Lx / Lz ) * cos(x_) * sin(y_) *cos(z_)* expon,- 2 * pi * (Ly / Lx + Lx / Ly) * cos(x_) * cos(y_) *sin(z_)* expon]
+        return vort
+
+    @staticmethod
+    def taylorGreen3DNConvective(coord, nu, t=None):
+        Lx= 1
+        Ly= 1
+        Lz=1
+        Uref = 1
+        x_ = 2 * pi * coord[0] / Lx
+        y_ = 2 * pi * coord[1] / Ly
+        z_ = 2 * pi * coord[2] / Lz
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2+ 1.0 / Lz ** 2))
+        conv = [2*(Ly/Lz)*( 2 * pi *expon)**2*sin(y_)*cos(y_)*sin(z_)*cos(z_), \
+                 -2*(Lx/Lz)*( 2 * pi *expon)**2*sin(x_)*cos(x_)*sin(z_)*cos(z_),\
+                0]
+        return conv
+
+    @staticmethod
+    def taylorGreen3DNDiffusive(coord, nu, t=None):
+        Lx= 1
+        Ly= 1
+        Lz=1
+        Uref = 1
+        x_ = 2 * pi * coord[0] / Lx
+        y_ = 2 * pi * coord[1] / Ly
+        z_ = 2 * pi * coord[2] / Lz
+        expon = Uref *nu * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2+ 1.0 / Lz ** 2))
+        diff = [-(2*pi)**3*expon*sin(x_)*cos(y_)*cos(z_)*(Ly/(Lx*Lx*Lz)+Ly/(Ly*Ly*Lz)+Ly/(Lz*Lz*Lz)),\
+            -(2*pi)**3*expon*cos(x_)*sin(y_)*cos(z_)*(Lx/(Lx*Lx*Lz)+Lx/(Ly*Ly*Lz)+Lx/(Lz*Lz*Lz)),\
+             (2*pi)**3*expon*cos(x_)*cos(y_)*sin(z_)*(Lx/(Lx*Lx*Ly)+Lx/(Ly*Ly*Ly)+Lx/(Lz*Lz*Ly)+Ly/(Lx*Lx*Lx)+Ly/(Ly*Ly*Lx)+Ly/(Lz*Lz*Lx))]
         return diff
 
     @staticmethod
