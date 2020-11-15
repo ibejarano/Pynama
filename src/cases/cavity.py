@@ -166,9 +166,9 @@ class Cavity(NoSlipFreeSlip):
     @staticmethod
     def flatplateVel3d(coord, nu , t=None):
         U_ref = 1
-        vx = U_ref*sqrt(2)/2 * (1-erf(coord[1]/ sqrt(4*nu*t)))
+        vx = U_ref*sqrt(2)/2 * (erf(coord[1]/ sqrt(4*nu*t)))
         vy = 0
-        vz = U_ref *sqrt(2)/2*(1- erf(coord[1]/ sqrt(4*nu*t)))
+        vz = U_ref *sqrt(2)/2*( erf(coord[1]/ sqrt(4*nu*t)))
         return [vx, vy, vz]
 
     @staticmethod

@@ -1,6 +1,6 @@
 ---
 name: Cavity
-save-dir: FlatPlateDiagonalNelem10ngl3Forchart
+save-dir: FlatPlateDiagonal6to10125
 
 material-properties:
   rho: 0.5
@@ -8,15 +8,15 @@ material-properties:
 
 domain:
   dim: 3 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [10,10,10]
+  nelem: [6,6,6]
   ngl: 3
   lower: [0,0,0]
   upper: [1,1,1]
   
 time-solver:
-  max-steps: 1000
+  max-steps: 10000
   start-time: 0.001
-  end-time: 10
+  end-time: 10.125
 
 boundary-conditions:
   #  no-slip:
@@ -24,7 +24,7 @@ boundary-conditions:
   free-slip:
     left: [ 'flatPlateX' , 'flatPlateY' ]
     right: [ 'flatPlateX' , 'flatPlateY' ]
-    down: [ 'flatPlateX' , 'flatPlateY' ]
-    #up: [ 'flatPlateX' , 'flatPlateY' ]
+    #down: [ 'flatPlateX' , 'flatPlateY' ]
+    up: [ 'flatPlateX' , 'flatPlateY' ]
     front: [ 'flatPlateX' , 'flatPlateY' ]
     back: [ 'flatPlateX' , 'flatPlateY' ]
