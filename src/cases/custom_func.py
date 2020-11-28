@@ -44,6 +44,12 @@ class CustomFuncCase(FreeSlip):
         elif self.case == 'taylor-green2d-3d':
             self.velFunction = self.taylorGreenVel_2D_3D
             self.vortFunction = self.taylorGreenVort_2D_3D
+        elif self.case == 'taylor-green2d-3d-nx':
+            self.velFunction = self.taylorGreenVel_2D_3D_Nx
+            self.vortFunction = self.taylorGreenVort_2D_3D_Nx
+        elif self.case == 'taylor-green2d-3d-ny':
+            self.velFunction = self.taylorGreenVel_2D_3D_Ny
+            self.vortFunction = self.taylorGreenVort_2D_3D_Ny
         elif self.case == 'senoidal':
             if self.dim == 2:
                 self.velFunction = self.senoidalVel_2D
@@ -64,6 +70,9 @@ class CustomFuncCase(FreeSlip):
 
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()
+        #fvel_coords = lambda coords: self.velFunction(coords, self.nu, t=startTime)
+        #vel = self.dom.applyFunctionVecToVec(allNodes, fvel_coords, self.vel, self.dim)
+        #self.vort = self.operator.Curl * vel
         fvort_coords = lambda coords: self.vortFunction(coords, self.nu,t=startTime)
         self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort, self.dim_w)
         self.vort.assemble()
@@ -249,6 +258,18 @@ class CustomFuncCase(FreeSlip):
         vel = [cos(x_) * sin(y_) *sin(z_)*Lx* expon, sin(x_) * cos(y_) *sin(z_)*Ly *expon,-2*sin(x_)* sin(y_) * cos(z_) *Lz* expon]
         return vel
 
+
+    @staticmethod
+    def taylorGreenVel_2D_3D(coord, nu,t=None):
+        Lx= 1
+        Ly= 1
+        Uref = 1
+        x_ = 2 * pi * coord[0] / Lx
+        y_ = 2 * pi * coord[1] / Ly
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
+        vel = [cos(x_) * sin(y_) * expon, -sin(x_) * cos(y_) * expon]
+        return [vel[0], vel[1],0]
+
     @staticmethod
     def taylorGreenVort_2D_3D(coord, nu,t=None):
         Lx= 1
@@ -260,16 +281,52 @@ class CustomFuncCase(FreeSlip):
         vort = -2 * pi * (1.0 / Lx + 1.0 / Ly) * cos(x_) * cos(y_) * expon
         return [0,0,vort]
     
+
+
+
     @staticmethod
-    def taylorGreenVel_2D_3D(coord, nu,t=None):
+    def taylorGreenVel_2D_3D_Nx(coord, nu,t=None):
+        Lx= 1
+        Ly= 1
+        Uref = 1
+        y_ = 2 * pi * coord[1] / Lx
+        z_ = 2 * pi * coord[2] / Ly
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
+        vel = [cos(y_) * sin(z_) * expon, -sin(y_) * cos(z_) * expon]
+        return [0,vel[0], vel[1]]
+
+    @staticmethod
+    def taylorGreenVort_2D_3D_Nx(coord, nu,t=None):
+        Lx= 1
+        Ly= 1
+        Uref = 1
+        y_ = 2 * pi * coord[1] / Lx
+        z_ = 2 * pi * coord[2] / Ly
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
+        vort = -2 * pi * (1.0 / Lx + 1.0 / Ly) * cos(y_) * cos(z_) * expon
+        return [vort,0,0]
+
+    @staticmethod
+    def taylorGreenVel_2D_3D_Ny(coord, nu,t=None):
         Lx= 1
         Ly= 1
         Uref = 1
         x_ = 2 * pi * coord[0] / Lx
-        y_ = 2 * pi * coord[1] / Ly
+        z_ = 2 * pi * coord[1] / Ly
         expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
-        vel = [cos(x_) * sin(y_) * expon, -sin(x_) * cos(y_) * expon]
-        return [vel[0], vel[1],0]
+        vel = [cos(x_) * sin(z_) * expon, -sin(x_) * cos(z_) * expon]
+        return [vel[0],0, vel[1]]
+
+    @staticmethod
+    def taylorGreenVort_2D_3D_Ny(coord, nu,t=None):
+        Lx= 1
+        Ly= 1
+        Uref = 1
+        x_ = 2 * pi * coord[0] / Lx
+        z_ = 2 * pi * coord[2] / Ly
+        expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
+        vort = 2 * pi * (1.0 / Lx + 1.0 / Ly) * cos(x_) * cos(z_) * expon
+        return [0,vort,0]
 
     @staticmethod
     def taylorGreenVort_3D(coord, nu ,t=None):

@@ -10,7 +10,7 @@ import csv
 OptDB = petsc4py.PETSc.Options()
 case = OptDB.getString('case', False)
 
-customFunctions = ['taylor-green','taylor-green2d-3d', 'taylor-green3dN', 'senoidal', 'flat-plate']
+customFunctions = ['taylor-green','taylor-green2d-3d','taylor-green2d-3d-nx','taylor-green2d-3d-ny', 'taylor-green3dN', 'senoidal', 'flat-plate']
 
 if case in customFunctions:
     from cases.custom_func import CustomFuncCase as FemProblem
@@ -151,14 +151,14 @@ def generateChartKLE(config):
     fem.getChartKLE()
 
 def generateChartKLEs(config):
-    nelems=[6,8,10,20]
+    nelems=[6,8]#,10]#,20]
     ngl=3
     labels=[]
     dim = len(config.get("domain").get("nelem"))
-    file="velerror.csv"
+    file="velerror-tg3dN-prueba.csv"
     for i in nelems:
         nelem=[i]*dim
-        labels.append(r"$n_{elem}$="+str(nelem)+"-$N_{GL}$="+str(ngl))
+        labels.append(r"$n_{elem}$="+str(i)+"-$N_{GL}$="+str(ngl))
         print(labels)
         fem = FemProblem(config,ngl=3, nelem=nelem,chart=True)
         fem.setUp()
@@ -191,7 +191,7 @@ def generateChartKLEs(config):
     #plt.xlim(-0.001,5)
     plt.legend()    
     plt.title(r'Máximo error de la velocidad en el tiempo')
-    plt.savefig(f"Error-Velocidad-mallas-{case}-{nelems[0]}-{nelems[-1]}-{ngl}")
+    plt.savefig(f"Error-Velocidad-mallas-curl-{case}-{nelems[0]}-{nelems[-1]}-{ngl}")
     plt.figure(figsize=(20,10))
     plt.rcParams.update({'font.size': 22})
     plt.xlabel(r'tiempo')
@@ -209,10 +209,10 @@ def generateChartKLEs(config):
                 error=[float(num)for num in line if num !="" ]
                 plt.plot(time, error ,marker=mark[n], markersize=3 ,color=colors[n],label=labels[n])
                 n+=1
-    plt.xlim(-0.001,4)
+    plt.xlim(-0.01,4)
     plt.legend()    
     plt.title(r'Máximo error de la velocidad en el tiempo')
-    plt.savefig(f"Error-Velocidad-mallas-{case}-{nelems[0]}-{nelems[-1]}-ngl-{ngl}-tiempo4")
+    plt.savefig(f"Error-Velocidad-mallas-curl-{case}-{nelems[0]}-{nelems[-1]}-ngl-{ngl}-tiempo4")
     
         
 
@@ -247,6 +247,7 @@ def main():
         generateChart(yamlData)
     elif runTests == 'operators':
         generateChartOperators(yamlData)
+        #coment weigCurl.destroy()!
     elif runTests == 'chartkle':
         generateChartKLE(yamlData)
     elif runTests == 'chartkles':
