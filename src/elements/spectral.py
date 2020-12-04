@@ -191,18 +191,26 @@ class Spectral(Element):
 
             for i,ind in enumerate (self.indCurl):
                 B_curl[ind[0],ind[1]::self.dim]= (-1)**(i)*Hxy[ind[2]]
-                
+            #B_srt ONLY FOR INCOMPRESSIBLE
             for x in range(self.dim):
                 Hdiv[x, x::self.dim] = H
+                B_srt[2*x,x::self.dim]=2*Hxy[x]
                 for i in range(self.dim):
                     B_div[i,self.indBdiv[x][i]::self.dim_s]= Hxy[x]
-                    B_srt[self.indBdiv[x][i],i::self.dim]=Hxy[x]
+                    if i!=x :
+                        if x+i!=2: 
+                            B_srt[x+i,i::self.dim]=Hxy[x]
+                        else:
+                            B_srt[5,i::self.dim]=Hxy[x]
 
-            B_srt[0, 1::self.dim] = -Hxy[1]
-            B_srt[2, 0::self.dim] = -Hxy[0]
-            for i in range(self.dim_s-4):
-                B_srt[4, i::self.dim] = -Hxy[i]
-                B_srt[2*i, 2::self.dim] = -Hxy[2]
+
+                    #B_srt[self.indBdiv[x][i],i::self.dim]=Hxy[x]
+
+            #B_srt[0, 1::self.dim] = -Hxy[1]
+            #B_srt[2, 0::self.dim] = -Hxy[0]
+            #for i in range(self.dim_s-4):
+                #B_srt[4, i::self.dim] = -Hxy[i]
+                #B_srt[2*i, 2::self.dim] = -Hxy[2]
 
             B_srt *= 0.5
             
