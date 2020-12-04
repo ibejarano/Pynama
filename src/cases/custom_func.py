@@ -312,7 +312,7 @@ class CustomFuncCase(FreeSlip):
         Ly= 1
         Uref = 1
         x_ = 2 * pi * coord[0] / Lx
-        z_ = 2 * pi * coord[1] / Ly
+        z_ = 2 * pi * coord[2] / Ly
         expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
         vel = [cos(x_) * sin(z_) * expon, -sin(x_) * cos(z_) * expon]
         return [vel[0],0, vel[1]]
