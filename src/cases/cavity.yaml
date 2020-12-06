@@ -6,22 +6,17 @@ material-properties:
   mu: 0.01
 
 domain:
-  dim: 2 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [3,3]
   ngl: 3
-  lower: [0,0]
-  upper: [1,1]
+  box-mesh:
+    nelem: [30,30]
+    lower: [0,0]
+    upper: [1,1]
   
 time-solver:
   max-steps: 150
-  start-time: 0.001
-  end-time: 1
+  start-time: 0
+  end-time: 10
 
 boundary-conditions:
-  # no-slip:
-  #   up: [1,0]
-  free-slip:
-    left: [ 'flatPlateX' , 'flatPlateY' ]
-    right: [ 'flatPlateX' , 'flatPlateY' ]
-    # down: [ 'flatPlateX' , 'flatPlateY' ]
-    up: [ 'flatPlateX' , 'flatPlateY' ]
+  no-slip:
+    up: [1 ,0 ]

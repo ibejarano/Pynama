@@ -31,6 +31,7 @@ class BaseProblem(object):
         self.caseName = self.config.get("name")
         self.readDomainData(kwargs)
         self.readMaterialData()
+        self.opts = kwargs
         if "chart" in kwargs:
             self.setUpTimeSolverTest()
         elif 'time-solver' in self.config:
@@ -48,7 +49,25 @@ class BaseProblem(object):
         self.buildOperators()
 
     def setUpDomain(self):
-        self.dom = DMPlexDom(self.lower, self.upper, self.nelem)
+        domain = self.config.get("domain")
+        self.dom = None
+        self.logger.info("Setting dom with box Mesh")
+        if "box-mesh" in domain:
+            meshData = domain.get('box-mesh')
+            self.dom = DMPlexDom(boxMesh=meshData, **self.opts)
+        elif "gmsh-file" in domain:
+            meshData = domain.get('gmsh-file')
+            self.dom = DMPlexDom(fileName=meshData)
+
+        self.dim = self.dom.getDimension()
+        self.dim_w = 1 if self.dim == 2 else 3
+        self.dim_s = 3 if self.dim == 2 else 6
+
+        if "ngl" in self.opts:
+            self.ngl = self.opts['ngl']
+        else:
+            self.ngl = domain['ngl']
+
         self.dom.setFemIndexing(self.ngl)
         if not self.comm.rank:
             self.logger.info(f"DMPlex dom created")
@@ -74,13 +93,17 @@ class BaseProblem(object):
         domain = self.config.get("domain")
         if "nelem" in kwargs:
             self.nelem = kwargs['nelem']
+        elif "box-mesh" in domain:
+            self.nelem = domain['box-mesh']['nelem']
+            self.lower = domain['box-mesh']['lower']
+            self.upper = domain['box-mesh']['upper']
+
         else:
-            self.nelem = domain['nelem']
+            raise Exception("No Gmsh Implemented")
+
         self.dim = len(self.nelem)
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
-        self.lower = domain['lower']
-        self.upper = domain['upper']
         if "ngl" in kwargs:
             self.ngl = kwargs['ngl']
         else:
@@ -93,13 +116,13 @@ class BaseProblem(object):
         if saveMesh:
             self.viewer.saveMesh(self.dom.fullCoordVec)
         if not self.comm.rank:
-            self.logger.info(f"Mesh of {self.nelem} created")
+            self.logger.info(f"Mesh created")
 
     def setUpGeneral(self):
         self.setUpDomain()
         self.setUpElement()
         self.createMesh()
-
+        self.bcNodes = self.getBoundaryNodes()
     # @profile
     def buildOperators(self):
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
@@ -132,7 +155,7 @@ class BaseProblem(object):
         self.saveStep = []
         self.saveTime = []
         self.ts.initSolver(self.evalRHS, self.convergedStepFunctionKLET)
-
+        
     def createNumProcVec(self, step):
         proc = self.vort.copy()
         proc.setName("num proc")
@@ -147,7 +170,6 @@ class BaseProblem(object):
         time = ts.time
         step = ts.step_number
         incr = ts.getTimeStep()
-        self.solveKLE(time, self.vort)
         self.viewer.saveData(step, time, self.vel, self.vort)
         # self.viewer.newSaveVec([self.vel, self.vort], step)
         self.viewer.writeXmf(self.caseName)
@@ -192,7 +214,6 @@ class BaseProblem(object):
             nodesSet |= set(nodes)
         return list(nodesSet)
 
-    #@profile
     def evalRHS(self, ts, t, Vort, f):
         """Evaluate the KLE right hand side."""
         # KLE spatial solution with vorticity given
@@ -294,7 +315,7 @@ class NoSlipFreeSlip(BaseProblem):
         self.velFS = self.vel.copy()
 
     def solveKLE(self, time, vort):
-        self.applyBoundaryConditions(time)
+        self.applyBoundaryConditions()
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
              + self.mat.Krhsfs * self.vel , self.velFS)
         self.applyBoundaryConditionsFS()
@@ -450,8 +471,7 @@ class FreeSlip(BaseProblem):
             self.logger.info(f"Empty Operators created")
 
     def solveKLE(self, time, vort):
-        boundaryNodes = self.getBoundaryNodes()
-        self.applyBoundaryConditions(time, boundaryNodes)
+        self.applyBoundaryConditions(time, self.bcNodes)
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def getKLEError(self, viscousTimes=None ,startTime=0.0, endTime=1.0, steps=10):
@@ -473,11 +493,12 @@ class FreeSlip(BaseProblem):
 
     def buildKLEMats(self):
         indices2one = set() 
-        boundaryNodes = self.mat.globalIndicesDIR 
-        cornerCoords = self.dom.getCellCornersCoords(cell=0)
-        locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
-
+        boundaryNodes = self.mat.globalIndicesDIR
+        # cornerCoords = self.dom.getCellCornersCoords(cell=0)
+        # locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
+            cornerCoords = self.dom.getCellCornersCoords(cell)
+            locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
             nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             # Build velocity and vorticity DoF indices
             indicesVel = self.dom.getVelocityIndex(nodes)
