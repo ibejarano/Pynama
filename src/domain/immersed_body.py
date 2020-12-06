@@ -2,24 +2,163 @@ import numpy as np
 from math import sin, cos , pi , sqrt, ceil, floor
 from petsc4py import PETSc
 import logging
+import yaml
+import logging
 
+class BodiesContainer:
+    types = ['circle', 'line', 'box']
+    def __init__(self, bodies):
+        self.logger = logging.getLogger("Bodies Container")
+        self.bodies= list()
+        for cfgBody in bodies:
+            center = cfgBody['center']
+            if cfgBody['type'] == 'circle':
+                body = Circle(vel=[0,0], center=center, radius=cfgBody['radius'])
+            elif cfgBody['type'] == 'line':
+                body = Line(vel=[0,0], center=center)
+            elif cfgBody['type'] =='box':
+                body = OpenBox(vel=[0,0], center=center)
+            else:
+                raise Exception("not defined")
+            
+            if cfgBody['vel'] == 'dynamic':
+                body.setIsMoving()
+            self.bodies.append(body)
+
+    def createBodies(self, h):
+        for i, body in enumerate(self.bodies):
+            body.generateDMPlex(h)
+            self.logger.info(f"Body number: {i}")
+            body.viewState()
+        self.locTotalNodes = body.getTotalNodes()
+        # exit()
+
+    def getTotalNodes(self):
+        nodes = 0
+        for body in self.bodies:
+            bodyNodes = body.getTotalNodes()
+            nodes += bodyNodes
+        return nodes
+
+    def getRegion(self):
+        radius = 0.5
+        distanceCenters = 2
+        hCeil = self.getElementLong()
+        tot = radius + distanceCenters + hCeil*4
+        return tot
+
+    def mapGlobToLocal(self, globNode):
+        numBody = 0
+        locNode = None
+        if globNode >= self.locTotalNodes:
+            globNode = globNode - self.locTotalNodes
+            numBody +=1
+        locNode = globNode
+        return locNode, numBody
+
+    def getNodeCoordinates(self, globNode):
+        # input is global
+        # necesito identificar a que cuerpo pertenece
+        numBody = 0
+        if globNode >= self.locTotalNodes:
+            globNode = globNode - self.locTotalNodes
+            numBody +=1
+        coord = self.bodies[numBody].getNodeCoordinates(globNode)
+        return coord
+
+    def getDiracs(self, dist, h):
+        return self.bodies[0].getDiracs(dist, h)
+
+    def getElementLong(self):
+        dl = self.bodies[0].getElementLong()
+        return dl
+
+    def getCenters(self):
+        centers = list()
+        for i in self.bodies:
+            centers.append(i.getCenterBody())
+        return centers
+
+    def setEulerNodes(self, glNode, eulerNodesNum):
+        locNode, numBody = self.mapGlobToLocal(glNode)
+        self.bodies[numBody].setEulerNodes(locNode, eulerNodesNum)
+
+    def computeForce(self, vec, dt):
+        offset = 0
+        forces_x = list()
+        forces_y = list()
+        vec = vec.getArray()
+        for body in self.bodies:
+            nodes = body.getTotalNodes()
+            fx_local, fy_local = body.computeForce(vec[offset*2:(nodes+offset)*2])
+            forces_x.append(float(fx_local/dt))
+            forces_y.append(float(fy_local/dt))
+            offset += nodes
+        return forces_x, forces_y
+
+    def setVelRef(self, vel):
+        for body in self.bodies:
+            body.setVelRef(vel)
+
+    def getVelRef(self, bodyNum=0):
+        return self.bodies[bodyNum].getVelRef()
+
+    def updateBodyParameters(self, t):
+        for body in self.bodies:
+            body.updateBodyParameters(t)
+
+    def viewBodies(self):
+        for i, body in enumerate(self.bodies):
+            print(f"Body num: {i}")
+            # body.view()
+            body.viewState()
+            # body.viewCoordinates()
+
+    def getVelocity(self):
+        # hacer esto para varios cuerpos
+        vels = list()
+        for body in self.bodies:
+        # body = self.bodies[0]
+            vel = body.getVelocity()
+            vels.append(vel)
+        # vel = PETSc.Vec().createNest(vels)
+        return PETSc.Vec().createNest(vels)
+
+    def updateVelocity(self):
+        for body in self.bodies:
+            body.updateVelocity()
+
+    def bodyNumbers(self):
+        return len(self.bodies)
 
 class ImmersedBody:
     def __init__(self, vel=[0,0], center=[0,0]):
         self.dirac = fourGrid
         self.__centerDisplacement = center
+        self.__startCenter = center
         self.__dl = None
         self.__vel = vel
+        self.__Uref = None
         self.logger = logging.getLogger("Body Immersed")
+        self.__history = {"times": [], "displ": [], "vel": [] } 
+        self.__isStatic = True
 
     def setVelRef(self, vel):
         self.__Uref = vel
+
+    def getVelRef(self):
+        return self.__Uref
+
+    def setIsMoving(self):
+        self.__isStatic = False
 
     def view(self):
         self.logger.info(f"Arc len: {self.__dl} | Dirac Type: {self.dirac.__name__} | Vel Fluid Reference: {self.__Uref} ")
 
     def viewState(self):
-        self.logger.info(f"Body vel: {self.__vel} | Body position {self.__centerDisplacement}")
+        self.logger.info(f"{self.__class__.__name__} vel: {self.__vel} | Body center position {self.__centerDisplacement}")
+        with open('body-history.yaml', 'w') as outfile:
+            yaml.dump(self.__history, outfile, default_flow_style=False)
     
     def setUpDimensions(self):
         self.firstNode, self.lastNode = self.__dom.getHeightStratum(1)
@@ -51,7 +190,7 @@ class ImmersedBody:
     def saveVTK(self, dir, step=None):
         viewer = PETSc.Viewer()
         if step == None:
-            viewer.createVTK('body.vtk', mode=PETSc.Viewer.Mode.WRITE)
+            viewer.createVTK('body-testing.vtk', mode=PETSc.Viewer.Mode.WRITE)
         else:
             viewer.createVTK(f"body-{step:05d}", mode=PETSc.Viewer.Mode.WRITE)
         viewer.view(self.__dom)
@@ -67,19 +206,18 @@ class ImmersedBody:
     def computeForce(self, q):
         fx = 0
         fy = 0
-        fouris = 0
         points = self.getTotalNodes()
         for poi in range(points):
-            nodes = self.__lagNodes[poi]
-            fx += q[poi*2] * nodes
-            fy += q[poi*2+1] * nodes
-            if 16 - nodes < 0:
-                print("HAY MAS NODOS!")
-            fouris += 16 - nodes
-        return fx, fy, fouris
+            fx += q[poi*2]
+            fy += q[poi*2+1]
+        return fx, fy
 
     def getVelocity(self):
         return self.__velVec
+
+    def setVelocity(self, inds, values ):
+        self.__velVec.setValues( inds , values )
+        self.__velVec.assemble()
 
     def getElementLong(self):
         return self.__dl
@@ -104,28 +242,44 @@ class ImmersedBody:
             self.coordSection, self.coordinates, node + self.firstNode
             ) + self.__centerDisplacement
     
+    def viewCoordinates(self):
+        # self.__dom.view()
+        print(self.firstNode, self.lastNode)
+        a = np.zeros(2)
+        for i in range(self.lastNode-self.firstNode):
+            coord = self.getNodeCoordinates(i)
+            # self.logger.info(f" Node: {i} | Coord {coord}")
+            a += coord
+        print("final" , a)
+
     def getRegion(self):
         return None
 
-    def getDiracs(self, dist):
+    # @profile
+    def getDiracs(self, dist, h):
         dirac = 1
         for r in dist:   
-            dirac *= self.dirac(abs(r)/self.__dl)
-            dirac /= self.__dl
+            dirac *= self.dirac(abs(r)/h)
+            dirac /= h
         return dirac
 
     def updateBodyParameters(self, t):
         # A1 : f/D = 7.5 & A=D = 1 => f=7.5 & A =1
-        velX = 0
-        displX = 0
-        f = 7.5
-        A = 1
-        alpha = 2 * pi * self.__Uref / f  
-        displY = A * sin(alpha * t)
-        velY = A * alpha * cos(alpha * t)
+        if self.__isStatic:
+            return
+        velX = 0 
+        displX = 0  + self.__startCenter[0]
+        f = 5
+        Te = f / self.__Uref
+        A = 0.3
+        displY = A * sin(2 * pi * t / Te) + self.__startCenter[1]
+        velY = 2 * pi * A * cos(2 * pi * t / Te)/Te
         self.__vel = [velX, velY]
         self.__centerDisplacement = [displX, displY]
         self.updateVelocity()
+        self.__history["times"].append(t)
+        self.__history["displ"].append(self.__centerDisplacement)
+        self.__history["vel"].append(self.__vel)
 
     def updateVelocity(self):
         points = self.getTotalNodes()
@@ -137,22 +291,71 @@ class ImmersedBody:
         return None, None ,None
 
 class Line(ImmersedBody):
-    def generateBody(self, div, **kwargs):
+    def generateBody(self, dl , longitud=2):
         # this can be improved with lower & upper
-        longitud = kwargs['long']
+        self.__region = longitud
+        div = ceil(longitud/dl) 
         coords_x = np.linspace(0, longitud, div)
-        coords_y = np.array([1]*div)
-        coords = np.array([coords_x.T, coords_y.T])
-        dl = longitud / (div-1)
+        coords_y = np.array([0]*div)
         cone= list()
+        coords = list()
         for i in range(div-1):
             localCone = [i,i+1]
             cone.append(localCone)
+            coords.append([coords_x[i], coords_y[i]])
+        coords.append([coords_x[i+1], coords_y[i+1]])
+        return coords, cone, dl
 
-        self.generateDMPlex(coords.T, cone)
-        self.setCenter(np.array([0,1]))
-        self.setCaracteristigLong(longitud)
-        self.setElementLong(dl, normals=[1])
+    def getLong(self):
+        return 1
+
+    def getRegion(self):
+        return self.__region
+
+class OpenBox(ImmersedBody):
+    def generateBody(self, dl , longitud=1):
+        # this can be improved with lower & upper
+        cone= list()
+        coords = list()
+        div = ceil(sqrt(2)/dl)
+        x1 , y1 = 0, longitud
+        x2 , y2 = -longitud, 0
+        x3 , y3 = 0, - longitud
+        x4 , y4 = longitud, 0
+        x1Tox2 =  np.linspace(x1, x2, div, endpoint=False)
+        x2Tox3 = np.linspace(x2, x3, div, endpoint=False)
+        x3Tox4 = np.linspace(x3, x4, div, endpoint=False)
+        xfinal = np.linspace(x4, x1, div, endpoint=False)
+
+        coords_x = np.append(x1Tox2, [x2Tox3, x3Tox4, xfinal])
+
+        y1Toy2 =  np.linspace(y1, y2, div, endpoint=False)
+        y2Toy3 = np.linspace(y2, y3, div, endpoint=False)
+        y3Toy4 = np.linspace(y3, y4, div, endpoint=False)
+        yfinal = np.linspace(y4, y1, div, endpoint=False)
+
+        coords_y = np.append(y1Toy2, [y2Toy3, y3Toy4, yfinal])
+
+        for i in range(len(coords_x)):
+            localCone = [i,i+1]
+            cone.append(localCone)
+            coords.append([coords_x[i], coords_y[i]])
+        cone[-1][-1] = 0
+
+        return coords, cone, dl
+
+    def updateVelocity(self):
+        points = self.getTotalNodes()
+        velRef = self.getVelRef()
+        self.logger.info(f"setting Lid Driven Cavity Velocity: {velRef}")
+        velValues = np.zeros(points*2)
+        for poi in range(points):
+            coord = self.getNodeCoordinates(poi)
+            if coord[0] >= 0 and coord[1] >= 0:
+                velValues[poi*2] = velRef / sqrt(2)
+                velValues[poi*2+1] = - velRef / sqrt(2)
+        ind = [poi*2+dof for poi in range(points) for dof in range(2)]
+        self.setVelocity(ind, velValues)
 
     def getLong(self):
         return 1
@@ -167,28 +370,23 @@ class Circle(ImmersedBody):
 
     def generateBody(self, dh):
         r = self.__radius
-        center = self.getCenterBody()
         longTotal = 2*pi*r
-        print(dh)
-        points = floor(longTotal/dh) + 2
-        assert points > 4
+        points =  ceil(longTotal/dh)
+        # assert points > 4
+        dh = longTotal/points
         startAng = pi/1000
-        angles = np.linspace(0, 2*pi , points)
-        x = r * np.cos(angles + startAng) + center[0]
-        y = r * np.sin(angles + startAng) + center[1]
+        angles = np.linspace(0, 2*pi , points, endpoint=False)
+        x = r * np.cos(angles + startAng)
+        y = r * np.sin(angles + startAng)
         coords = list()
         cone = list()
-        for i in range(len(x)-1):
+        for i in range(len(x)):
             localCone = [i,i+1]
             coords.append([x[i] , y[i]])
             cone.append(localCone)
         cone[-1][-1] = 0
-        dl = sqrt((coords[0][0]-coords[1][0])**2 + (coords[0][1]-coords[1][1])**2)
-        # self.generateDMPlex(coords, cone)
+        dl = 2 * pi * r / len(coords)
         return coords, cone, dl
-
-    def getRadius(self):
-        return self.__radius
 
     def getLong(self):
         return self.__radius*2
@@ -213,6 +411,7 @@ def linear(r):
     else:
         return 0
 
+# @profile
 def fourGrid(r):
     if r <=  1:
         return (3 - 2*r + sqrt(1 + 4*r - 4*r**2))/8
@@ -278,3 +477,9 @@ class EulerNode:
         
     def getDiracComputed(self):
         return self.__diracs
+
+if __name__ == '__main__':
+    logging.basicConfig(level='INFO' )
+    bodies = BodiesContainer('side-by-side')
+    bodies.createBodies(0.1)
+    bodies.viewBodies()
