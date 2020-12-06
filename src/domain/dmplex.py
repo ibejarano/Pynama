@@ -60,6 +60,9 @@ class DMPlexDom(PETSc.DMPlex):
         if not self.comm.rank:
             self.logger.debug("FEM/SEM Indexing SetUp")
 
+    def getNGL(self):
+        return self.indicesManager.getNGL()
+
     def computeFullCoordinates(self, spElem):
         # self.logger = logging.getLogger("[{}] DomainMin Compute Coordinates".format(self.comm.rank))
         coordsComponents = self.getDimension()
@@ -127,13 +130,16 @@ class DMPlexDom(PETSc.DMPlex):
         if not self.comm.rank:
             self.logger.debug("Labels creados en borders")
 
-    def getBorderEntities(self, name):
-        faceNum = self.mapFaceNameToNum(name)
+    def __getBorderEntities(self, name):
+        faceNum = self.__mapFaceNameToNum(name)
         try:
             faces = self.getStratumIS("Face Sets", faceNum).getIndices()
         except:
             faces = []
         return faces
+
+    def getBordersNames(self):
+        return self.namingConvention
 
     def getBordersNodes(self):
         nodes = set()
@@ -142,14 +148,14 @@ class DMPlexDom(PETSc.DMPlex):
         return nodes
 
     def getBorderNodes(self, name):
-        entities = self.getBorderEntities(name)
+        entities = self.__getBorderEntities(name)
         nodesSet = set()
         for entity in entities:
             nodes = self.getGlobalNodesFromCell(entity, False)
             nodesSet |= set(nodes)
         return list(nodesSet)
 
-    def mapFaceNameToNum(self, name):
+    def __mapFaceNameToNum(self, name):
         """This ordering corresponds to nproc = 1"""
         num = self.namingConvention.index(name) + 1
         return num
@@ -221,7 +227,7 @@ class DMPlexDom(PETSc.DMPlex):
         normals = list()
         localEntities = set(self.getTransitiveClosure(cell)[0])
         for faceName in self.namingConvention:
-            globalEntitiesBorders = set(self.getBorderEntities(faceName))
+            globalEntitiesBorders = set(self.__getBorderEntities(faceName))
             localEntitiesBorders = globalEntitiesBorders & localEntities 
             if localEntitiesBorders:
                 localEntitiesBorders = list(localEntitiesBorders)
@@ -331,7 +337,7 @@ if __name__ == "__main__":
     faces = [3,3]
     dm = DMPlexDom(lower, upper, faces)
     for i in ["left", "right", "up", "down"]:
-        cara = dm.getBorderEntities(i)
+        cara = dm.__getBorderEntities(i)
         print(i)
         for car in cara:
             coords = dm.getFaceCoords(car).reshape(2,2)
