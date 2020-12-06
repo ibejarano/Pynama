@@ -12,6 +12,10 @@ from viewer.paraviewer import Paraviewer
 class UniformFlow(FreeSlip):
     def setUp(self):
         self.setUpGeneral()
+        self.setUpBoundaryConditions()
+        self.setUpEmptyMats()
+        self.buildKLEMats()
+        self.buildOperators()
 
         self.cteValue = [1,0]
 
@@ -21,6 +25,12 @@ class UniformFlow(FreeSlip):
         self.setUpEmptyMats()
         self.buildKLEMats()
         self.buildOperators()
+
+    def setUpBoundaryConditions(self):
+        self.dom.setLabelToBorders()
+        self.dom.setBoundaryCondition(["right", "up", "left", "down"],[])
+        if not self.comm.rank:
+            self.logger.info(f"Boundary Conditions setted up")
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
