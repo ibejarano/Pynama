@@ -7,11 +7,11 @@ material-properties:
   mu: 0.01
 
 domain:
-  dim: 5 # no es necesario dim = 2, es implicito con nelem + lower + upper
-  nelem: [5,5,5]
   ngl: 3
-  lower: [0,0,0]
-  upper: [1,1,1]
+  box-mesh:
+    nelem: [5,5]
+    lower: [0,0]
+    upper: [1,1]
 
 time-solver:
   max-steps: 200

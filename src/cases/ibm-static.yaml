@@ -1,30 +1,58 @@
 ---
 name: ibm-static
-save-dir: test-re20-ngl5
+save-dir: ibm-test
+save-n-steps: 2
 
+# cylinder
 domain:
-  dim: 2
-  nelem: [80, 40]
   ngl: 3
-  lower: [-1.5*pi,-1*pi]
-  upper: [2.5*pi,1*pi]
-  # upper: [16,5] double
-body:
-  -
-    vel: [0,0]
-    type: "circle"
-    radius: 0.5
-    center: [0,0]
+  box-mesh:
+    nelem: [50, 50]
+    lower: [-3,-3]
+    upper: [3,3]
+  # gmsh-file: sbs-d3-h04.msh
+  # h-min: 0.04
 
 boundary-conditions:
   constant:
-    re: 20
+    re: 10
+    direction: 0
+    longRef: '1'
+bodies:
+  -
+    type: "circle"
+    vel: 'static'
+    radius: 0.5
+    center: [0,0]
+  # -
+  #   type: "circle"
+  #   vel: 'static'
+  #   radius: 0.5
+  #   center: [0,-1.5]
+
+# cavity
+# domain:
+#   ngl: 3
+#   box-mesh:
+#     nelem: [400, 400]
+#     lower: [-4,-4]
+#     upper: [4,4]
+# boundary-conditions:
+#   constant:
+#     re: 100
+#     direction: -45
+#     longRef: "sqrt(2)"
+# bodies:
+#   -
+#     vel: 'static'
+#     type: "box"
+#     center: [0,0]
 
 material-properties:
   rho: 0.5
   mu: 0.01
 
 time-solver:
-  max-steps: 9999
+  max-steps: 100
   start-time: 0
-  end-time: 150
+  end-time: 120
