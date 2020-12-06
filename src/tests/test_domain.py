@@ -10,7 +10,6 @@ class TestBoxDMPLEX2D(unittest.TestCase):
 
     # Test Roadmap
     ## 1. Separate dmplex from indicesmanager
-    ## 2. Test the exact numer of the nodes in the border
 
     def setUp(self):
         data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [3,4]}
@@ -31,10 +30,16 @@ class TestBoxDMPLEX2D(unittest.TestCase):
         np_test.assert_array_almost_equal(coords_cell_0, coord, decimal=13)
 
     def test_borders_nodes(self):
-        # total is for 3,4 ngl=3 box mesh
-        # Cambiar por exact num, dejar la cantidad para ngl variable
         total = 28
-        assert len(self.dom.getBordersNodes()) == total
+        bordersNodes = self.dom.getBordersNodes()
+        bordersNodes_alt = self.dom.getNodesFromLabel("marco")
+        assert type(bordersNodes) == set
+        assert len(bordersNodes) == total
+
+        assert type(bordersNodes_alt) == set
+        assert len(bordersNodes_alt) == total
+
+        np_test.assert_equal(bordersNodes, bordersNodes_alt)
 
     def test_border_nodes(self):
         borderNames = self.dom.getBordersNames()
@@ -43,7 +48,6 @@ class TestBoxDMPLEX2D(unittest.TestCase):
                 assert len(self.dom.getBorderNodes(b)) == 7
             else:
                 assert len(self.dom.getBorderNodes(b)) == 9
-        
 
 class TestNglIndexing2D(unittest.TestCase):
     def setUp(self):
@@ -73,39 +77,85 @@ class TestNglIndexing2D(unittest.TestCase):
                     total = 4 + 3*(ngl-2)
                     assert len(dom.getBorderNodes(b)) == total
 
-# class TestBoxDMPLEX3D(unittest.TestCase):
-#     def setUp(self):
-#         data2D = {}
-#         self.dom_list_2d = list()
-#         dim = 2
-#         for ngl in range(2,4):
-#             dm = DMPlexDom([0]*dim, [1]*dim, [2]*dim)
-#             dm.setFemIndexing(ngl)
-#             self.dom_list_2d.append(dm)
+class TestBoxDMPLEX3D(unittest.TestCase):
 
-#         self.dom_list_3d = list()
+    def setUp(self):
+        data3D = {'lower': [0,0,0] , 'upper':[0.6,0.8,1], "nelem": [3,4,5]}
+        self.dom = DMPlexDom(boxMesh=data3D)
+        self.dom.setFemIndexing(3)
 
-#         dim = 3
-#         for ngl in range(2,4):
-#             dm = DMPlexDom([0]*dim, [1]*dim, [2]*dim)
-#             dm.setFemIndexing(ngl)
+    def test_generate_dmplex(self):
+        assert self.dom.getDimension() == 3
 
-#             self.dom_list_3d.append(dm)
+    def test_cell_start_end(self):
+        self.assertEqual(self.dom.cellStart, 0)
+        self.assertEqual(self.dom.cellEnd, 3*4*5)
 
-#     def test_generate_dmplex(self):
-#         for dom in self.dom_list_3d:
-#             self.assertEqual(dom.getDimension(), 3)
+    def test_cell_corners_coords(self):
+        coords_cell_0 = np.array(
+            [[0,0,0 ] , [0,0.2,0],
+            [0.2,0.2,0], [0.2,0,0],
+            [0,0,0.2 ],[0.2,0,0.2],
+            [0.2,0.2,0.2],
+            [0,0.2,0.2]
+        ])
+        coords_cell_0.shape = 8*3
+        coord= self.dom.getCellCornersCoords(0)
+        np_test.assert_array_almost_equal(coords_cell_0, coord, decimal=13)
 
-#     def test_cell_start_end(self):
-#         for dom in self.dom_list_3d:
-#             self.assertEqual(dom.cellStart, 0)
-#             self.assertEqual(dom.cellEnd, 8)
+    def test_borders_nodes(self):
+        totalArc = 28*11
+        totalFace = 35*2
+        total = totalArc + totalFace
+        bordersNodes = self.dom.getBordersNodes()
+        bordersNodes_alt = self.dom.getNodesFromLabel("marco")
+        assert type(bordersNodes) == set
+        assert len(bordersNodes) == total
 
-#     def test_cell_corners_coordshape(self):
-#         shape = 8*3
-#         for dom in self.dom_list_3d:
-#             coords = dom.getCellCornersCoords(0)
-#             self.assertEqual(coords.shape[0], shape)
+        assert type(bordersNodes_alt) == set
+        assert len(bordersNodes_alt) == total
+
+        np_test.assert_equal(bordersNodes, bordersNodes_alt)
+
+    def test_border_nodes(self):
+        borderNames = self.dom.getBordersNames()
+        for b in borderNames:
+            if b in ['up', 'down']:
+                assert len(self.dom.getBorderNodes(b)) == 7*11
+            elif b in ['left', 'right']:
+                assert len(self.dom.getBorderNodes(b)) == 9*11
+            else:
+                assert len(self.dom.getBorderNodes(b)) == 7*9
+
+class TestNglIndexing3D(unittest.TestCase):
+    def setUp(self):
+        self.doms = list()
+        data3D = {'lower': [0,0,0] , 'upper':[0.6,0.8,1], "nelem": [2,3,4]}
+        for ngl in range(2, 10 , 2):
+            dm = DMPlexDom(boxMesh=data3D)
+            dm.setFemIndexing(ngl)
+            self.doms.append(dm)
+
+    def test_borders_nodes_num(self):
+        edges = 36 + 68
+        cells = 52
+        cornerNodes = 54
+        for dom in self.doms:
+            ngl = dom.getNGL()
+            total = cornerNodes + edges*(ngl-2) + cells*((ngl-2)**2)
+            assert len(dom.getBordersNodes()) == total
+
+    # def test_border_nodes_num(self):
+    #     borderNames = self.doms[0].getBordersNames()
+    #     for dom in self.doms:
+    #         ngl = dom.getNGL()
+    #         for b in borderNames:
+    #             if b in ['up', 'down']:
+    #                 total = 3 + 2*(ngl-2)
+    #                 assert len(dom.getBorderNodes(b)) == total
+    #             else:
+    #                 total = 4 + 3*(ngl-2)
+    #                 assert len(dom.getBorderNodes(b)) == total
 
 # class DomainModTests(unittest.TestCase):
 

@@ -138,10 +138,20 @@ class DMPlexDom(PETSc.DMPlex):
             faces = []
         return faces
 
+    def getNodesFromLabel(self, label) -> set:
+        nodes = set()
+        try:
+            entities = self.getStratumIS(label, 0).getIndices()
+            # for entity in entities:
+            nodes |= self.getGlobalNodesFromEntities(entities,shared=False)
+        except:
+            self.logger.warning(f"Label >> {label} << found")
+        return nodes
+
     def getBordersNames(self):
         return self.namingConvention
 
-    def getBordersNodes(self):
+    def getBordersNodes(self) -> set:
         nodes = set()
         for faceName in self.namingConvention:
             nodes |= set(self.getBorderNodes(faceName))
