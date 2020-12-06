@@ -1,15 +1,11 @@
 from cases.base_problem import NoSlipFreeSlip
 from common.nswalls import NoSlipWalls
 import numpy as np
-from math import sqrt, erf, exp, pi
 
 class Cavity(NoSlipFreeSlip):
     def setUp(self):
         super().setUp()
         self.collectCornerNodes()
-
-        self.velFunction = self.flatplateVel
-        self.vortFunction = self.flatplateVort
 
     def collectCornerNodes(self):
         cornerNodes = set()
@@ -53,19 +49,9 @@ class Cavity(NoSlipFreeSlip):
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
-        allNodes = self.dom.getAllNodes()
-        fvort_coords = lambda coords: self.vortFunction(coords, self.nu,t=startTime)
-        self.vort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, self.vort, self.dim_w)
-        self.vort.assemble()
 
-    def applyBoundaryConditions(self, time):
+    def applyBoundaryConditions(self):
         self.vel.set(0.0)
-        # self.vort.view()
-        if self.globalNodesDIR:
-            fvel_coords = lambda coords: self.velFunction(coords, self.nu, t=time)
-            fvort_coords = lambda coords: self.vortFunction(coords, self.nu, t=time)
-            self.vel = self.dom.applyFunctionVecToVec(self.globalNodesDIR, fvel_coords, self.vel, self.dim)
-            self.vort = self.dom.applyFunctionVecToVec(self.globalNodesDIR, fvort_coords, self.vort, self.dim_w)
 
         wallsWithVel = self.nsWalls.getWallsWithVelocity()
         for wallName in wallsWithVel:
@@ -94,16 +80,3 @@ class Cavity(NoSlipFreeSlip):
             self.velFS.setValues(dofVelToSet, np.repeat(0, len(nodes)*len(velDofs)))
 
         self.velFS.assemble()
-
-    @staticmethod
-    def flatplateVel(coord, nu , t=None):
-        U_ref = 1
-        vx = U_ref * erf(coord[1]/ sqrt(4*nu*t))
-        vy = 0
-        return [vx, vy]
-
-    @staticmethod
-    def flatplateVort(coord, nu, t=None):
-        tau = sqrt(4*nu*t)
-        vort = (-2/(tau * sqrt(pi))) * exp(-(coord[1]/tau)**2)
-        return [vort]
