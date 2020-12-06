@@ -2,14 +2,14 @@ import sys
 import petsc4py
 from math import pi, sin, cos, exp, erf, sqrt
 petsc4py.init(sys.argv)
-import matplotlib.pyplot as plt
+
 from cases.base_problem import FreeSlip
 import numpy as np
 import yaml
 from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
-from viewer.plotter import Plotter
+# from viewer.plotter import Plotter
 
 class CustomFuncCase(FreeSlip):
     # @profile
@@ -51,6 +51,11 @@ class CustomFuncCase(FreeSlip):
             else:
                 raise Exception("not implemented func for dim 3")
 
+    def setUpBoundaryConditions(self):
+        self.dom.setLabelToBorders()
+        self.dom.setBoundaryCondition(["right", "up", "left", "down"],[])
+        if not self.comm.rank:
+            self.logger.info(f"Boundary Conditions setted up")
 
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()
@@ -85,7 +90,7 @@ class CustomFuncCase(FreeSlip):
         startTime = self.ts.getTime()
         endTime = self.ts.getMaxTime()
         times = np.linspace(startTime, endTime, steps)
-        viscousTimes=[0.01,0.4,0.9]
+        viscousTimes=[0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
         times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
         nodesToPlot, coords = self.dom.getNodesOverline("x", 0.5)
         boundaryNodes = self.getBoundaryNodes()
@@ -98,39 +103,13 @@ class CustomFuncCase(FreeSlip):
             self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort)
             exact_x , _ = self.dom.getVecArrayFromNodes(exactVel, nodesToPlot)
             calc_x, _ = self.dom.getVecArrayFromNodes(self.vel, nodesToPlot)
-            plotter.updatePlot(exact_x, [{"name": fr"$\tau$ = ${viscousTimes[step]}$" ,"data":coords}], step )
+            # plotter.updatePlot(exact_x, [{"name": fr"$\tau$ = ${viscousTimes[step]}$" ,"data":coords}], step )
             # plotter.scatter(calc_x , coords, "calc")
             # plotter.plt.pause(0.001)
             self.logger.info(f"Saving time: {time:.1f} | Step: {step}")
-        plotter.plt.legend()
-        plotter.show()
+        # plotter.plt.legend()
+        # plotter.show()
         self.viewer.writeXmf(self.caseName)
-
-    def getChartKLE(self):
-        plt.figure(figsize=(10,10))
-        plt.xlabel(r'tiempo')
-        plt.ylabel(r'$||Error_{vel}||_{2}$')
-        plt.loglog(self.saveTime, self.saveError2 ,marker='o', markersize=3 ,color="b")
-        plt.title(r'Error norma 2 de la velocidad en el tiempo')
-        plt.savefig(f"Error-Velocidad-Log")
-        plt.figure(figsize=(10,10))
-        plt.xlabel(r'tiempo')
-        plt.ylabel(r'$||Error_{vel}||_{\infty}$')
-        plt.plot(self.saveTime, self.saveError8 ,marker='o', markersize=3 ,color="b")
-        plt.title(r'Error Infinito de la velocidad en el tiempo')
-        plt.savefig(f"Error-Velocidad-NormaInfinito")
-        plt.figure(figsize=(10,10))
-        plt.xlabel(r'tiempo')
-        plt.ylabel(r'$||Error_{vel}||_{2}$')
-        plt.plot(self.saveTime, self.saveError2 ,marker='o', markersize=3 ,color="b")
-        plt.title(r'Error de la velocidad en el tiempo')
-        plt.savefig(f"Error-Velocidad-NOLog")
-        plt.figure(figsize=(10,10))
-        plt.xlabel(r'step')
-        plt.ylabel(r'tiempo')
-        plt.plot(self.saveStep, self.saveTime ,marker='o', markersize=3 ,color="b")
-        plt.title(r'Tiempo vs pasos')
-        plt.savefig(f"tiempos-pasos")
 
     def generateExactOperVecs(self,time):
         exactVel = self.mat.K.createVecRight()
@@ -153,8 +132,8 @@ class CustomFuncCase(FreeSlip):
         exactDiff = self.dom.applyFunctionVecToVec(allNodes, fdiff_coords, exactDiff, self.dim_w )
         return exactVel, exactVort, exactConv, exactDiff
 
-    def OperatorsTests(self):
-        time = 1
+    def OperatorsTests(self, viscousTime=1):
+        time = (viscousTime**2)/(4*self.nu)
         boundaryNodes = self.getBoundaryNodes()
         self.applyBoundaryConditions(time, boundaryNodes)
         step = 0
