@@ -83,11 +83,11 @@ class DMPlexDom(PETSc.DMPlex):
             indicesGlobales = self.indicesManager.mapNodesToIndices(nodosGlobales, coordsComponents)
 
             elTotNodes = spElem.nnode
-            totCoord = np.mat(np.zeros((coordsComponents*elTotNodes, 1)))
+            totCoord = np.zeros((coordsComponents*elTotNodes))
 
             for idx, gp in enumerate(spElem.gpsOp):
                 totCoord[[coordsComponents * idx + d for d in range(coordsComponents)]] = \
-                    (spElem.HCooOp[idx] * coords).T
+                    (spElem.HCooOp[idx]@coords).T
             self.fullCoordVec.setValues(indicesGlobales, totCoord)
 
         self.fullCoordVec.assemble()

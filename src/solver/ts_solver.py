@@ -2,8 +2,8 @@ from petsc4py.PETSc import TS
 
 class TsSolver(TS):
     rk_types = ["3", "5f", "5bs"]
-    def __init__(self):
-        self.create()
+    def __init__(self, comm):
+        self.create(comm)
         self.setProblemType(self.ProblemType.NONLINEAR)
         # self.setEquationType(self.EquationType.ODE_EXPLICIT)
         self.setRK()
