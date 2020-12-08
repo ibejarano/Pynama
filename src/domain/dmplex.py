@@ -9,8 +9,8 @@ class DMPlexDom(PETSc.DMPlex):
         comm = MPI.COMM_WORLD
         try:
             meshData = kwargs['boxMesh']
-            lower = meshData.get('lower')
-            upper = meshData.get('upper')
+            lower = kwargs['lower'] if 'lower' in kwargs else meshData.get('lower')
+            upper = kwargs['upper'] if 'upper' in kwargs else meshData.get('upper')
             faces = kwargs['nelem'] if 'nelem' in kwargs else meshData.get('nelem')
             try:
                 self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
