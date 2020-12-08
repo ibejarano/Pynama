@@ -50,6 +50,9 @@ class CustomFuncCase(FreeSlip):
                 self.convectiveFunction = self.flatplateConvective
             else:
                 raise Exception("not implemented func for dim 3")
+        else:
+            print(self.case)
+            raise Exception("Case not found")
 
     def setUpBoundaryConditions(self):
         self.dom.setLabelToBorders()
