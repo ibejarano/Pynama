@@ -23,8 +23,10 @@ class BaseProblem(object):
         self.timerTotal= Timer()
         self.timerTotal.tic()
         self.timer = Timer()
-        case = PETSc.Options().getString('case', 'uniform' )
-        # case = kwargs['case']
+        try:
+            case = PETSc.Options().getString('case', kwargs['case'] )
+        except:
+            raise Exception("Case not defined")
         self.config = config
         self.logger = logging.getLogger(self.config.get("name"))
         self.case = case
@@ -292,6 +294,11 @@ class BaseProblem(object):
     def setUpEmptyMats(self):
         self.mat = None
         self.operator = None
+
+    def view(self):
+        print(f"Case: {self.case}")
+        print(f"Domain: {self.dom.view()} ")
+        print(f"NGL: {self.dom.getNGL() }")
 
 class NoSlipFreeSlip(BaseProblem):
     def setUpEmptyMats(self):
