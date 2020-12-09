@@ -53,11 +53,14 @@ class BaseProblem(object):
     def setUpDomain(self):
         domain = self.config.get("domain")
         self.dom = None
-        self.logger.info("Setting dom with box Mesh")
         if "box-mesh" in domain:
+            self.logger.info("Creating dom with box Mesh")
             meshData = domain.get('box-mesh')
+            self.meshType = "box-mesh"
             self.dom = DMPlexDom(boxMesh=meshData, **self.opts)
         elif "gmsh-file" in domain:
+            self.logger.info("Creating dom with Gmsh File")
+            self.meshType = 'gmsh'
             meshData = domain.get('gmsh-file')
             self.dom = DMPlexDom(fileName=meshData)
 
