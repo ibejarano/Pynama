@@ -19,6 +19,7 @@ from common.timer import Timer
 class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
         super().setUp()
+        self.setUpBodies()
         self.boundaryNodes = self.getBoundaryNodes()
         cells = self.getAffectedCells(10)
         self.collectedNodes, self.maxNodesPerLag = self.collectNodes(cells)
@@ -53,18 +54,27 @@ class ImmersedBoundaryStatic(FreeSlip):
 
     def setUpDomain(self):
         super().setUpDomain()
-        if 'box-mesh' in self.config['domain']:
-            nelem = self.config['domain']['box-mesh']['nelem']
-            height = self.config['domain']['box-mesh']['upper'][0]  -  self.config['domain']['box-mesh']['lower'][0] 
+        if self.meshType == 'box-mesh':
+            nelem = self.nelem
+            lower, upper = self.dom.getBoundingBox()
+            height = upper[1]  -  lower[0]
             self.h = (height/nelem[0]) / (self.ngl-1)
-        else:
+        elif self.meshType == 'gmsh-file':
             self.h = self.config['domain']['h-min'] / (self.ngl-1)
+        else:
+            raise Exception("Mesh not defined")
 
-        bodies = self.config['bodies']
-        self.body = BodiesContainer(bodies)
-        self.logger.info(f"Node separation: {self.h}")
-        self.body.createBodies(self.h)
-        self.body.setVelRef(self.U_ref)
+    def setUpBodies(self):
+        try:
+            assert 'bodies' in self.config
+            bodies = self.config['bodies']
+            self.body = BodiesContainer(bodies)
+            self.logger.info(f"Node separation: {self.h}")
+            self.body.createBodies(self.h)
+            self.body.setVelRef(self.U_ref)
+            # self.body.viewBodies()
+        except AssertionError:
+            raise Exception("Bodies not defined")
 
     def buildOperators(self):
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
