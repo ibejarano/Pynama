@@ -20,7 +20,7 @@ class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
         super().setUp()
         self.setUpBodies()
-        self.boundaryNodes = self.getBoundaryNodes()
+        self.boundaryNodes = self.dom.getNodesFromLabel("External Boundary")
         cells = self.getAffectedCells(10)
         self.collectedNodes, self.maxNodesPerLag = self.collectNodes(cells)
         self.totalEulerNodes = len(self.dom.getAllNodes())

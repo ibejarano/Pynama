@@ -127,7 +127,7 @@ class BaseProblem(object):
         self.setUpDomain()
         self.setUpElement()
         self.createMesh()
-        self.bcNodes = self.getBoundaryNodes()
+        self.bcNodes = self.dom.getNodesFromLabel("External Boundary")
     # @profile
     def buildOperators(self):
         cornerCoords = self.dom.getCellCornersCoords(cell=0)
@@ -208,16 +208,6 @@ class BaseProblem(object):
         viewer.createVTK('immersed-body.vtk', mode=PETSc.Viewer.Mode.WRITE)
         viewer.view(self.dom)
         viewer.destroy()
-
-    def getBoundaryNodes(self):
-        """ IS: Index Set """
-        nodesSet = set()
-        IS =self.dom.getStratumIS('marco', 0)
-        entidades = IS.getIndices()
-        for entity in entidades:
-            nodes = self.dom.getGlobalNodesFromCell(entity, False)
-            nodesSet |= set(nodes)
-        return list(nodesSet)
 
     def evalRHS(self, ts, t, Vort, f):
         """Evaluate the KLE right hand side."""
@@ -495,7 +485,7 @@ class FreeSlip(BaseProblem):
             viscousTimes = np.arange(startTime, endTime, (endTime - startTime)/steps)
 
         times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
-        boundaryNodes = self.getBoundaryNodes()
+        boundaryNodes = self.dom.getNodesFromLabel("External Boundary")
         errors = list()
         for time in times:
             exactVel, exactVort = self.generateExactVecs(time)

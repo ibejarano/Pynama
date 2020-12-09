@@ -90,7 +90,7 @@ class CustomFuncCase(FreeSlip):
         viscousTimes=[0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
         times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
         nodesToPlot, coords = self.dom.getNodesOverline("x", 0.5)
-        boundaryNodes = self.getBoundaryNodes()
+        boundaryNodes = self.dom.getNodesFromLabel("External Boundary")
         plotter = Plotter(r"$\frac{u}{U}$" , r"$\frac{y}{Y}$")
         for step,time in enumerate(times):
             exactVel, exactVort = self.generateExactVecs(time)
@@ -131,7 +131,7 @@ class CustomFuncCase(FreeSlip):
 
     def OperatorsTests(self, viscousTime=1):
         time = (viscousTime**2)/(4*self.nu)
-        boundaryNodes = self.getBoundaryNodes()
+        boundaryNodes = self.dom.getNodesFromLabel("External Boundary")
         self.applyBoundaryConditions(time, boundaryNodes)
         step = 0
         exactVel, exactVort, exactConv, exactDiff = self.generateExactOperVecs(time)

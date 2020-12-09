@@ -32,7 +32,7 @@ class TestBoxDMPLEX2D(unittest.TestCase):
     def test_borders_nodes(self):
         total = 28
         bordersNodes = self.dom.getBordersNodes()
-        bordersNodes_alt = self.dom.getNodesFromLabel("marco")
+        bordersNodes_alt = self.dom.getNodesFromLabel("External Boundary")
         assert type(bordersNodes) == set
         assert len(bordersNodes) == total
 
@@ -116,7 +116,7 @@ class TestBoxDMPLEX3D(unittest.TestCase):
         totalFace = 35*2
         total = totalArc + totalFace
         bordersNodes = self.dom.getBordersNodes()
-        bordersNodes_alt = self.dom.getNodesFromLabel("marco")
+        bordersNodes_alt = self.dom.getNodesFromLabel("External Boundary")
         assert type(bordersNodes) == set
         assert len(bordersNodes) == total
 

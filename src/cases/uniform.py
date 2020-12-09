@@ -38,7 +38,7 @@ class UniformFlow(FreeSlip):
 
     def solveKLETests(self, startTime=0.0, endTime=1.0, steps=10):
         times = np.linspace(startTime, endTime, steps)
-        boundaryNodes = self.getBoundaryNodes()
+        boundaryNodes = self.dom.getNodesFromLabel("External Boundary")
         for step,time in enumerate(times):
             exactVel, exactVort = self.generateExactVecs(time)
             self.applyBoundaryConditions(time, boundaryNodes)

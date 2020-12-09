@@ -24,8 +24,8 @@ class DMPlexDom(PETSc.DMPlex):
 
         self.logger = logging.getLogger(f"[{self.comm.rank}] Class")
         self.logger.debug("Domain Instance Created")
-        self.createLabel('marco')
-        self.markBoundaryFaces('marco',0)
+        self.createLabel('External Boundary')
+        self.markBoundaryFaces('External Boundary',0)
         self.distribute()
         self.dim = self.getDimension()
         self.dim_w = 1 if self.dim == 2 else 3
