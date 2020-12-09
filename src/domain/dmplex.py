@@ -3,14 +3,14 @@ from domain.indices import IndicesManager
 import numpy as np
 import logging
 from mpi4py import MPI
-from math import pi
+from math import pi, floor
 class DMPlexDom(PETSc.DMPlex):
     def __init__(self, **kwargs):
         comm = MPI.COMM_WORLD
         try:
             meshData = kwargs['boxMesh']
-            lower = meshData.get('lower')
-            upper = meshData.get('upper')
+            lower = kwargs['lower'] if 'lower' in kwargs else meshData.get('lower')
+            upper = kwargs['upper'] if 'upper' in kwargs else meshData.get('upper')
             faces = kwargs['nelem'] if 'nelem' in kwargs else meshData.get('nelem')
             try:
                 self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
@@ -60,6 +60,9 @@ class DMPlexDom(PETSc.DMPlex):
         if not self.comm.rank:
             self.logger.debug("FEM/SEM Indexing SetUp")
 
+    def getNGL(self):
+        return self.indicesManager.getNGL()
+
     def computeFullCoordinates(self, spElem):
         # self.logger = logging.getLogger("[{}] DomainMin Compute Coordinates".format(self.comm.rank))
         coordsComponents = self.getDimension()
@@ -80,11 +83,11 @@ class DMPlexDom(PETSc.DMPlex):
             indicesGlobales = self.indicesManager.mapNodesToIndices(nodosGlobales, coordsComponents)
 
             elTotNodes = spElem.nnode
-            totCoord = np.mat(np.zeros((coordsComponents*elTotNodes, 1)))
+            totCoord = np.zeros((coordsComponents*elTotNodes))
 
             for idx, gp in enumerate(spElem.gpsOp):
                 totCoord[[coordsComponents * idx + d for d in range(coordsComponents)]] = \
-                    (spElem.HCooOp[idx] * coords).T
+                    (spElem.HCooOp[idx]@coords).T
             self.fullCoordVec.setValues(indicesGlobales, totCoord)
 
         self.fullCoordVec.assemble()
@@ -127,29 +130,42 @@ class DMPlexDom(PETSc.DMPlex):
         if not self.comm.rank:
             self.logger.debug("Labels creados en borders")
 
-    def getBorderEntities(self, name):
-        faceNum = self.mapFaceNameToNum(name)
+    def __getBorderEntities(self, name):
+        faceNum = self.__mapFaceNameToNum(name)
         try:
             faces = self.getStratumIS("Face Sets", faceNum).getIndices()
         except:
             faces = []
         return faces
 
-    def getBordersNodes(self):
+    def getNodesFromLabel(self, label) -> set:
+        nodes = set()
+        try:
+            entities = self.getStratumIS(label, 0).getIndices()
+            # for entity in entities:
+            nodes |= self.getGlobalNodesFromEntities(entities,shared=False)
+        except:
+            self.logger.warning(f"Label >> {label} << found")
+        return nodes
+
+    def getBordersNames(self):
+        return self.namingConvention
+
+    def getBordersNodes(self) -> set:
         nodes = set()
         for faceName in self.namingConvention:
             nodes |= set(self.getBorderNodes(faceName))
         return nodes
 
     def getBorderNodes(self, name):
-        entities = self.getBorderEntities(name)
+        entities = self.__getBorderEntities(name)
         nodesSet = set()
         for entity in entities:
             nodes = self.getGlobalNodesFromCell(entity, False)
             nodesSet |= set(nodes)
         return list(nodesSet)
 
-    def mapFaceNameToNum(self, name):
+    def __mapFaceNameToNum(self, name):
         """This ordering corresponds to nproc = 1"""
         num = self.namingConvention.index(name) + 1
         return num
@@ -207,13 +223,19 @@ class DMPlexDom(PETSc.DMPlex):
             globalNodes.extend(self.indicesManager.getGlobalNodes(entity, shared=False)[0])
         return globalNodes
 
-    def getNodesCoordinates(self, nodes):
+    def getNodesCoordinates(self, nodes=None, indices=None):
         """
         nodes: [Int]
         """
         dim = self.getDimension()
-        indices = self.indicesManager.mapNodesToIndices(nodes, dim)
-        arr = self.fullCoordVec.getValues(indices).reshape((len(nodes),dim))
+        try:
+            assert nodes is not None
+            indices = self.indicesManager.mapNodesToIndices(nodes, dim)
+            arr = self.fullCoordVec.getValues(indices).reshape((len(nodes),dim))
+        except AssertionError:
+            assert indices is not None
+            numOfNodes = floor(len(indices) / dim)
+            arr = self.fullCoordVec.getValues(indices).reshape((numOfNodes,dim))
         return arr
 
     def getBorderNodesWithNormal(self, cell, intersect):
@@ -221,7 +243,7 @@ class DMPlexDom(PETSc.DMPlex):
         normals = list()
         localEntities = set(self.getTransitiveClosure(cell)[0])
         for faceName in self.namingConvention:
-            globalEntitiesBorders = set(self.getBorderEntities(faceName))
+            globalEntitiesBorders = set(self.__getBorderEntities(faceName))
             localEntitiesBorders = globalEntitiesBorders & localEntities 
             if localEntitiesBorders:
                 localEntitiesBorders = list(localEntitiesBorders)
@@ -280,23 +302,27 @@ class DMPlexDom(PETSc.DMPlex):
         conecMat = self.getDMConectivityMat()
         rStart, rEnd = conecMat.getOwnershipRange()
         locElRow = rEnd - rStart
-        # ind_d = [0] * (rEnd - rStart)
-        ind_d = np.zeros(rEnd-rStart, dtype=set)
-        # ind_o = [0] * (rEnd - rStart)
-        ind_o = np.zeros(rEnd-rStart, dtype=set)
+        ind_d = np.zeros(locElRow, dtype=set)
+        alt_d = np.zeros(locElRow, dtype=np.int32)
+        ind_o = np.zeros(locElRow, dtype=set)
+        alt_o = np.zeros(locElRow, dtype=np.int32)
+
         for row in range(rStart, rEnd):
             cols, _ = conecMat.getRow(row)
             locRow = row - rStart
             mask_diag = np.logical_and(cols >= rStart,cols < rEnd)
             mask_off = np.logical_or(cols < rStart,cols >= rEnd)
             ind_d[locRow] = set(cols[mask_diag])
+            alt_d[locRow] = len(ind_d[locRow]) 
             ind_o[locRow] = set(cols[mask_off])
+            alt_o[locRow] = len(ind_o[locRow]) 
         conecMat.destroy()
-        d_nnz_ind = [len(indSet) for indSet in ind_d]
-        o_nnz_ind = [len(indSet) for indSet in ind_o]
-        locElRow = rEnd - rStart
-        d_nnz_ind = [x if x <= locElRow else locElRow for x in d_nnz_ind]
-        return rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o
+        # d_nnz_ind = [len(indSet) for indSet in ind_d]
+        # o_nnz_ind = [len(indSet) for indSet in ind_o]
+
+        # TODO : Fix the line below for parallel
+        # d_nnz_ind = [x if x <= locElRow else locElRow for x in d_nnz_ind]
+        return rStart, rEnd, alt_d, alt_o, ind_d, ind_o
 
     def getNodesOverline(self, line: str, val: float, invert=False):
         assert line in ['x', 'y']
@@ -331,7 +357,7 @@ if __name__ == "__main__":
     faces = [3,3]
     dm = DMPlexDom(lower, upper, faces)
     for i in ["left", "right", "up", "down"]:
-        cara = dm.getBorderEntities(i)
+        cara = dm.__getBorderEntities(i)
         print(i)
         for car in cara:
             coords = dm.getFaceCoords(car).reshape(2,2)

@@ -17,9 +17,12 @@ class UniformFlow(FreeSlip):
         self.buildKLEMats()
         self.buildOperators()
 
-        self.cteValue = [1,0]
-
-        assert self.dim == 2
+        if self.dim == 2:
+            self.cteValue = [1,0]
+        elif self.dim == 3:
+            self.cteValue = [1, 0, 0]
+        else:
+            raise Exception("Wrong dim")
 
         self.setUpBoundaryConditions()
         self.setUpEmptyMats()
@@ -54,7 +57,7 @@ class UniformFlow(FreeSlip):
             self.viewer.saveStepInXML(step, time, vecs=[exactVel, exactVort, self.vel, self.vort])
         self.viewer.writeXmf(self.caseName)
 
-    def generateExactVecs(self, time):
+    def generateExactVecs(self, time=None):
         exactVel = self.mat.K.createVecRight()
         exactVort = self.mat.Rw.createVecRight()
         exactVel.setName(f"{self.caseName}-exact-vel")

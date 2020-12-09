@@ -23,8 +23,10 @@ class BaseProblem(object):
         self.timerTotal= Timer()
         self.timerTotal.tic()
         self.timer = Timer()
-        case = PETSc.Options().getString('case', 'uniform' )
-        # case = kwargs['case']
+        try:
+            case = PETSc.Options().getString('case', kwargs['case'] )
+        except:
+            raise Exception("Case not defined")
         self.config = config
         self.logger = logging.getLogger(self.config.get("name"))
         self.case = case
@@ -51,11 +53,14 @@ class BaseProblem(object):
     def setUpDomain(self):
         domain = self.config.get("domain")
         self.dom = None
-        self.logger.info("Setting dom with box Mesh")
         if "box-mesh" in domain:
+            self.logger.info("Creating dom with box Mesh")
             meshData = domain.get('box-mesh')
+            self.meshType = "box-mesh"
             self.dom = DMPlexDom(boxMesh=meshData, **self.opts)
         elif "gmsh-file" in domain:
+            self.logger.info("Creating dom with Gmsh File")
+            self.meshType = 'gmsh'
             meshData = domain.get('gmsh-file')
             self.dom = DMPlexDom(fileName=meshData)
 
@@ -236,12 +241,16 @@ class BaseProblem(object):
 
         self.operator.Curl.mult(rhs, f)
 
-    def computeVtensV(self):
+    def computeVtensV(self, vec=None):
+        if vec is not None:
+            arr = vec.getArray()
+        else:
+            arr = self.vel.getArray()
+
         sK, eK = self.mat.K.getOwnershipRange()
-        velArr = self.vel.getArray()
         ind = np.arange(int(sK*self.dim_s/self.dim), int(eK*self.dim_s/self.dim), dtype=np.int32)
-        v_x = velArr[::self.dim]
-        v_y = velArr[1::self.dim]
+        v_x = arr[::self.dim]
+        v_y = arr[1::self.dim]
         self._VtensV.setValues(ind[::self.dim_s], v_x**2 , False)
         self._VtensV.setValues(ind[1::self.dim_s], v_x * v_y , False)
         self._VtensV.setValues(ind[2::self.dim_s], v_y**2 , False)
@@ -292,6 +301,11 @@ class BaseProblem(object):
     def setUpEmptyMats(self):
         self.mat = None
         self.operator = None
+
+    def view(self):
+        print(f"Case: {self.case}")
+        print(f"Domain: {self.dom.view()} ")
+        print(f"NGL: {self.dom.getNGL() }")
 
 class NoSlipFreeSlip(BaseProblem):
     def setUpEmptyMats(self):

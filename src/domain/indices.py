@@ -16,6 +16,9 @@ class IndicesManager:
         if not comm.rank:
             self.logger.debug("IndicesManager Seteado")
 
+    def getNGL(self):
+        return self._ngl
+
     def getNumCompAndNumDof(self, componentsPerField ,numFields):
         numComp = [componentsPerField] * numFields
         nodesPerEntity = [ 1 , self._ngl - 2 , (self._ngl - 2)**2 ]

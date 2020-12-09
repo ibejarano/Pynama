@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import yaml
 from cases.immersed_boundary import ImmersedBoundaryStatic
 
 class TestSearch(unittest.TestCase):
@@ -9,7 +10,11 @@ class TestSearch(unittest.TestCase):
         # it must
         # set malla 10x10 de 10 de largo y 10 alto
         # self.h = 1
-        self.fem = ImmersedBoundaryStatic(case='ibm-static')
+        case = 'ibm-static'
+        domain = {"nelem": [10,10] , "ngl": 3, "lower":[-5,-5] ,"upper":[5,5]}
+        with open(f'src/cases/{case}.yaml') as f:
+            yamlData = yaml.load(f, Loader=yaml.Loader)
+        self.fem = ImmersedBoundaryStatic(yamlData, case=case, **domain)
         self.fem.setUp()
 
     def test_total_euler_nodes_finded(self):
@@ -49,22 +54,47 @@ class TestSearch(unittest.TestCase):
         cells = self.fem.getAffectedCells(xSide=1, ySide=2, center=center)
         assert len(cells)== 1 * 3
 
-class TestDirac(unittest.TestCase):
+class TestDiracRegularGrid(unittest.TestCase):
     def setUp(self):
-        self.ibm = ImmersedBoundaryStatic(case='ibm-static')
-        self.ibm.setUp()
-        self.ibm.setUpSolver()
+        case = 'ibm-static'
+        domain = {"nelem": [10,10] , "ngl": 3, "lower":[-5,-5] ,"upper":[5,5]}
+        with open(f'src/cases/{case}.yaml') as f:
+            yamlData = yaml.load(f, Loader=yaml.Loader)
+        self.fem = ImmersedBoundaryStatic(yamlData, case=case, **domain)
+        self.fem.setUp()
+        self.fem.setUpSolver()
 
     def test_mass_conservation(self):
-        D = self.ibm.H
-        sizeLoc, sizeGl = D.getSizes()[0]
-        dl = self.ibm.body.getElementLong()
-        print("dl:", dl)
-        print("h :",self.ibm.h)
+        D = self.fem.H
+        _ , sizeGl = D.getSizes()[0]
         for i in range(sizeGl):
             mass = D.getRow(i)[1].sum()
-            print(mass*dl**2 , mass*self.ibm.h**2 )
-        assert False
+            self.assertAlmostEqual(mass, 1, places=10)
 
     def test_momentum_conservation(self):
-        pass
+        D = self.fem.H
+        _ , sizeGl = D.getSizes()[0]
+        dim = self.fem.dom.getDimension()
+        for lagInd in range(0, sizeGl, dim):
+            eulerInd, diracs = D.getRow(lagInd)
+            eulerNodes = eulerInd / dim
+            lagNode = lagInd / dim
+            eulerCoords = self.fem.dom.getNodesCoordinates(nodes=eulerNodes)
+            lagCoord = self.fem.body.getNodeCoordinates(lagNode)
+            dist = eulerCoords - lagCoord
+            # print(dist)
+            # print(dist[:,1])
+            dist = dist[:,0] * dist[:,1]
+            momentum = dist * diracs
+            self.assertAlmostEqual(momentum.sum(), 0, places=10)
+
+class TestDiracSpectralRegularGrid(unittest.TestCase):
+    # TODO: Need to implement this
+    def setUp(self):
+        case = 'ibm-static'
+        domain = {"nelem": [10,10] , "ngl": 5, "lower":[-5,-5] ,"upper":[5,5]}
+        with open(f'src/cases/{case}.yaml') as f:
+            yamlData = yaml.load(f, Loader=yaml.Loader)
+        self.fem = ImmersedBoundaryStatic(yamlData, case=case, **domain)
+        self.fem.setUp()
+        self.fem.setUpSolver()

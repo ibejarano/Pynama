@@ -97,28 +97,28 @@ class Spectral(Element):
         # geometry use a reduced set
         elTotNodes = self.nnode
 
-        elStiffMat = np.mat(np.zeros((self.dim*elTotNodes,
-                                      self.dim*elTotNodes)))
-        elR_wMat = np.mat(np.zeros((self.dim*elTotNodes,
-                                    self.dim_w*elTotNodes)))
-        elR_dMat = np.mat(np.zeros((self.dim*elTotNodes, elTotNodes)))
+        elStiffMat = np.zeros((self.dim*elTotNodes,
+                                      self.dim*elTotNodes))
+        elR_wMat = np.zeros((self.dim*elTotNodes,
+                                    self.dim_w*elTotNodes))
+        elR_dMat = np.zeros((self.dim*elTotNodes, elTotNodes))
 
         # Velocity interpolation
-        Hvel = np.mat(np.zeros((self.dim, self.dim*elTotNodes)))
+        Hvel = np.zeros((self.dim, self.dim*elTotNodes))
         # Velocity gradient
-        B_gr = np.mat(np.zeros((self.dim**2, self.dim*elTotNodes)))
+        B_gr = np.zeros((self.dim**2, self.dim*elTotNodes))
         # Velocity divergence
-        B_div = np.mat(np.zeros((1, self.dim*elTotNodes)))
+        B_div = np.zeros((1, self.dim*elTotNodes))
         # Velocity curl
-        B_curl = np.mat(np.zeros((self.dim_w, self.dim*elTotNodes)))
+        B_curl = np.zeros((self.dim_w, self.dim*elTotNodes))
         # Vorticty curl
-        Bw_curl = np.mat(np.zeros((self.dim, self.dim_w*elTotNodes)))
+        Bw_curl = np.zeros((self.dim, self.dim_w*elTotNodes))
 
         for idx, gp in enumerate(self.gps):
             Hrs = self.Hrs[idx]
             H = self.H[idx]
-            J = self.HrsCoo[idx] * coords #coords
-            Hxy = inv(J) * Hrs
+            J = self.HrsCoo[idx].dot(coords)
+            Hxy = inv(J).dot(Hrs)
             detJ = det(J)
 
             for nd in range(self.dim):
@@ -128,17 +128,17 @@ class Spectral(Element):
             for i,ind in enumerate (self.indWCurl):
                 Bw_curl[ind[0],ind[1]::self.dim_w]= (-1)**(i)*Hxy[ind[2]]
             
-            elStiffMat += gp.w * detJ * B_gr.T * B_gr
-            elR_wMat += gp.w * detJ * Hvel.T * Bw_curl
-            elR_dMat -= gp.w * detJ * Hvel.T * Hxy
+            elStiffMat += gp.w * detJ * B_gr.T.dot(B_gr)
+            elR_wMat += gp.w * detJ * Hvel.T.dot(Bw_curl)
+            elR_dMat -= gp.w * detJ * Hvel.T.dot(Hxy)
         
         Hvel = np.zeros((self.dim_w, self.dim_w*elTotNodes))
         # Reduced integration of penalizations
         for idx, gp in enumerate(self.gpsRed):
             Hrs = self.HrsRed[idx]
             H = self.HRed[idx]
-            J = self.HrsCooRed[idx] * coords
-            Hxy = inv(J) * Hrs
+            J = self.HrsCooRed[idx].dot(coords)
+            Hxy = inv(J).dot(Hrs)
             detJ = det(J)
 
             for nd in range(self.dim):
@@ -149,41 +149,46 @@ class Spectral(Element):
             for nd in range(self.dim_w):
                 Hvel[nd, nd::self.dim_w] = H
             
-            elStiffMat += gp.w * detJ * (alpha_d * B_div.T * B_div +
-                                         + alpha_w * B_curl.T * B_curl)
+            elStiffMat += gp.w * detJ * (alpha_d * B_div.T.dot(B_div) +
+                                         + alpha_w * B_curl.T.dot(B_curl))
 
-            elR_wMat += gp.w * detJ * alpha_w * B_curl.T * Hvel
-            elR_dMat += gp.w * detJ * alpha_d * Hxy.flatten('F').T * H
+            elR_wMat += gp.w * detJ * alpha_w * B_curl.T.dot(Hvel)
+            # print("Actual Dim", self.dim)
+            # print("Shape of Hxy", Hxy.shape)
+            # print("Shape of H", H.T.shape)
+            # print("Shape of Hxy * H", Hxy.T.dot(H).shape )
+            # print("Shape of R_d", elR_dMat.shape)
+            elR_dMat += gp.w * detJ * alpha_d * np.outer(Hxy.flatten("F"), H)
         return (elStiffMat, elR_wMat, elR_dMat)
 
     def getElemKLEOperators(self, coords):
         coords.shape = (int(len(coords)/self.dim), self.dim)
         elTotNodes = self.nnode
-        elSTensorMat = np.mat(np.zeros((self.dim_s*elTotNodes,
-                                        self.dim*elTotNodes)))
+        elSTensorMat = np.zeros((self.dim_s*elTotNodes,
+                                        self.dim*elTotNodes))
         # The strain rate tensor is symmetric, thus we work with reduced
         # number of components
-        elDivSTMat = np.mat(np.zeros((self.dim*elTotNodes,
-                                      self.dim_s*elTotNodes)))
-        elCurlMat = np.mat(np.zeros((self.dim_w*elTotNodes,
-                                     self.dim*elTotNodes)))
-        elWeigMat = np.mat(np.zeros((elTotNodes, elTotNodes)))
+        elDivSTMat = np.zeros((self.dim*elTotNodes,
+                                      self.dim_s*elTotNodes))
+        elCurlMat = np.zeros((self.dim_w*elTotNodes,
+                                     self.dim*elTotNodes))
+        elWeigMat = np.zeros((elTotNodes, elTotNodes))
         # Strain rate Tensor
-        B_srt = np.mat(np.zeros((self.dim_s, self.dim*elTotNodes)))
-        Hsrt = np.mat(np.zeros((self.dim_s, self.dim_s*elTotNodes)))
+        B_srt = np.zeros((self.dim_s, self.dim*elTotNodes))
+        Hsrt = np.zeros((self.dim_s, self.dim_s*elTotNodes))
         # Velocity gradient divergence
-        B_div = np.mat(np.zeros((self.dim, self.dim_s*elTotNodes)))
-        Hdiv = np.mat(np.zeros((self.dim, self.dim*elTotNodes)))
+        B_div = np.zeros((self.dim, self.dim_s*elTotNodes))
+        Hdiv = np.zeros((self.dim, self.dim*elTotNodes))
         # Velocity curl
-        B_curl = np.mat(np.zeros((self.dim_w, self.dim*elTotNodes)))
-        Hcurl = np.mat(np.zeros((self.dim_w, self.dim_w*elTotNodes)))
+        B_curl = np.zeros((self.dim_w, self.dim*elTotNodes))
+        Hcurl = np.zeros((self.dim_w, self.dim_w*elTotNodes))
 
         for idx, gp in enumerate(self.gpsOp):
             Hrs = self.HrsOp[idx]
             H = self.HOp[idx]
 
             J = self.HrsCooOp[idx].dot( coords )
-            Hxy = inv(J) * Hrs
+            Hxy = inv(J).dot(Hrs)
             detJ = det(J)
 
             for nd_s in range(self.dim_s):
@@ -209,10 +214,10 @@ class Spectral(Element):
             for i in range(self.dim_w):
                 Hcurl[i,i::self.dim_w] = H
 
-            elSTensorMat += gp.w * detJ * Hsrt.T.dot( B_srt )
-            elDivSTMat += gp.w * detJ * Hdiv.T.dot( B_div )
-            elCurlMat += gp.w * detJ * Hcurl.T.dot( B_curl )
-            elWeigMat += gp.w * detJ * H.T.dot( H ) 
+            elSTensorMat += gp.w * detJ * Hsrt.T.dot(B_srt)
+            elDivSTMat += gp.w * detJ * Hdiv.T.dot(B_div )
+            elCurlMat += gp.w * detJ * Hcurl.T.dot(B_curl)
+            elWeigMat += gp.w * detJ * np.outer(H, H)
 
         elWeigVec = elWeigMat.sum(1)
         return (elSTensorMat, elDivSTMat, elCurlMat, elWeigVec)
@@ -275,14 +280,16 @@ class Spectral(Element):
         for doubleTern in itertools.product(h1D, h1D):
             auxRow = [reduce(operator.mul, twoPle, 1) for twoPle
                       in itertools.product(*doubleTern)]
-            H.append(np.mat([auxRow[y] for y in invPerm]))
+            H.append(np.array([auxRow[y] for y in invPerm]))
+            # print("inv",invPerm)
+            # print("aux",auxRow)
 
         # Derivatives of H wrt R & S
         Hrs = list()
         for doubleTern in itertools.product(dh1D, h1D):
             auxRow = [reduce(operator.mul, twoPle, 1) for twoPle
                       in itertools.product(*doubleTern)]
-            Hrs.append(np.mat([[auxRow[y] for y in invPerm],
+            Hrs.append(np.array([[auxRow[y] for y in invPerm],
                                [0]*len(invPerm)]))
 
         for ind, doubleTern in enumerate(itertools.product(h1D, dh1D)):
@@ -311,14 +318,14 @@ class Spectral(Element):
         for doubleTern in itertools.product(h1D, h1D ,h1D):
             auxRow = [reduce(operator.mul, twoPle, 1) for twoPle
                       in itertools.product(*doubleTern)]
-            H.append(np.mat([auxRow[y] for y in invPerm]))
+            H.append(np.array([auxRow[y] for y in invPerm]))
 
         # Derivatives of H wrt  R , S & T
         Hrs = list()
         for doubleTern in itertools.product(dh1D, h1D , h1D):
             auxRow = [reduce(operator.mul, twoPle, 1) for twoPle
                       in itertools.product(*doubleTern)]
-            Hrs.append(np.mat([[auxRow[y] for y in invPerm],
+            Hrs.append(np.array([[auxRow[y] for y in invPerm],
                                [0]*len(invPerm),
                                [0]*len(invPerm)]))
 
