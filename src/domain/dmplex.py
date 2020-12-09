@@ -296,23 +296,27 @@ class DMPlexDom(PETSc.DMPlex):
         conecMat = self.getDMConectivityMat()
         rStart, rEnd = conecMat.getOwnershipRange()
         locElRow = rEnd - rStart
-        # ind_d = [0] * (rEnd - rStart)
-        ind_d = np.zeros(rEnd-rStart, dtype=set)
-        # ind_o = [0] * (rEnd - rStart)
-        ind_o = np.zeros(rEnd-rStart, dtype=set)
+        ind_d = np.zeros(locElRow, dtype=set)
+        alt_d = np.zeros(locElRow, dtype=np.int32)
+        ind_o = np.zeros(locElRow, dtype=set)
+        alt_o = np.zeros(locElRow, dtype=np.int32)
+
         for row in range(rStart, rEnd):
             cols, _ = conecMat.getRow(row)
             locRow = row - rStart
             mask_diag = np.logical_and(cols >= rStart,cols < rEnd)
             mask_off = np.logical_or(cols < rStart,cols >= rEnd)
             ind_d[locRow] = set(cols[mask_diag])
+            alt_d[locRow] = len(ind_d[locRow]) 
             ind_o[locRow] = set(cols[mask_off])
+            alt_o[locRow] = len(ind_o[locRow]) 
         conecMat.destroy()
-        d_nnz_ind = [len(indSet) for indSet in ind_d]
-        o_nnz_ind = [len(indSet) for indSet in ind_o]
-        locElRow = rEnd - rStart
-        d_nnz_ind = [x if x <= locElRow else locElRow for x in d_nnz_ind]
-        return rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o
+        # d_nnz_ind = [len(indSet) for indSet in ind_d]
+        # o_nnz_ind = [len(indSet) for indSet in ind_o]
+
+        # TODO : Fix the line below for parallel
+        # d_nnz_ind = [x if x <= locElRow else locElRow for x in d_nnz_ind]
+        return rStart, rEnd, alt_d, alt_o, ind_d, ind_o
 
     def getNodesOverline(self, line: str, val: float, invert=False):
         assert line in ['x', 'y']
