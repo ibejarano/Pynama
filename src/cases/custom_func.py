@@ -73,12 +73,12 @@ class CustomFuncCase(FreeSlip):
         exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort, self.dim_w)
         return exactVel, exactVort
 
-    def applyBoundaryConditions(self, time, bcNodes):
+    def applyBoundaryConditions(self, time):
         self.vel.set(0.0)
         fvel_coords = lambda coords: self.velFunction(coords, self.nu, t=time)
         fvort_coords = lambda coords: self.vortFunction(coords, self.nu, t=time)
-        self.vel = self.dom.applyFunctionVecToVec(bcNodes, fvel_coords, self.vel, self.dim)
-        self.vort = self.dom.applyFunctionVecToVec(bcNodes, fvort_coords, self.vort, self.dim_w)
+        self.vel = self.dom.applyFunctionVecToVec(self.bcNodes, fvel_coords, self.vel, self.dim)
+        self.vort = self.dom.applyFunctionVecToVec(self.bcNodes, fvort_coords, self.vort, self.dim_w)
         self.vel.assemble()
         self.vort.assemble()
 
@@ -90,11 +90,10 @@ class CustomFuncCase(FreeSlip):
         viscousTimes=[0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
         times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
         nodesToPlot, coords = self.dom.getNodesOverline("x", 0.5)
-        boundaryNodes = self.dom.getNodesFromLabel("External Boundary")
         plotter = Plotter(r"$\frac{u}{U}$" , r"$\frac{y}{Y}$")
         for step,time in enumerate(times):
             exactVel, exactVort = self.generateExactVecs(time)
-            self.applyBoundaryConditions(time, boundaryNodes)
+            self.applyBoundaryConditions(time)
             self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
             self.operator.Curl.mult( exactVel , self.vort )
             self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort)
@@ -131,7 +130,6 @@ class CustomFuncCase(FreeSlip):
 
     def OperatorsTests(self, viscousTime=1):
         time = (viscousTime**2)/(4*self.nu)
-        boundaryNodes = self.dom.getNodesFromLabel("External Boundary")
         self.applyBoundaryConditions(time, boundaryNodes)
         step = 0
         exactVel, exactVort, exactConv, exactDiff = self.generateExactOperVecs(time)

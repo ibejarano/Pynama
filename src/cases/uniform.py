@@ -32,16 +32,15 @@ class UniformFlow(FreeSlip):
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
 
-    def applyBoundaryConditions(self, time, bcNodes):
+    def applyBoundaryConditions(self, time):
         self.vel.set(0.0)
-        self.vel = self.dom.applyValuesToVec(bcNodes, self.cteValue, self.vel)
+        self.vel = self.dom.applyValuesToVec(self.bcNodes, self.cteValue, self.vel)
 
     def solveKLETests(self, startTime=0.0, endTime=1.0, steps=10):
         times = np.linspace(startTime, endTime, steps)
-        boundaryNodes = self.dom.getNodesFromLabel("External Boundary")
         for step,time in enumerate(times):
             exactVel, exactVort = self.generateExactVecs(time)
-            self.applyBoundaryConditions(time, boundaryNodes)
+            self.applyBoundaryConditions(time)
             self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
             self.mat.Curl.mult( exactVel , self.vort )
             self.viewer.saveVec(self.vel, timeStep=step)

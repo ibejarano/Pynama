@@ -265,7 +265,7 @@ class BaseProblem(object):
     def computeInitialCondition(self, startTime):
         pass
 
-    def applyBoundaryConditions(self, time, bcNodes):
+    def applyBoundaryConditions(self, time):
         pass
 
     def readBoundaryCondition(self):
@@ -475,7 +475,7 @@ class FreeSlip(BaseProblem):
             self.logger.info(f"Empty Operators created")
 
     def solveKLE(self, time, vort):
-        self.applyBoundaryConditions(time, self.bcNodes)
+        self.applyBoundaryConditions(time)
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def getKLEError(self, viscousTimes=None ,startTime=0.0, endTime=1.0, steps=10):
@@ -485,11 +485,10 @@ class FreeSlip(BaseProblem):
             viscousTimes = np.arange(startTime, endTime, (endTime - startTime)/steps)
 
         times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
-        boundaryNodes = self.dom.getNodesFromLabel("External Boundary")
         errors = list()
         for time in times:
             exactVel, exactVort = self.generateExactVecs(time)
-            self.applyBoundaryConditions(time, boundaryNodes)
+            self.applyBoundaryConditions(time)
             self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
             error = (exactVel - self.vel).norm(norm_type=2)
             errors.append(error)

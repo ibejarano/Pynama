@@ -20,7 +20,6 @@ class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
         super().setUp()
         self.setUpBodies()
-        self.boundaryNodes = self.dom.getNodesFromLabel("External Boundary")
         cells = self.getAffectedCells(10)
         self.collectedNodes, self.maxNodesPerLag = self.collectNodes(cells)
         self.totalEulerNodes = len(self.dom.getAllNodes())
@@ -197,11 +196,11 @@ class ImmersedBoundaryStatic(FreeSlip):
         self._Aux1 = PETSc.Vec().createMPI(
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
 
-    def applyBoundaryConditions(self, time, bcNodes):
+    def applyBoundaryConditions(self, time):
         self.vel.set(0.0)
-        velDofs = [nodes*self.dim + dof for nodes in self.boundaryNodes for dof in range(self.dim)]
-        self.vel.setValues(velDofs, np.tile(self.cteValue, len(self.boundaryNodes)))
-        self.vort.setValues( self.boundaryNodes, np.zeros(len(self.boundaryNodes)) , addv=False )
+        velDofs = [nodes*self.dim + dof for nodes in self.bcNodes for dof in range(self.dim)]
+        self.vel.setValues(velDofs, np.tile(self.cteValue, len(self.bcNodes)))
+        self.vort.setValues( self.bcNodes, np.zeros(len(self.bcNodes)) , addv=False )
 
     def computeVelocityCorrection(self, **kwargs):
         bodyVel = self.body.getVelocity()
