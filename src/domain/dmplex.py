@@ -3,7 +3,7 @@ from domain.indices import IndicesManager
 import numpy as np
 import logging
 from mpi4py import MPI
-from math import pi
+from math import pi, floor
 class DMPlexDom(PETSc.DMPlex):
     def __init__(self, **kwargs):
         comm = MPI.COMM_WORLD
@@ -223,13 +223,19 @@ class DMPlexDom(PETSc.DMPlex):
             globalNodes.extend(self.indicesManager.getGlobalNodes(entity, shared=False)[0])
         return globalNodes
 
-    def getNodesCoordinates(self, nodes):
+    def getNodesCoordinates(self, nodes=None, indices=None):
         """
         nodes: [Int]
         """
         dim = self.getDimension()
-        indices = self.indicesManager.mapNodesToIndices(nodes, dim)
-        arr = self.fullCoordVec.getValues(indices).reshape((len(nodes),dim))
+        try:
+            assert nodes is not None
+            indices = self.indicesManager.mapNodesToIndices(nodes, dim)
+            arr = self.fullCoordVec.getValues(indices).reshape((len(nodes),dim))
+        except AssertionError:
+            assert indices is not None
+            numOfNodes = floor(len(indices) / dim)
+            arr = self.fullCoordVec.getValues(indices).reshape((numOfNodes,dim))
         return arr
 
     def getBorderNodesWithNormal(self, cell, intersect):
