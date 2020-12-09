@@ -29,12 +29,6 @@ class UniformFlow(FreeSlip):
         self.buildKLEMats()
         self.buildOperators()
 
-    def setUpBoundaryConditions(self):
-        self.dom.setLabelToBorders()
-        self.dom.setBoundaryCondition(["right", "up", "left", "down"],[])
-        if not self.comm.rank:
-            self.logger.info(f"Boundary Conditions setted up")
-
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
 

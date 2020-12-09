@@ -54,12 +54,6 @@ class CustomFuncCase(FreeSlip):
             print(self.case)
             raise Exception("Case not found")
 
-    def setUpBoundaryConditions(self):
-        self.dom.setLabelToBorders()
-        self.dom.setBoundaryCondition(["right", "up", "left", "down"],[])
-        if not self.comm.rank:
-            self.logger.info(f"Boundary Conditions setted up")
-
     def computeInitialCondition(self, startTime):
         allNodes = self.dom.getAllNodes()
         fvort_coords = lambda coords: self.vortFunction(coords, self.nu,t=startTime)

@@ -46,12 +46,6 @@ class ImmersedBoundaryStatic(FreeSlip):
             self.re = self.U_ref / self.nu
         self.logger.info(f"Velocity Free Stream: {self.cteValue}")
 
-    def setUpBoundaryConditions(self):
-        self.dom.setLabelToBorders()
-        self.dom.setBoundaryCondition(["right", "up", "left", "down"],[])
-        if not self.comm.rank:
-            self.logger.info(f"Boundary Conditions setted up")
-
     def setUpDomain(self):
         super().setUpDomain()
         if self.meshType == 'box-mesh':
