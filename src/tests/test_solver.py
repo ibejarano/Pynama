@@ -2,13 +2,15 @@ import unittest
 from cases.uniform import UniformFlow
 from cases.custom_func import CustomFuncCase
 import yaml
+from petsc4py import PETSc
+import numpy as np
 
 class TestKle2D(unittest.TestCase):
     def setFemProblem(self, case, **kwargs):
         with open(f'src/cases/{case}.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
         if case == 'uniform':
-            fem = UniformFlow(yamlData, case=case)
+            fem = UniformFlow(yamlData, case=case, **kwargs)
         else:
             fem = CustomFuncCase(yamlData, case=case , **kwargs)
         fem.setUp()
@@ -58,3 +60,28 @@ class TestKle3D(unittest.TestCase):
         fem.view()
         self.assertLess(normError, 2e-13)
         del fem
+
+class TestRHSEval(TestKle2D):
+
+    def test_VtensV_eval(self):
+        domain = {'lower':[0,0,0],'upper':[1,1],'nelem':[2,2], 'ngl':2}
+        fem = self.setFemProblem('uniform', **domain)
+
+        vec_init = [ 1 , 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 ]
+        vec_ref = [ 1 , 1*2 , 2*2 ,
+        3*3 , 3*4 , 4*4 ,
+        5*5 , 5*6 , 6*6 ,
+        7*7 , 7*8 , 8*8 ,
+        9*9 , 9*10 ,10*10  ,
+        11*11 ,11*12  , 12*12 ,
+        13*13 , 13*14 , 14*14 ,
+        15*15 , 15*16 , 16*16 ,
+        17*17 , 17*18 , 18*18 ,
+        ]
+
+        vec_ref = np.array(vec_ref)
+        vec_init = PETSc.Vec().createWithArray(np.array(vec_init))
+
+        fem.computeVtensV(vec=vec_init)
+
+        np.testing.assert_array_almost_equal(vec_ref, fem._VtensV, decimal=10)

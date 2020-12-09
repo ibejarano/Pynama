@@ -241,12 +241,16 @@ class BaseProblem(object):
 
         self.operator.Curl.mult(rhs, f)
 
-    def computeVtensV(self):
+    def computeVtensV(self, vec=None):
+        if vec is not None:
+            arr = vec.getArray()
+        else:
+            arr = self.vel.getArray()
+
         sK, eK = self.mat.K.getOwnershipRange()
-        velArr = self.vel.getArray()
         ind = np.arange(int(sK*self.dim_s/self.dim), int(eK*self.dim_s/self.dim), dtype=np.int32)
-        v_x = velArr[::self.dim]
-        v_y = velArr[1::self.dim]
+        v_x = arr[::self.dim]
+        v_y = arr[1::self.dim]
         self._VtensV.setValues(ind[::self.dim_s], v_x**2 , False)
         self._VtensV.setValues(ind[1::self.dim_s], v_x * v_y , False)
         self._VtensV.setValues(ind[2::self.dim_s], v_y**2 , False)
