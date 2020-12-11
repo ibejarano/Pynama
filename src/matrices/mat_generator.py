@@ -7,12 +7,11 @@ class Mat:
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
         self.comm = comm
+        self.mats = list()
 
     def assembleAll(self):
-        self.K.assemble()
-        self.Rw.assemble()
-        self.Rd.assemble()
-        self.Krhs.assemble()
+        for m in self.mats:
+            m.assemble()
 
     def isParallel(self):
         return self.comm.rank > 1
@@ -71,9 +70,15 @@ class Mat:
             ow_nnz[minInd:maxInd] = [0] * self.dim
 
         self.K = self.createEmptyMat(vel_dofs, vel_dofs,d_nnz, o_nnz )
+        self.K.setName("K")
         self.Rw = self.createEmptyMat(vel_dofs, vort_dofs, dw_nnz, ow_nnz)
+        self.Rw.setName("Rw")
         self.Rd = self.createEmptyMat(vel_dofs, locElRow, dd_nnz, od_nnz)
+        self.Rd.setName("Rd")
         self.Krhs = self.createEmptyMat(vel_dofs, vel_dofs, drhs_nnz, orhs_nnz)
+        self.Krhs.setName("Krhs")
+
+        self.mats = [self.K, self.Rw, self.Rd, self.Krhs]
 
     def createEmptyMat(self, rows, cols, d_nonzero, offset_nonzero):
         mat = PETSc.Mat().createAIJ(((rows, None), (cols, None)),
@@ -99,6 +104,19 @@ class Mat:
             self.K.setValues(indd, indd, 1, addv=False)
         self.Krhs.assemble()
         self.K.assemble()
+
+    def printMatsInfo(self):
+        print(" MATS INFO ")
+        print(f"Mat   | Memory Used [B]  | NZ Unneeded")
+        print(f"--------------------------------------")
+        for m in self.mats:
+            info = m.getInfo()
+            print(self.formatMatInfo(m.getName(), info))
+
+    @staticmethod
+    def formatMatInfo(name, info):
+        return f"{name:{5}} | {info['memory']:{16}} | {info['nz_unneeded']:{10}}"
+    
 
 class Operators(Mat):
     def createAll(self, rStart, rEnd, d_nnz_ind, o_nnz_ind):
