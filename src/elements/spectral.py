@@ -153,11 +153,6 @@ class Spectral(Element):
                                          + alpha_w * B_curl.T.dot(B_curl))
 
             elR_wMat += gp.w * detJ * alpha_w * B_curl.T.dot(Hvel)
-            # print("Actual Dim", self.dim)
-            # print("Shape of Hxy", Hxy.shape)
-            # print("Shape of H", H.T.shape)
-            # print("Shape of Hxy * H", Hxy.T.dot(H).shape )
-            # print("Shape of R_d", elR_dMat.shape)
             elR_dMat += gp.w * detJ * alpha_d * np.outer(Hxy.flatten("F"), H)
         return (elStiffMat, elR_wMat, elR_dMat)
 
