@@ -497,8 +497,7 @@ class FreeSlip(BaseProblem):
         return errors
 
     def buildKLEMats(self):
-        indices2one = set() 
-        boundaryNodes = self.mat.globalIndicesDIR
+        # indices2one = set() 
         # cornerCoords = self.dom.getCellCornersCoords(cell=0)
         # locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
@@ -509,8 +508,7 @@ class FreeSlip(BaseProblem):
             indicesVel = self.dom.getVelocityIndex(nodes)
             indicesW = self.dom.getVorticityIndex(nodes)
            
-            nodeBCintersect = boundaryNodes & set(nodes)
-            
+            nodeBCintersect = set(self.bcNodes) & set(nodes)
             dofFreeFSSetNS = set()  # local dof list free at FS sol
             dofSetFSNS = set()  # local dof list set at both solutions
 
@@ -532,11 +530,11 @@ class FreeSlip(BaseProblem):
                 self.mat.Krhs.setValues(
                 gldofFree, gldof2beSet,
                 -locK[np.ix_(dofFree, dof2beSet)], addv=True)
-                indices2one.update(gldof2beSet)
-
+                # indices2one.update(gldof2beSet)
+                # print(indices2one)
                 # FIXME: is the code below really necessary?
-                for indd in gldof2beSet:
-                    self.mat.Krhs.setValues(indd, indd, 0, addv=True)
+                # for indd in gldof2beSet:
+                #     self.mat.Krhs.setValues(indd, indd, 0, addv=True)
 
             self.mat.K.setValues(gldofFree, gldofFree,
                              locK[np.ix_(dofFree, dofFree)], addv=True)
@@ -546,7 +544,8 @@ class FreeSlip(BaseProblem):
 
             self.mat.Rw.setValues(gldofFree, indicesW,
                               locRw[np.ix_(dofFree, range(len(indicesW)))], addv=True)
+
+        self.mat.setIndices2One(self.mat.globalIndicesDIR)
         self.mat.assembleAll()
-        self.mat.setIndices2One(indices2one)
         if not self.comm.rank:
             self.logger.info(f"KLE Matrices builded")
