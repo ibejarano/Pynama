@@ -1,14 +1,14 @@
 from petsc4py.PETSc import KSP
 from petsc4py.PETSc import PC
+import logging
 
 class KspSolver(KSP):
     def __init__(self):
-        pass
+        self.logger = None
 
     def createSolver(self, mat, comm):
-        # self.logger.debug("setupKSP")
-        # create linear solver
-        # ksp = PETSc.KSP()
+        self.logger = logging.getLogger("KSP Solver")
+        self.logger.debug("setupKSP")
         self.create(comm)
         self.setType('preonly')
         pc = PC().create()
