@@ -55,8 +55,14 @@ class Mat:
         # FIXME: This reserves self.dim nonzeros for each node with
         # Dirichlet conditions despite the number of DoF conditioned
         drhs_nnz, orhs_nnz = self.createNNZWithArray(drhs_nnz_ind, orhs_nnz_ind, self.dim, self.dim)
-        drhs_nnz[np.array(list(indicesDIR))*2] = 1
-        drhs_nnz[np.array(list(indicesDIR))*2+1] = 1
+
+        # FIXME: Here i fix the globalIndicesDIR to REAL Indices and not nodes
+        tmp = np.array(list(indicesDIR), dtype=np.int32)
+        self.globalIndicesDIR = np.repeat(tmp*self.dim, self.dim)
+        for dim in range(self.dim-1):
+            self.globalIndicesDIR[dim+1::self.dim] += dim+1
+
+        drhs_nnz[self.globalIndicesDIR] = 1
 
         for indRow in set(range(rStart, rEnd)) & set(indicesDIR):
             minInd = (indRow - rStart) * self.dim
@@ -79,7 +85,6 @@ class Mat:
         self.Rd.setName("Rd")
         self.Krhs = self.createEmptyMat(vel_dofs, vel_dofs, drhs_nnz, orhs_nnz)
         self.Krhs.setName("Krhs")
-
         self.mats = [self.K, self.Rw, self.Rd, self.Krhs]
 
     def createEmptyMat(self, rows, cols, d_nonzero, offset_nonzero):
@@ -102,8 +107,8 @@ class Mat:
 
     def setIndices2One(self, indices2one):
         for indd in indices2one:
-            self.Krhs.setValues(indd, indd, 1, addv=False)
-            self.K.setValues(indd, indd, 1, addv=False)
+            self.Krhs.setValues(indd, indd, 1, addv=True)
+            self.K.setValues(indd, indd, 1, addv=True)
         self.Krhs.assemble()
         self.K.assemble()
 
