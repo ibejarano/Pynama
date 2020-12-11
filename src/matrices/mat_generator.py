@@ -55,6 +55,8 @@ class Mat:
         # FIXME: This reserves self.dim nonzeros for each node with
         # Dirichlet conditions despite the number of DoF conditioned
         drhs_nnz, orhs_nnz = self.createNNZWithArray(drhs_nnz_ind, orhs_nnz_ind, self.dim, self.dim)
+        drhs_nnz[np.array(list(indicesDIR))*2] = 1
+        drhs_nnz[np.array(list(indicesDIR))*2+1] = 1
 
         for indRow in set(range(rStart, rEnd)) & set(indicesDIR):
             minInd = (indRow - rStart) * self.dim
