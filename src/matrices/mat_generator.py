@@ -33,8 +33,6 @@ class Mat:
         vel_dofs = locElRow * self.dim
         vort_dofs = locElRow * self.dim_w
         # Create matrices for the resolution of the KLE and vorticity transport
-        # Create array of NNZ from d_nnz_ind and o_nnz_ind to create K
-        d_nnz, o_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim, self.dim )
         # Create array of NNZ from d_nnz_ind and o_nnz_ind to create Rw
         dw_nnz, ow_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim_w, self.dim)
         # Create array of NNZ from d_nnz_ind and o_nnz_ind to create Rd
@@ -48,8 +46,12 @@ class Mat:
                 drhs_nnz_ind[indRow] = 1
             else:
                 drhs_nnz_ind[indRow] = len(indSet & self.globalIndicesDIR)
+                d_nnz_ind[indRow] = d_nnz_ind[indRow] - len(indSet & self.globalIndicesDIR)
         for indRow, indSet in enumerate(ind_o):
             orhs_nnz_ind[indRow] = len(indSet & self.globalIndicesDIR)
+
+        # Create array of NNZ from d_nnz_ind and o_nnz_ind to create K
+        d_nnz, o_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim, self.dim )
 
         # FIXME: This reserves self.dim nonzeros for each node with
         # Dirichlet conditions despite the number of DoF conditioned

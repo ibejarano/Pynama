@@ -23,10 +23,10 @@ class BaseProblem(object):
         self.timerTotal= Timer()
         self.timerTotal.tic()
         self.timer = Timer()
-        try:
-            case = PETSc.Options().getString('case', kwargs['case'] )
-        except:
-            raise Exception("Case not defined")
+        if 'case' in kwargs:
+            case = kwargs['case']
+        else:
+            case = PETSc.Options().getString('case', 'uniform')
         self.config = config
         self.logger = logging.getLogger(self.config.get("name"))
         self.case = case
@@ -466,11 +466,13 @@ class FreeSlip(BaseProblem):
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
 
+        d_nnz_ind_op = d_nnz_ind.copy()
+
         self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)
         if not self.comm.rank:
             self.logger.info(f"Empty KLE Matrices created")
 
-        self.operator.createAll(rStart, rEnd, d_nnz_ind, o_nnz_ind)
+        self.operator.createAll(rStart, rEnd, d_nnz_ind_op, o_nnz_ind)
         if not self.comm.rank:
             self.logger.info(f"Empty Operators created")
 
