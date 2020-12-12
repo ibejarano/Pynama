@@ -1,9 +1,11 @@
 from petsc4py import PETSc
 import numpy as np
+import logging
 
 class Mat:
     def __init__(self, dim, comm=PETSc.COMM_WORLD):
         self.dim = dim
+        self.logger = logging.getLogger(f"[{comm.rank}]:MatClass")
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
         self.comm = comm
@@ -14,7 +16,7 @@ class Mat:
             m.assemble()
 
     def isParallel(self):
-        return self.comm.rank > 1
+        return self.comm.size > 1
 
     def getGlobalIndices(self, localIndices):
         globalIndices = set()
