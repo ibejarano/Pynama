@@ -28,7 +28,7 @@ class BaseProblem(object):
         else:
             case = PETSc.Options().getString('case', 'uniform')
         self.config = config
-        self.logger = logging.getLogger(self.config.get("name"))
+        self.logger = logging.getLogger(f"[{self.comm.rank}] {self.config.get('name')}")
         self.case = case
         self.caseName = self.config.get("name")
         self.readDomainData(kwargs)
@@ -500,6 +500,7 @@ class FreeSlip(BaseProblem):
         # indices2one = set() 
         # cornerCoords = self.dom.getCellCornersCoords(cell=0)
         # locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
+        globalBCNodes = self.dom.getNodesFromLabel("External Boundary", shared=True)
         for cell in range(self.dom.cellStart, self.dom.cellEnd):
             cornerCoords = self.dom.getCellCornersCoords(cell)
             locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
@@ -508,7 +509,7 @@ class FreeSlip(BaseProblem):
             indicesVel = self.dom.getVelocityIndex(nodes)
             indicesW = self.dom.getVorticityIndex(nodes)
            
-            nodeBCintersect = set(self.bcNodes) & set(nodes)
+            nodeBCintersect = set(globalBCNodes) & set(nodes)
             dofFreeFSSetNS = set()  # local dof list free at FS sol
             dofSetFSNS = set()  # local dof list set at both solutions
 

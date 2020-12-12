@@ -138,12 +138,12 @@ class DMPlexDom(PETSc.DMPlex):
             faces = []
         return faces
 
-    def getNodesFromLabel(self, label) -> set:
+    def getNodesFromLabel(self, label, shared=False) -> set:
         nodes = set()
         try:
             entities = self.getStratumIS(label, 0).getIndices()
             # for entity in entities:
-            nodes |= self.getGlobalNodesFromEntities(entities,shared=False)
+            nodes |= self.getGlobalNodesFromEntities(entities,shared=shared)
         except:
             self.logger.warning(f"Label >> {label} << found")
         return nodes
@@ -325,7 +325,11 @@ class DMPlexDom(PETSc.DMPlex):
         # o_nnz_ind = [len(indSet) for indSet in ind_o]
 
         # TODO : Fix the line below for parallel
+        # TODO : this line is not doing anything at all
         # d_nnz_ind = [x if x <= locElRow else locElRow for x in d_nnz_ind]
+        # self.logger.info(f"d_nnz_ind_old {o_nnz_ind}")
+        # self.logger.info(f"new one {alt_o}  ")
+        # exit()
         return rStart, rEnd, alt_d, alt_o, ind_d, ind_o
 
     def getNodesOverline(self, line: str, val: float, invert=False):

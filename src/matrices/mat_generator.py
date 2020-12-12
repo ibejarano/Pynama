@@ -14,6 +14,7 @@ class Mat:
     def assembleAll(self):
         for m in self.mats:
             m.assemble()
+            self.logger.debug(f"Mat {m.getName()} Assembled")
 
     def isParallel(self):
         return self.comm.size > 1
@@ -52,7 +53,6 @@ class Mat:
 
         # Create array of NNZ from d_nnz_ind and o_nnz_ind to create K
         d_nnz, o_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim, self.dim )
-
         # FIXME: This reserves self.dim nonzeros for each node with
         # Dirichlet conditions despite the number of DoF conditioned
         drhs_nnz, orhs_nnz = self.createNNZWithArray(drhs_nnz_ind, orhs_nnz_ind, self.dim, self.dim)
@@ -65,11 +65,7 @@ class Mat:
         for dim in range(self.dim-1):
             self.globalIndicesDIR[dim+1::self.dim] += dim+1
             locIndicesTmp[dim+1::self.dim] += dim+1
-
-        self.logger.info(f"locIndicesTMP: {locIndicesTmp}")
-        self.logger.info(f"self.globalIndicesDIR {self.globalIndicesDIR}")
-        self.logger.info(f"drhs_nnz {drhs_nnz}")
-
+            
         drhs_nnz[locIndicesTmp] = 1
         del locIndicesTmp
 
