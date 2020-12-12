@@ -33,7 +33,6 @@ class Mat:
         locElRow = rEnd - rStart
         vel_dofs = locElRow * self.dim
         vort_dofs = locElRow * self.dim_w
-        # Create matrices for the resolution of the KLE and vorticity transport
         # Create array of NNZ from d_nnz_ind and o_nnz_ind to create Rw
         dw_nnz, ow_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim_w, self.dim)
         # Create array of NNZ from d_nnz_ind and o_nnz_ind to create Rd
@@ -59,12 +58,20 @@ class Mat:
         drhs_nnz, orhs_nnz = self.createNNZWithArray(drhs_nnz_ind, orhs_nnz_ind, self.dim, self.dim)
 
         # FIXME: Here i fix the globalIndicesDIR to REAL Indices and not nodes
-        tmp = np.array(list(indicesDIR), dtype=np.int32)
+        tmp = np.array(list(self.globalIndicesDIR), dtype=np.int32)
+        tmp_loc = np.array(list(indicesDIR), dtype=np.int32)
         self.globalIndicesDIR = np.repeat(tmp*self.dim, self.dim)
+        locIndicesTmp = np.repeat(tmp_loc*self.dim, self.dim) - rStart*self.dim
         for dim in range(self.dim-1):
             self.globalIndicesDIR[dim+1::self.dim] += dim+1
+            locIndicesTmp[dim+1::self.dim] += dim+1
 
-        drhs_nnz[self.globalIndicesDIR] = 1
+        self.logger.info(f"locIndicesTMP: {locIndicesTmp}")
+        self.logger.info(f"self.globalIndicesDIR {self.globalIndicesDIR}")
+        self.logger.info(f"drhs_nnz {drhs_nnz}")
+
+        drhs_nnz[locIndicesTmp] = 1
+        del locIndicesTmp
 
         for indRow in set(range(rStart, rEnd)) & set(indicesDIR):
             minInd = (indRow - rStart) * self.dim
