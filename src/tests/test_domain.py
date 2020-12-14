@@ -1,23 +1,73 @@
 import unittest
-from domain.dmplex import DMPlexDom
-from elements.spectral import Spectral
+from domain.dmplex import Domain, BoxDom, GmshDom
+from domain.elements.spectral import Spectral
 import numpy as np
 import numpy.testing as np_test
 from math import sqrt
 from petsc4py import PETSc
 
+class TestDomainInterface(unittest.TestCase):
+    def setUp(self):
+        dataBoxMesh = {"ngl":3, "box_mesh": {
+        "nelem": [2,2],
+        "lower": [0,0],
+        "upper": [1,1]
+    }}
+        self.dataBoxMesh = dataBoxMesh
+        self.dataGmsh = {"ngl": 3 , "gmsh_file": "src/tests/test.msh"}
+
+    def test_create_boxmesh(self):
+        dom = Domain(self.dataBoxMesh)
+        test_type = dom.getMeshType()
+        test_ngl = dom.getNGL()
+        test_numOfElem = dom.getNumOfElements()
+        assert test_type == 'box'
+        assert test_numOfElem == 4
+        assert test_ngl == 3
+
+    def test_create_gmsh(self):
+        dom = Domain(self.dataGmsh)
+        test_type = dom.getMeshType()
+        test_ngl = dom.getNGL()
+        test_numOfElem = dom.getNumOfElements()
+        assert test_type == 'gmsh'
+        assert test_ngl == 3
+        assert test_numOfElem == 33
+
+    def test_box_set_from_opts_ngl(self):
+        ngl_ref = 7
+        dom = Domain(self.dataBoxMesh, ngl=ngl_ref)
+        ngl_test = dom.getNGL()
+        assert ngl_test == ngl_ref
+
+    def test_gmsh_set_from_opts_ngl(self):
+        ngl_ref = 9
+        dom = Domain(self.dataGmsh, ngl=ngl_ref)
+        ngl_test = dom.getNGL()
+        assert ngl_test == ngl_ref
+
+    def test_set_from_opts_nelem(self):
+        dom = Domain(self.dataBoxMesh, nelem=[4,4])
+        test_numOfElem = dom.getNumOfElements()
+        assert test_numOfElem == 16
+
+    def test_set_from_opts_hmin(self):
+        pass
 class TestBoxDMPLEX2D(unittest.TestCase):
 
     # Test Roadmap
     ## 1. Separate dmplex from indicesmanager
 
     def setUp(self):
+        ngl = 3
         data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [3,4]}
-        self.dom = DMPlexDom(boxMesh=data2D)
-        self.dom.setFemIndexing(3)
+        self.dom = BoxDom(data2D)
+        self.dom.setFemIndexing(ngl)
 
     def test_generate_dmplex(self):
         assert self.dom.getDimension() == 2
+        self.dom.getTotalNodes()
+        assert False
 
     def test_cell_start_end(self):
         self.assertEqual(self.dom.cellStart, 0)
@@ -54,7 +104,7 @@ class TestNglIndexing2D(unittest.TestCase):
         self.doms = list()
         data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [2,3]}
         for ngl in range(2, 10 , 2):
-            dm = DMPlexDom(boxMesh=data2D)
+            dm = BoxDom(data2D)
             dm.setFemIndexing(ngl)
             self.doms.append(dm)
 
@@ -81,7 +131,7 @@ class TestBoxDMPLEX3D(unittest.TestCase):
 
     def setUp(self):
         data3D = {'lower': [0,0,0] , 'upper':[0.6,0.8,1], "nelem": [3,4,5]}
-        self.dom = DMPlexDom(boxMesh=data3D)
+        self.dom = BoxDom(data3D)
         self.dom.setFemIndexing(3)
 
     def test_generate_dmplex(self):
@@ -140,7 +190,7 @@ class TestNglIndexing3D(unittest.TestCase):
         self.doms = list()
         data3D = {'lower': [0,0,0] , 'upper':[0.6,0.8,1], "nelem": [2,3,4]}
         for ngl in range(2, 10 , 2):
-            dm = DMPlexDom(boxMesh=data3D)
+            dm = BoxDom(data3D)
             dm.setFemIndexing(ngl)
             self.doms.append(dm)
 
@@ -175,7 +225,7 @@ class DomainModTests2D(unittest.TestCase):
     def setUp(self):
         ngl = 2
         data2D = {'lower': [0,0] , 'upper':[1,1], "nelem": [2,2]}
-        self.dom = DMPlexDom(boxMesh=data2D)
+        self.dom = BoxDom(data2D)
         self.dom.setFemIndexing(ngl)
 
         dim = self.dom.getDimension()
@@ -187,7 +237,7 @@ class DomainModTests2D(unittest.TestCase):
     def test_get_all_global_nodes_ngls(self):
         data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [2,3]}
         for ngl in range(2, 14):
-            dom = DMPlexDom(boxMesh=data2D)
+            dom = BoxDom(data2D)
             dom.setFemIndexing(ngl)
             allNodes = dom.getAllNodes()
             total = 12 + 17*(ngl-2) + 6*((ngl-2)**2)

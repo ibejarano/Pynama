@@ -2,9 +2,9 @@ import unittest
 import numpy as np
 import math
 import numpy.testing as np_test
-from elements.utilities import gaussPoints, lobattoPoints, GaussPoint2D, generateGaussPoints3D ,GaussPoint3D ,generateGaussPoints2D
-from elements.elemutils import SpElem2D, SpElem3D
-from elements.spectral import Spectral
+from domain.elements.utilities import gaussPoints, lobattoPoints, GaussPoint2D, generateGaussPoints3D ,GaussPoint3D ,generateGaussPoints2D
+from domain.elements.elemutils import SpElem2D, SpElem3D
+from domain.elements.spectral import Spectral
 
 class SpectralTest(unittest.TestCase):
     def setUp(self):

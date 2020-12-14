@@ -17,7 +17,7 @@ from numpy import linalg
 import itertools
 from functools import reduce
 import operator
-from elements.utilities import GaussPoint2D, GaussPoint3D
+from .utilities import GaussPoint2D, GaussPoint3D
 from numpy.linalg import inv, det
 
 class Element(object):

@@ -1,27 +1,106 @@
+import petsc4py
+import sys
+petsc4py.init(sys.argv)
 from petsc4py import PETSc
-from domain.indices import IndicesManager
+from .indices import IndicesManager
+from .elements.spectral import Spectral
 import numpy as np
 import logging
 from mpi4py import MPI
 from math import pi, floor
-class DMPlexDom(PETSc.DMPlex):
-    def __init__(self, **kwargs):
-        comm = MPI.COMM_WORLD
-        try:
-            meshData = kwargs['boxMesh']
-            lower = kwargs['lower'] if 'lower' in kwargs else meshData.get('lower')
-            upper = kwargs['upper'] if 'upper' in kwargs else meshData.get('upper')
-            faces = kwargs['nelem'] if 'nelem' in kwargs else meshData.get('nelem')
-            try:
-                self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
-            except TypeError:
-                lower = [eval(lower[0]) , eval(lower[1])]
-                upper = [eval(upper[0]) , eval(upper[1])]
-                self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False, comm=comm)
-        except:
-            fileName = kwargs['fileName']
-            self.createFromFile(fileName, comm=comm)
 
+def checkOption(optName, optKwargs):
+    OptDB = PETSc.Options()
+    optStr = OptDB.getString(optName, False)
+    if optStr:
+        print(f"Setting {optName} from options: {optStr}")
+        return optStr
+    elif optName in optKwargs:
+        print(f"Setting {optName} from args: {optKwargs[optName]}")
+        return optKwargs[optName]
+    else:
+        return False
+
+class Domain:
+    def __init__(self, data:dict={}, comm=PETSc.COMM_WORLD, **kwargs):
+        # 1. Gmsh file wins to all
+        self.logger = logging.getLogger(f"{[comm.rank]} - Domain:")
+        domainData = checkOption("gmsh_file", kwargs)
+        if domainData:
+            self.logger.info("Setting up with options: gmsh_file")
+            self.__meshType = 'gmsh'
+        elif 'gmsh_file' in data:
+            self.__meshType = 'gmsh'
+            domainData = data['gmsh_file']
+            self.logger.info("Setting up with gmsh file from yaml")
+        else:
+            self.__meshType = 'box'
+            if 'box_mesh' in data:
+                domainData = data['box_mesh']
+                self.logger.info("Setting up with Box from yaml")
+                nelemOpt = checkOption("nelem", kwargs)
+                if nelemOpt:
+                    self.logger.info("Setting nelem with options")
+                    try:
+                        nelemOpt = eval(nelemOpt)
+                    except:
+                        nelemOpt = nelemOpt
+                    domainData['nelem'] = nelemOpt
+
+            else:
+                raise Exception("Domain not defined")
+
+        nglOpt = checkOption("ngl", kwargs)
+        if nglOpt:
+            self.__ngl = nglOpt
+            self.logger.info(f"Setting NGL w/ options : {self.__ngl}")
+        else:
+            self.__ngl = data['ngl']
+            self.logger.info(f"NGL : {self.__ngl}")
+
+
+        self.createDomain(domainData)
+        dim = self.__dm.getDimension()
+        self.setUpSpectralElement(Spectral(self.__ngl, dim))
+
+    def createDomain(self, inp):
+        if self.__meshType == 'box':
+            dm = BoxDom(inp)
+        elif self.__meshType == 'gmsh':
+            dm = GmshDom(inp)
+        else:
+            raise Exception("Mesh Type not defined")
+
+        self.__dm = dm
+
+    def getMeshType(self):
+        return self.__meshType
+
+    def getNGL(self):
+        return self.__ngl
+
+    def getNumOfElements(self):
+        return self.__dm.getTotalElements()
+
+    def setUpIndexing(self):
+        pass
+
+    def setUpSpectralElement(self, elem):
+        self.__elem = elem
+
+    def view(self):
+        print("Domain info")
+        if self.__dm == None:
+            print(f"Domain not Setted up")
+        print(f"Domain dimensions: {self.__dm.getDimension()}")
+        print(f"Mesh Type : {self.__meshType}")
+        print(f"Element Type : {self.__elem}")
+        print(f"Total number of Elements: {self.getNumOfElements()}")
+        print(f"Total number of Nodes: {'Not implemented yet'}")
+
+class DMPlexDom(PETSc.DMPlex):
+    comm = MPI.COMM_WORLD
+    def __init__(self):
         self.logger = logging.getLogger(f"[{self.comm.rank}] Class")
         self.logger.debug("Domain Instance Created")
         self.createLabel('External Boundary')
@@ -62,6 +141,14 @@ class DMPlexDom(PETSc.DMPlex):
 
     def getNGL(self):
         return self.indicesManager.getNGL()
+
+    def getTotalElements(self):
+        firstCell, lastCell = self.getHeightStratum(0)
+        return lastCell - firstCell
+
+    def getTotalNodes(self):
+        test = self.indicesManager.testFun()
+        print(test)
 
     def computeFullCoordinates(self, spElem):
         # self.logger = logging.getLogger("[{}] DomainMin Compute Coordinates".format(self.comm.rank))
@@ -350,24 +437,26 @@ class DMPlexDom(PETSc.DMPlex):
         arr_y = vecArr[nodes*self.dim+1]
         return arr_x, arr_y
 
-class DomainElementInterface(object):
-    
-    def __init__(self, element):
-        self.elem = element
+class BoxDom(DMPlexDom):
+    """Estrucuted DMPlex Mesh"""
+    def __init__(self, data):
+        lower = data['lower']
+        upper = data['upper']
+        faces = data['nelem']
+        self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False)
+        super().__init__()
 
-    def getTotalNodes(self):   
-        return self.elem.nnode
-
+class GmshDom(DMPlexDom):
+    """Unstructured DMPlex Mesh"""
+    def __init__(self, fileName: str):
+        self.createFromFile(fileName)
+        super().__init__()
 
 if __name__ == "__main__":
-    lower = [0,0]
-    upper = [1,1]
-    faces = [3,3]
-    dm = DMPlexDom(lower, upper, faces)
-    for i in ["left", "right", "up", "down"]:
-        cara = dm.__getBorderEntities(i)
-        print(i)
-        for car in cara:
-            coords = dm.getFaceCoords(car).reshape(2,2)
-            print(coords)
-    # dm.view()
+    data = {"ngl":3, "box_mesh": {
+        "nelem": [2,2],
+        "lower": [0,0],
+        "upper": [1,1]
+    }}
+
+    domain = Domain(data)

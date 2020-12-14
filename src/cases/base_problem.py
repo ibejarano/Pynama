@@ -2,8 +2,8 @@ import yaml
 from petsc4py import PETSc
 from mpi4py import MPI
 # Local packages
-from domain.dmplex import DMPlexDom
-from elements.spectral import Spectral
+from domain.dmplex import DMPlexDom, Domain
+from domain.elements.spectral import Spectral
 from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
 from matrices.mat_generator import Mat, Operators
@@ -77,6 +77,8 @@ class BaseProblem(object):
         if not self.comm.rank:
             self.logger.info(f"DMPlex dom created")
 
+        self.setUpElement()
+
     def setUpElement(self):
         self.elemType = Spectral(self.ngl, self.dim)
         if not self.comm.rank:
@@ -125,7 +127,6 @@ class BaseProblem(object):
 
     def setUpGeneral(self):
         self.setUpDomain()
-        self.setUpElement()
         self.createMesh()
         self.bcNodes = self.dom.getNodesFromLabel("External Boundary")
     # @profile
