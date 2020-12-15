@@ -21,30 +21,43 @@ class TestDomainInterface(unittest.TestCase):
         test_type = dom.getMeshType()
         test_ngl = dom.getNGL()
         test_numOfElem = dom.getNumOfElements()
+        test_numOfNodes = dom.getNumOfNodes()
         assert test_type == 'box'
         assert test_numOfElem == 4
         assert test_ngl == 3
+        assert test_numOfNodes == 25
 
     def test_create_gmsh(self):
         dom = Domain(self.dataGmsh)
         test_type = dom.getMeshType()
         test_ngl = dom.getNGL()
         test_numOfElem = dom.getNumOfElements()
+        test_numOfNodes = dom.getNumOfNodes()
         assert test_type == 'gmsh'
         assert test_ngl == 3
         assert test_numOfElem == 33
+        assert test_numOfNodes == 153 # This number is from Gmsh
 
     def test_box_set_from_opts_ngl(self):
         ngl_ref = 7
         dom = Domain(self.dataBoxMesh, ngl=ngl_ref)
         ngl_test = dom.getNGL()
+
+        nelem = self.dataBoxMesh['box_mesh']['nelem']
+        ref_numOfNodes = (ngl_ref*nelem[0] - 1)*(ngl_ref*nelem[1] - 1)
+
+        test_numOfNodes = dom.getNumOfNodes()
         assert ngl_test == ngl_ref
+        assert test_numOfNodes == ref_numOfNodes
 
     def test_gmsh_set_from_opts_ngl(self):
-        ngl_ref = 9
+        ngl_ref = 8
         dom = Domain(self.dataGmsh, ngl=ngl_ref)
+        test_numOfNodes = dom.getNumOfNodes()
+
         ngl_test = dom.getNGL()
         assert ngl_test == ngl_ref
+        assert test_numOfNodes == 1688 # This number is from Gmsh
 
     def test_set_from_opts_nelem(self):
         dom = Domain(self.dataBoxMesh, nelem=[4,4])
@@ -53,6 +66,7 @@ class TestDomainInterface(unittest.TestCase):
 
     def test_set_from_opts_hmin(self):
         pass
+
 class TestBoxDMPLEX2D(unittest.TestCase):
 
     # Test Roadmap
@@ -63,11 +77,6 @@ class TestBoxDMPLEX2D(unittest.TestCase):
         data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [3,4]}
         self.dom = BoxDom(data2D)
         self.dom.setFemIndexing(ngl)
-
-    def test_generate_dmplex(self):
-        assert self.dom.getDimension() == 2
-        self.dom.getTotalNodes()
-        assert False
 
     def test_cell_start_end(self):
         self.assertEqual(self.dom.cellStart, 0)
