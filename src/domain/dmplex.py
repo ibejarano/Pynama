@@ -60,6 +60,7 @@ class Domain:
 
 
         self.createDomain(domainData)
+        self.setUpIndexing()
         dim = self.__dm.getDimension()
         self.setUpSpectralElement(Spectral(self.__ngl, dim))
 
@@ -82,8 +83,11 @@ class Domain:
     def getNumOfElements(self):
         return self.__dm.getTotalElements()
 
+    def getNumOfNodes(self):
+        return self.__dm.getTotalNodes()
+
     def setUpIndexing(self):
-        pass
+        self.__dm.setFemIndexing(self.__ngl)
 
     def setUpSpectralElement(self, elem):
         self.__elem = elem
@@ -96,7 +100,7 @@ class Domain:
         print(f"Mesh Type : {self.__meshType}")
         print(f"Element Type : {self.__elem}")
         print(f"Total number of Elements: {self.getNumOfElements()}")
-        print(f"Total number of Nodes: {'Not implemented yet'}")
+        print(f"Total number of Nodes: {self.getNumOfNodes()}")
 
 class DMPlexDom(PETSc.DMPlex):
     comm = MPI.COMM_WORLD
@@ -147,8 +151,8 @@ class DMPlexDom(PETSc.DMPlex):
         return lastCell - firstCell
 
     def getTotalNodes(self):
-        test = self.indicesManager.testFun()
-        print(test)
+        totalNodes = self.indicesManager.getTotalNodes()
+        return totalNodes
 
     def computeFullCoordinates(self, spElem):
         # self.logger = logging.getLogger("[{}] DomainMin Compute Coordinates".format(self.comm.rank))

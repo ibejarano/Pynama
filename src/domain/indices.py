@@ -45,9 +45,9 @@ class IndicesManager:
     def getGlobalIndicesSection(self):
         return self._globalIndicesSection
 
-    def testFun(self):
-        a = self._globalIndicesSection.getChart()
-        return a
+    def getTotalNodes(self):
+        total = self._globalIndicesSection.getStorageSize()
+        return total
 
     def setDirichletNodes(self, nodes: set):
         self.__dirNodes |= nodes
