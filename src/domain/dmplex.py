@@ -25,27 +25,29 @@ class Domain:
     def __init__(self, data:dict={}, comm=PETSc.COMM_WORLD, **kwargs):
         # 1. Gmsh file wins to all
         self.logger = logging.getLogger(f"{[comm.rank]} - Domain:")
-        domainData = checkOption("gmsh_file", kwargs)
+        domainData = checkOption("gmsh-file", kwargs)
         if domainData:
-            self.logger.info("Setting up with options: gmsh_file")
+            self.logger.info("Setting up with options: gmsh-file")
             self.__meshType = 'gmsh'
-        elif 'gmsh_file' in data:
+        elif 'gmsh-file' in data:
             self.__meshType = 'gmsh'
-            domainData = data['gmsh_file']
+            domainData = data['gmsh-file']
             self.logger.info("Setting up with gmsh file from yaml")
         else:
             self.__meshType = 'box'
-            if 'box_mesh' in data:
-                domainData = data['box_mesh']
+            if 'box-mesh' in data:
+                domainData = data['box-mesh']
                 self.logger.info("Setting up with Box from yaml")
-                nelemOpt = checkOption("nelem", kwargs)
-                if nelemOpt:
-                    self.logger.info("Setting nelem with options")
-                    try:
-                        nelemOpt = eval(nelemOpt)
-                    except:
-                        nelemOpt = nelemOpt
-                    domainData['nelem'] = nelemOpt
+                availableOptions = ("nelem", "lower", "upper")
+                for opt in availableOptions:
+                    optConfigured = checkOption(opt, kwargs)
+                    if optConfigured:
+                        self.logger.info(f"Setting {opt} with options")
+                        try:
+                            optConfigured = eval(optConfigured)
+                        except:
+                            optConfigured = optConfigured
+                        domainData[opt] = optConfigured
 
             else:
                 raise Exception("Domain not defined")
@@ -59,10 +61,21 @@ class Domain:
             self.logger.info(f"NGL : {self.__ngl}")
 
 
+        print(domainData)
         self.createDomain(domainData)
         self.setUpIndexing()
         dim = self.__dm.getDimension()
         self.setUpSpectralElement(Spectral(self.__ngl, dim))
+
+    def setUp(self):
+        self.setUpLabels()
+        self.setUpBoundaryConditions()
+
+    def setUpBoundaryConditions(self):
+        self.__dm.setBoundaryCondition()
+
+    def setUpLabels(self):
+        self.__dm.setLabelToBorders()
 
     def createDomain(self, inp):
         if self.__meshType == 'box':
@@ -77,20 +90,79 @@ class Domain:
     def getMeshType(self):
         return self.__meshType
 
+    def getDimension(self):
+        return self.__dm.getDimension()
+
     def getNGL(self):
         return self.__ngl
 
     def getNumOfElements(self):
         return self.__dm.getTotalElements()
 
-    def getNumOfNodes(self):
-        return self.__dm.getTotalNodes()
-
     def setUpIndexing(self):
         self.__dm.setFemIndexing(self.__ngl)
 
     def setUpSpectralElement(self, elem):
         self.__elem = elem
+
+    # -- Coordinates methods ---
+    def getExtremeCoords(self):
+        lower, upper = self.__dm.getBoundingBox()
+        return lower, upper
+
+    def computeFullCoordinates(self):
+        self.__dm.computeFullCoordinates(self.__elem)
+
+    def getFullCoordVec(self):
+        return self.__dm.fullCoordVec
+
+
+    # -- Get / SET Nodes methods --
+    def getNumOfNodes(self):
+        return self.__dm.getTotalNodes()
+
+    def getBoundaryNodes(self):
+        return self.__dm.getNodesFromLabel("External Boundary")
+
+    def getAllNodes(self):
+        return self.__dm.getAllNodes()
+
+    # -- Mat Index Generator --
+    def getMatIndices(self):
+        return self.__dm.getMatIndices()
+
+    # -- Indices -- 
+    def getGlobalIndicesDirichlet(self):
+        return self.__dm.getGlobalIndicesDirichlet()
+
+    # -- Mat Building --
+    def getLocalCellRange(self):
+        return self.__dm.cellStart, self.__dm.cellEnd
+
+    def computeLocalKLEMats(self, cell):
+        cornerCoords = self.__dm.getCellCornersCoords(cell)
+        localMats = self.__elem.getElemKLEMatrices(cornerCoords)
+        nodes = self.__dm.getGlobalNodesFromCell(cell, shared=True)
+        # Build velocity and vorticity DoF indices
+        indicesVel = self.__dm.getVelocityIndex(nodes)
+        indicesW = self.__dm.getVorticityIndex(nodes)
+        inds = (indicesVel, indicesW)
+        return nodes, inds , localMats
+
+    def computeLocalOperators(self, cell):
+        cornerCoords = self.__dm.getCellCornersCoords(cell)
+        localOperators = self.__elem.getElemKLEOperators(cornerCoords)
+        nodes = self.__dm.getGlobalNodesFromCell(cell, shared=True)
+        return nodes, localOperators
+
+    # -- apply values to vec
+
+    def applyValuesToVec(self, nodes, vals, vec):
+        return self.__dm.applyValuesToVec(nodes, vals, vec)
+
+    def applyFunctionVecToVec(self,nodes, f_vec, vec, dof):
+        return self.__dm.applyFunctionVecToVec(nodes, f_vec, vec, dof)
+
 
     def view(self):
         print("Domain info")
