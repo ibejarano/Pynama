@@ -44,8 +44,9 @@ class BaseProblem(object):
             self.readBoundaryCondition(boundaryConditions)
 
     def setUp(self):
-        self.setUpGeneral()
-        self.setUpBoundaryConditions()
+        self.setUpDomain()
+        self.createMesh()
+        self.bcNodes = self.dom.getBoundaryNodes()
         self.setUpEmptyMats()
         self.buildKLEMats()
         self.buildOperators()
@@ -53,42 +54,13 @@ class BaseProblem(object):
     def setUpDomain(self):
         domain = self.config.get("domain")
         self.dom = None
-        if "box-mesh" in domain:
-            self.logger.info("Creating dom with box Mesh")
-            meshData = domain.get('box-mesh')
-            self.meshType = "box-mesh"
-            self.dom = DMPlexDom(boxMesh=meshData, **self.opts)
-        elif "gmsh-file" in domain:
-            self.logger.info("Creating dom with Gmsh File")
-            self.meshType = 'gmsh'
-            meshData = domain.get('gmsh-file')
-            self.dom = DMPlexDom(fileName=meshData)
+        self.dom = Domain(domain, **self.opts)
 
         self.dim = self.dom.getDimension()
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
 
-        if "ngl" in self.opts:
-            self.ngl = self.opts['ngl']
-        else:
-            self.ngl = domain['ngl']
-
-        self.dom.setFemIndexing(self.ngl)
-        if not self.comm.rank:
-            self.logger.info(f"DMPlex dom created")
-
-        self.setUpElement()
-
-    def setUpElement(self):
-        self.elemType = Spectral(self.ngl, self.dim)
-        if not self.comm.rank:
-            self.logger.info(f"{self.dim}-D ngl:{self.ngl} Spectral element created")
-
-    def setUpBoundaryConditions(self):
-        self.dom.setLabelToBorders()
-        self.dom.setBoundaryCondition()
-        if not self.comm.rank:
-            self.logger.info(f"Boundary Conditions setted up")
+        self.dom.setUp()
 
     def readMaterialData(self):
         materialData = self.config.get("material-properties")
@@ -119,22 +91,17 @@ class BaseProblem(object):
     def createMesh(self, saveMesh=True):
         saveDir = self.config.get("save-dir")
         self.viewer = Paraviewer(self.dim ,self.comm, saveDir)
-        self.dom.computeFullCoordinates(self.elemType)
+        self.dom.computeFullCoordinates()
         if saveMesh:
-            self.viewer.saveMesh(self.dom.fullCoordVec)
+            self.viewer.saveMesh(self.dom.getFullCoordVec())
         if not self.comm.rank:
             self.logger.info(f"Mesh created")
 
-    def setUpGeneral(self):
-        self.setUpDomain()
-        self.createMesh()
-        self.bcNodes = self.dom.getNodesFromLabel("External Boundary")
     # @profile
     def buildOperators(self):
-        cornerCoords = self.dom.getCellCornersCoords(cell=0)
-        localOperators = self.elemType.getElemKLEOperators(cornerCoords)
-        for cell in range(self.dom.cellStart, self.dom.cellEnd):
-            nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
+        cellStart, cellEnd = self.dom.getLocalCellRange()
+        for cell in range(cellStart, cellEnd):
+            nodes, localOperators = self.dom.computeLocalOperators(cell)
             self.operator.setValues(localOperators, nodes)
         self.operator.assembleAll()
         if not self.comm.rank:
@@ -501,15 +468,15 @@ class FreeSlip(BaseProblem):
         # indices2one = set() 
         # cornerCoords = self.dom.getCellCornersCoords(cell=0)
         # locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
-        globalBCNodes = self.dom.getNodesFromLabel("External Boundary", shared=True)
-        for cell in range(self.dom.cellStart, self.dom.cellEnd):
-            cornerCoords = self.dom.getCellCornersCoords(cell)
-            locK, locRw, _ = self.elemType.getElemKLEMatrices(cornerCoords)
-            nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
-            # Build velocity and vorticity DoF indices
-            indicesVel = self.dom.getVelocityIndex(nodes)
-            indicesW = self.dom.getVorticityIndex(nodes)
-           
+        globalBCNodes = self.bcNodes
+
+        cellStart , cellEnd = self.dom.getLocalCellRange()
+
+        for cell in range(cellStart, cellEnd):
+            nodes , inds , localMats = self.dom.computeLocalKLEMats(cell)
+            locK, locRw, _ = localMats
+            indicesVel, indicesW = inds
+            
             nodeBCintersect = set(globalBCNodes) & set(nodes)
             dofFreeFSSetNS = set()  # local dof list free at FS sol
             dofSetFSNS = set()  # local dof list set at both solutions
