@@ -47,12 +47,13 @@ class ImmersedBoundaryStatic(FreeSlip):
 
     def setUpDomain(self):
         super().setUpDomain()
-        if self.meshType == 'box-mesh':
+        meshType = self.dom.getMeshType()
+        if meshType == 'box':
             nelem = self.nelem
-            lower, upper = self.dom.getBoundingBox()
+            lower, upper = self.dom.getExtremeCoords()
             height = upper[1]  -  lower[0]
             self.h = (height/nelem[0]) / (self.ngl-1)
-        elif self.meshType == 'gmsh-file':
+        elif meshType == 'gmsh':
             self.h = self.config['domain']['h-min'] / (self.ngl-1)
         else:
             raise Exception("Mesh not defined")
@@ -68,18 +69,6 @@ class ImmersedBoundaryStatic(FreeSlip):
             # self.body.viewBodies()
         except AssertionError:
             raise Exception("Bodies not defined")
-
-    def buildOperators(self):
-        cornerCoords = self.dom.getCellCornersCoords(cell=0)
-        localOperators = self.elemType.getElemKLEOperators(cornerCoords)
-        for cell in range(self.dom.cellStart, self.dom.cellEnd):
-            # cornerCoords = self.dom.getCellCornersCoords(cell)
-            # localOperators = self.elemType.getElemKLEOperators(cornerCoords)
-            nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
-            self.operator.setValues(localOperators, nodes)
-        self.operator.assembleAll()
-        if not self.comm.rank:
-            self.logger.info(f"Operators Matrices builded")
 
     def startSolver(self):
         self.computeInitialCondition()
@@ -251,12 +240,11 @@ class ImmersedBoundaryStatic(FreeSlip):
         return list(nodes)
 
     def collectNodes(self, cells):
-        ibmNodes = self.dom.getGlobalNodesFromEntities(cells, shared=False)
+        # print(cells)
+        ibmNodes, eulerCoords = self.dom.getNodesCoordsFromEntities(cells)
         lagNodes = self.body.getTotalNodes()
-        eulerCoords = self.dom.getNodesCoordinates(ibmNodes)
         ibmNodes = np.array(list(ibmNodes), dtype=np.int32)
         nodes = dict()
-        indices = dict()
         maxFound = 0
         for lagNode in range(lagNodes):
             nodesFound = self.computeClose(lagNode, eulerCoords)
@@ -277,11 +265,10 @@ class ImmersedBoundaryStatic(FreeSlip):
         except:
             ySide = xSide
 
-        cellStart, cellEnd = self.dom.getHeightStratum(0)
+        cellStart, cellEnd = self.dom.getLocalCellRange()
         cells = list()
         for cell in range(cellStart, cellEnd):
-            cellCoords = self.dom.getCellCornersCoords(cell).reshape(( 2 ** self.dim, self.dim))
-            cellCentroid = self.computeCentroid(cellCoords)
+            cellCentroid = self.dom.getCellCentroid(cell)
             dist = cellCentroid - center
             if abs(dist[0]) < (xSide) and abs(dist[1]) < (ySide):
                 cells.append(cell)
@@ -318,10 +305,6 @@ class ImmersedBoundaryStatic(FreeSlip):
             else:
                 close.append(0)
         return np.array(close)
-
-    @staticmethod
-    def computeCentroid(corners):
-        return np.mean(corners, axis=0)
     
     def markAffectedNodes(self, nodes):
         nnodes = len(nodes)

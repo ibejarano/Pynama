@@ -116,6 +116,13 @@ class Domain:
     def getFullCoordVec(self):
         return self.__dm.fullCoordVec
 
+    def getCellCentroid(self, cell):
+        dim = self.__dm.getDimension()
+        cornerCoords = self.__dm.getCellCornersCoords(cell).reshape((2**dim), dim)
+        return np.mean(cornerCoords, axis=0)
+
+    def getNodesCoordinates(self, nodes):
+        return self.__dm.getNodesCoordinates(nodes=nodes)
 
     # -- Get / SET Nodes methods --
     def getNumOfNodes(self):
@@ -126,6 +133,11 @@ class Domain:
 
     def getAllNodes(self):
         return self.__dm.getAllNodes()
+
+    def getNodesCoordsFromEntities(self, entities):
+        nodes = self.__dm.getGlobalNodesFromEntities(entities, shared=True)
+        coords = self.__dm.getNodesCoordinates(nodes)
+        return nodes, coords
 
     # -- Mat Index Generator --
     def getMatIndices(self):
