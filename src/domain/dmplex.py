@@ -60,8 +60,6 @@ class Domain:
             self.__ngl = data['ngl']
             self.logger.info(f"NGL : {self.__ngl}")
 
-
-        print(domainData)
         self.createDomain(domainData)
         self.setUpIndexing()
         dim = self.__dm.getDimension()
