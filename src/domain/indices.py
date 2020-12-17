@@ -54,7 +54,7 @@ class IndicesManager:
 
     def getDirichletNodes(self):
         self.globalIndicesDIR = set()
-        for remoteIndices in self.comm.tompi4py().allgather(self.__dirNodes):
+        for remoteIndices in self.comm.allgather(self.__dirNodes):
             self.globalIndicesDIR |= remoteIndices
         return self.__dirNodes
 
@@ -63,7 +63,7 @@ class IndicesManager:
 
     def getNoSlipNodes(self):
         self.globalIndicesNS = set()
-        for remoteIndices in self.comm.tompi4py().allgather(self.__nsNodes):
+        for remoteIndices in self.comm.allgather(self.__nsNodes):
             self.globalIndicesNS |= remoteIndices
         return self.__nsNodes
 
