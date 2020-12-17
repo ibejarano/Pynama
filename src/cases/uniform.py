@@ -11,11 +11,7 @@ from viewer.paraviewer import Paraviewer
 
 class UniformFlow(FreeSlip):
     def setUp(self):
-        self.setUpGeneral()
-        self.setUpBoundaryConditions()
-        self.setUpEmptyMats()
-        self.buildKLEMats()
-        self.buildOperators()
+        super().setUp()
 
         if self.dim == 2:
             self.cteValue = [1,0]
@@ -23,11 +19,6 @@ class UniformFlow(FreeSlip):
             self.cteValue = [1, 0, 0]
         else:
             raise Exception("Wrong dim")
-
-        self.setUpBoundaryConditions()
-        self.setUpEmptyMats()
-        self.buildKLEMats()
-        self.buildOperators()
 
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
