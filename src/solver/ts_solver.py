@@ -1,8 +1,8 @@
-from petsc4py.PETSc import TS
+from petsc4py.PETSc import TS, COMM_WORLD
 
 class TsSolver(TS):
     rk_types = ["3", "5f", "5bs"]
-    def __init__(self, comm):
+    def __init__(self, comm=COMM_WORLD):
         self.create(comm)
         self.setProblemType(self.ProblemType.NONLINEAR)
         # self.setEquationType(self.EquationType.ODE_EXPLICIT)
