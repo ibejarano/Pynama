@@ -64,7 +64,7 @@ class TestKle3D(unittest.TestCase):
 class TestRHSEval(TestKle2D):
 
     def test_VtensV_eval(self):
-        domain = {'lower':[0,0,0],'upper':[1,1],'nelem':[2,2], 'ngl':2}
+        domain = {'lower':[0,0],'upper':[1,1],'nelem':[2,2], 'ngl':2}
         fem = self.setFemProblem('uniform', **domain)
 
         vec_init = [ 1 , 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 ]
