@@ -14,8 +14,8 @@ class TestMat2D(unittest.TestCase):
         else:
             # fem = CustomFuncCase(yamlData, case=case , **kwargs)
             raise Exception("Test case not implemented")
-        fem.setUpGeneral()
-        fem.setUpBoundaryConditions()
+        fem.setUpDomain()
+        # fem.setUpBoundaryConditions()
         # fem.setUpEmptyMats()
         return fem
 
