@@ -8,13 +8,13 @@ from petsc4py import PETSc
 
 class TestDomainInterface(unittest.TestCase):
     def setUp(self):
-        dataBoxMesh = {"ngl":3, "box_mesh": {
+        dataBoxMesh = {"ngl":3, "box-mesh": {
         "nelem": [2,2],
         "lower": [0,0],
         "upper": [1,1]
     }}
         self.dataBoxMesh = dataBoxMesh
-        self.dataGmsh = {"ngl": 3 , "gmsh_file": "src/tests/test.msh"}
+        self.dataGmsh = {"ngl": 3 , "gmsh-file": "src/tests/test.msh"}
 
     def test_create_boxmesh(self):
         dom = Domain(self.dataBoxMesh)
@@ -43,7 +43,7 @@ class TestDomainInterface(unittest.TestCase):
         dom = Domain(self.dataBoxMesh, ngl=ngl_ref)
         ngl_test = dom.getNGL()
 
-        nelem = self.dataBoxMesh['box_mesh']['nelem']
+        nelem = self.dataBoxMesh['box-mesh']['nelem']
         ref_numOfNodes = (ngl_ref*nelem[0] - 1)*(ngl_ref*nelem[1] - 1)
 
         test_numOfNodes = dom.getNumOfNodes()
