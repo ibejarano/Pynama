@@ -14,12 +14,8 @@ from viewer.paraviewer import Paraviewer
 class CustomFuncCase(FreeSlip):
     # @profile
     def setUp(self):
-        self.setUpGeneral()
-        self.setUpBoundaryConditions()
-        self.setUpEmptyMats()
-        self.buildKLEMats()
-        self.buildOperators()
-
+        super().setUp()
+        
         self.nu = self.mu / self.rho
 
         if self.case == 'taylor-green':
