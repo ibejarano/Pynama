@@ -145,6 +145,9 @@ class Domain:
     def getGlobalIndicesDirichlet(self):
         return self.__dm.getGlobalIndicesDirichlet()
 
+    def getGlobalIndicesNoSlip(self):
+        return self.__dm.getGlobalIndicesNoSlip()
+
     # -- Mat Building --
     def getLocalCellRange(self):
         return self.__dm.cellStart, self.__dm.cellEnd
