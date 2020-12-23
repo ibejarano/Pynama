@@ -272,6 +272,7 @@ class NoSlipFreeSlip(BaseProblem):
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
         self.globalNodesDIR = self.dom.getGlobalIndicesDirichlet()
         globalNodesNS = self.dom.getGlobalIndicesNoSlip()
+        # print("globNS", globalNodesNS)
         self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, self.globalNodesDIR, globalNodesNS )
         if not self.comm.rank:
             self.logger.info(f"Empty KLE Matrices created")
@@ -283,7 +284,7 @@ class NoSlipFreeSlip(BaseProblem):
     def setUpSolver(self):
         super().setUpSolver()
         self.solverFS = KspSolver()
-        self.solverFS.createSolver(self.mat.K + self.mat.Kfs, self.comm) 
+        self.solverFS.createSolver(self.mat.K + self.mat.Kfs, self.comm)
         self.velFS = self.vel.copy()
 
     def solveKLE(self, time, vort):
@@ -298,16 +299,23 @@ class NoSlipFreeSlip(BaseProblem):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
         boundaryNodesNS = self.mat.globalIndicesNS
         boundaryNodesDIR =  self.mat.globalIndicesDIR
-        cornerCoords = self.dom.getCellCornersCoords(cell=0)
-        locK, locRw, locRd = self.elemType.getElemKLEMatrices(cornerCoords)
+        # cornerCoords = self.dom.getCellCornersCoords(cell=0)
+        # locK, locRw, locRd = self.elemType.getElemKLEMatrices(cornerCoords)
         indices2one = set()
         indices2onefs = set()
-        for cell in range(self.dom.cellStart, self.dom.cellEnd):
-            nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
+        cellStart , cellEnd = self.dom.getLocalCellRange()
+
+        print(boundaryNodesDIR, "DIR")
+        print(boundaryNodesNS, "NS")
+        exit()
+        for cell in range(cellStart, cellEnd):
+            # nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             # Build velocity and vorticity DoF indices
-            indicesVel = self.dom.getVelocityIndex(nodes)
-            indicesW = self.dom.getVorticityIndex(nodes)
-           
+            # indicesVel = self.dom.getVelocityIndex(nodes)
+            # indicesW = self.dom.getVorticityIndex(nodes)
+            nodes , inds , localMats = self.dom.computeLocalKLEMats(cell)
+            locK, locRw, locRd = localMats
+            indicesVel, indicesW = inds
             nodeBCintersectNS = boundaryNodesNS & set(nodes)
             nodeBCintersectDIR = boundaryNodesDIR & set(nodes)
             dofFreeFSSetNS = set()  # local dof list free at FS sol
@@ -348,10 +356,15 @@ class NoSlipFreeSlip(BaseProblem):
             dofFreeFSSetNS = list(dofFreeFSSetNS)
             dofSetFSNS = list(dofSetFSNS)
             gldofFreeFSSetNS = [indicesVel[ii] for ii in dofFreeFSSetNS]
+            print("gldofFreeFSSetNS", gldofFreeFSSetNS)
             gldofSetFSNS = [indicesVel[ii] for ii in dofSetFSNS]
+            print("gldofSetFSNS", gldofSetFSNS)
             gldof2beSet = [indicesVel[ii] for ii in dof2beSet]
+            print("gldof2beSet", gldof2beSet)
             gldofFree = [indicesVel[ii] for ii in dofFree]
+            print("gldofFree", gldofFree)
             
+            exit()
             if nodeBCintersectNS | nodeBCintersectDIR:
                 self.mat.Krhs.setValues(
                 gldofFree, gldof2beSet,

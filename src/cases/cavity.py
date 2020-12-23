@@ -4,8 +4,26 @@ import numpy as np
 
 class Cavity(NoSlipFreeSlip):
     def setUp(self):
-        super().setUp()
+        self.setUpDomain()
+        self.setNoSlipFaces()
+        self.createMesh()
+        self.bcNodes = self.dom.getBoundaryNodes()
+        self.setUpEmptyMats()
+        self.buildKLEMats()
+        self.buildOperators()
         self.collectCornerNodes()
+
+
+    def setNoSlipFaces(self):
+        bc = self.config.get("boundary-conditions")
+        if 'free-slip' in bc:
+            fsFaces = bc['free-slip'].keys()
+        else:
+            fsFaces = list()
+        nsFaces = self.nsWalls.getWallsNames()
+        self.dom.setUpBoundaryConditions(fsFaces, list(nsFaces))
+        if not self.comm.rank:
+            self.logger.info(f"No-Slip Faces setted up")
 
     def collectCornerNodes(self):
         cornerNodes = set()
@@ -34,19 +52,6 @@ class Cavity(NoSlipFreeSlip):
             for wallName, wallVelocity in inputData['no-slip'].items():
                 self.nsWalls.setWallVelocity(wallName, wallVelocity)
 
-    def setUpBoundaryConditions(self):
-        self.dom.setLabelToBorders()
-
-        bc = self.config.get("boundary-conditions")
-        if 'free-slip' in bc:
-            fsFaces = bc['free-slip'].keys()
-        else:
-            fsFaces = list()
-        nsFaces = self.nsWalls.getWallsNames()
-        self.dom.setBoundaryCondition(fsFaces, list(nsFaces))
-        if not self.comm.rank:
-            self.logger.info(f"Boundary Conditions setted up")
-
     def computeInitialCondition(self, startTime):
         self.vort.set(0.0)
 
@@ -61,17 +66,12 @@ class Cavity(NoSlipFreeSlip):
             self.vel.setValues(dofVelToSet, np.repeat(vel, len(nodes)))
 
         # set vel to zero in corner nodes
-        #self.vel.setValues(self.cornerDofs, np.repeat(0, len(self.cornerDofs)) )
+        # self.vel.setValues(self.cornerDofs, np.repeat(0, len(self.cornerDofs)) )
         self.vel.assemble()
 
     def applyBoundaryConditionsFS(self):
         wallsWithVel = self.nsWalls.getWallsWithVelocity()
         staticWalls = self.nsWalls.getStaticWalls()
-        for wallName in wallsWithVel:
-            nodes = self.dom.getBorderNodes(wallName)
-            vel, velDofs = self.nsWalls.getWallVelocity(wallName)
-            dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
-            self.velFS.setValues(dofVelToSet, np.repeat(vel, len(nodes)))
 
         for staticWall in staticWalls:
             nodes = self.dom.getBorderNodes(staticWall)
@@ -79,4 +79,9 @@ class Cavity(NoSlipFreeSlip):
             dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
             self.velFS.setValues(dofVelToSet, np.repeat(0, len(nodes)*len(velDofs)))
 
+        for wallName in wallsWithVel:
+            nodes = self.dom.getBorderNodes(wallName)
+            vel, velDofs = self.nsWalls.getWallVelocity(wallName)
+            dofVelToSet = [node*self.dim + dof for node in nodes for dof in velDofs]
+            self.velFS.setValues(dofVelToSet, np.repeat(vel, len(nodes)))
         self.velFS.assemble()

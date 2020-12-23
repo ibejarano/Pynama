@@ -69,8 +69,10 @@ class Domain:
         self.setUpLabels()
         self.setUpBoundaryConditions()
 
-    def setUpBoundaryConditions(self):
-        self.__dm.setBoundaryCondition()
+    def setUpBoundaryConditions(self, fsFaces =[], nsFaces=[]):
+        self.__fsFaces = fsFaces
+        self.__nsFaces = nsFaces
+        self.__dm.setBoundaryCondition(self.__fsFaces, self.__nsFaces)
 
     def setUpLabels(self):
         self.__dm.setLabelToBorders()
@@ -136,6 +138,12 @@ class Domain:
         nodes = self.__dm.getGlobalNodesFromEntities(entities, shared=True)
         coords = self.__dm.getNodesCoordinates(nodes)
         return nodes, coords
+
+    def getBorderNodesWithNormal(self, cell, cellNodes):
+        return self.__dm.getBorderNodesWithNormal(cell, cellNodes)
+
+    def getBorderNodes(self, borderName):
+        return self.__dm.getBorderNodes(borderName)
 
     # -- Mat Index Generator --
     def getMatIndices(self):
