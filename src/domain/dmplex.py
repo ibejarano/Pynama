@@ -2,8 +2,9 @@ import petsc4py
 import sys
 petsc4py.init(sys.argv)
 from petsc4py import PETSc
-from .indices import IndicesManager
-from .elements.spectral import Spectral
+from indices import IndicesManager
+from elements.spectral import Spectral
+from boundary_conditions import BoundaryConditions
 import numpy as np
 import logging
 from mpi4py import MPI
@@ -73,6 +74,17 @@ class Domain:
         self.__fsFaces = fsFaces
         self.__nsFaces = nsFaces
         self.__dm.setBoundaryCondition(self.__fsFaces, self.__nsFaces)
+
+    def newBCSETUP(self, data: dict):
+        bcs = BoundaryConditions()
+        bcs.setBoundaryConditions(data)
+        boundaries = bcs.getBoundaries()
+        for boundary in boundaries:
+            name = boundary.getName()
+            boundaryNodes = self.__dm.getBorderNodes(name)
+            boundary.setIndices(boundaryNodes)
+            print(boundary.getIndices())
+        
 
     def setUpLabels(self):
         self.__dm.setLabelToBorders()
@@ -558,10 +570,22 @@ class GmshDom(DMPlexDom):
         super().__init__()
 
 if __name__ == "__main__":
-    data = {"ngl":3, "box_mesh": {
+    data = {"ngl":2, "box-mesh": {
         "nelem": [2,2],
         "lower": [0,0],
         "upper": [1,1]
     }}
 
+    testData = {
+        "free-slip": {
+            "down": [None, 0],
+            "left": [1, 0],
+            "right": [1, 0]},
+        "no-slip": {
+            "up": [1, 1]
+        }
+    }
+
     domain = Domain(data)
+    domain.newBCSETUP(testData)
+    # domain.view()
