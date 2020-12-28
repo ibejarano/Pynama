@@ -42,14 +42,17 @@ class Mat:
         drhs_nnz_ind = np.zeros(locElRow)
         orhs_nnz_ind = np.zeros(locElRow)
 
+        # FIXME check performance only dim 2
+        glNodesDIR = set([ int(i/2) for i in list(self.globalIndicesDIR)[::2]])
+        # print(glNodesDIR)
         for indRow, indSet in enumerate(ind_d):
-            if (indRow + rStart) in self.globalIndicesDIR:
+            if (indRow + rStart) in glNodesDIR:
                 drhs_nnz_ind[indRow] = 1
             else:
-                drhs_nnz_ind[indRow] = len(indSet & self.globalIndicesDIR)
-                d_nnz_ind[indRow] = d_nnz_ind[indRow] - len(indSet & self.globalIndicesDIR)
+                drhs_nnz_ind[indRow] = len(indSet & glNodesDIR)
+                d_nnz_ind[indRow] = d_nnz_ind[indRow] - len(indSet & glNodesDIR)
         for indRow, indSet in enumerate(ind_o):
-            orhs_nnz_ind[indRow] = len(indSet & self.globalIndicesDIR)
+            orhs_nnz_ind[indRow] = len(indSet & glNodesDIR)
 
         # Create array of NNZ from d_nnz_ind and o_nnz_ind to create K
         d_nnz, o_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim, self.dim )
@@ -57,19 +60,9 @@ class Mat:
         # Dirichlet conditions despite the number of DoF conditioned
         drhs_nnz, orhs_nnz = self.createNNZWithArray(drhs_nnz_ind, orhs_nnz_ind, self.dim, self.dim)
 
-        # FIXME: Here i fix the globalIndicesDIR to REAL Indices and not nodes
-        tmp = np.array(list(self.globalIndicesDIR), dtype=np.int32)
-        tmp_loc = np.array(list(indicesDIR), dtype=np.int32)
-        self.globalIndicesDIR = np.repeat(tmp*self.dim, self.dim)
-        locIndicesTmp = np.repeat(tmp_loc*self.dim, self.dim) - rStart*self.dim
-        for dim in range(self.dim-1):
-            self.globalIndicesDIR[dim+1::self.dim] += dim+1
-            locIndicesTmp[dim+1::self.dim] += dim+1
-            
-        drhs_nnz[locIndicesTmp] = 1
-        del locIndicesTmp
+        nodesDIR = set([ int(i/2) for i in list(indicesDIR)[::2]])
 
-        for indRow in set(range(rStart, rEnd)) & set(indicesDIR):
+        for indRow in set(range(rStart, rEnd)) & set(nodesDIR):
             minInd = (indRow - rStart) * self.dim
             maxInd = (indRow - rStart + 1) * self.dim
 
