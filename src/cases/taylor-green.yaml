@@ -9,7 +9,7 @@ material-properties:
 domain:
   ngl: 3
   box-mesh:
-    nelem: [5,5]
+    nelem: [20,20]
     lower: [0,0]
     upper: [1,1]
 
@@ -17,3 +17,10 @@ time-solver:
   max-steps: 200
   start-time: 0
   end-time: 5
+
+boundary-conditions:
+  free-slip:
+    up: [0,0]
+    down: [0,0]
+    left: [0,0]
+    right: [0,0]
