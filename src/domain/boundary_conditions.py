@@ -7,6 +7,8 @@ class BoundaryConditions:
 
     def __init__(self):
         self.__boundaries = list()
+        self.__nsBoundaries = list()
+        self.__fsBoundaries = list()
         self.__type = None
 
     def setBoundaryConditions(self, data):
@@ -39,10 +41,29 @@ class BoundaryConditions:
     def __setBoundary(self, name, typ, values):
         boundary = Boundary(name, typ, values)
         self.__boundaries.append(boundary)
+        if typ == 'free-slip':
+            self.__fsBoundaries.append(boundary)
+        elif typ == 'no-slip':
+            self.__nsBoundaries.append(boundary)
+        else:
+            raise Exception("Wrong boundary type")
 
     def getBoundaries(self):
         return self.__boundaries
 
+    def getNoSlipIndices(self):
+        inds = IS().createGeneral([])
+        for bc in self.__nsBoundaries:
+            bcIS = bc.getIS()
+            inds = bcIS.union(inds)
+        return set(inds.getIndices())
+
+    def getFreeSlipIndices(self):
+        inds = IS().createGeneral([])
+        for bc in self.__fsBoundaries:
+            bcIS = bc.getIS()
+            inds = bcIS.union(inds)
+        return set(inds.getIndices())
 
 class Boundary:
     def __init__(self, name, t, values):
@@ -83,6 +104,9 @@ class Boundary:
 
     def getNodes(self):
         return self.__inds.getBlockIndices()
+
+    def getIS(self):
+        return self.__inds
 
     def destroy(self):
         """Free memory from the nodes or dofs saved

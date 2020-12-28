@@ -39,10 +39,6 @@ class BaseProblem(object):
         elif 'time-solver' in self.config:
             self.setUpTimeSolver()
 
-        if 'boundary-conditions' in self.config:
-            boundaryConditions = self.config.get("boundary-conditions")
-            self.readBoundaryCondition(boundaryConditions)
-
     def setUp(self):
         self.setUpDomain()
         self.createMesh()
@@ -61,6 +57,8 @@ class BaseProblem(object):
         self.dim_s = 3 if self.dim == 2 else 6
 
         self.dom.setUp()
+        bcData = self.config.get("boundary-conditions")
+        self.dom.setUpBoundaryConditions(bcData)
 
     def readMaterialData(self):
         materialData = self.config.get("material-properties")
@@ -446,7 +444,6 @@ class FreeSlip(BaseProblem):
         self.operator = Operators(self.dim, self.comm)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
-
         d_nnz_ind_op = d_nnz_ind.copy()
 
         self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)

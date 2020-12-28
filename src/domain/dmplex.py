@@ -2,9 +2,9 @@ import petsc4py
 import sys
 petsc4py.init(sys.argv)
 from petsc4py import PETSc
-from indices import IndicesManager
-from elements.spectral import Spectral
-from boundary_conditions import BoundaryConditions
+from .indices import IndicesManager
+from .elements.spectral import Spectral
+from .boundary_conditions import BoundaryConditions
 import numpy as np
 import logging
 from mpi4py import MPI
@@ -70,12 +70,12 @@ class Domain:
         self.setUpLabels()
         # self.setUpBoundaryConditions()
 
-    def setUpBoundaryConditions(self, fsFaces =[], nsFaces=[]):
-        self.__fsFaces = fsFaces
-        self.__nsFaces = nsFaces
-        self.__dm.setBoundaryCondition(self.__fsFaces, self.__nsFaces)
+    # def setUpBoundaryConditions(self, fsFaces =[], nsFaces=[]):
+    #     self.__fsFaces = fsFaces
+    #     self.__nsFaces = nsFaces
+    #     self.__dm.setBoundaryCondition(self.__fsFaces, self.__nsFaces)
 
-    def newBCSETUP(self, data: dict):
+    def setUpBoundaryConditions(self, data: dict):
         bcs = BoundaryConditions()
         bcs.setBoundaryConditions(data)
         boundaries = bcs.getBoundaries()
@@ -83,9 +83,8 @@ class Domain:
             name = boundary.getName()
             boundaryNodes = self.__dm.getBorderNodes(name)
             boundary.setIndices(boundaryNodes)
-            print(boundary.getIndices())
+        self.__bc = bcs
         
-
     def setUpLabels(self):
         self.__dm.setLabelToBorders()
 
@@ -163,10 +162,14 @@ class Domain:
 
     # -- Indices -- 
     def getGlobalIndicesDirichlet(self):
-        return self.__dm.getGlobalIndicesDirichlet()
+        fsIndices = self.__bc.getFreeSlipIndices()
+        return fsIndices
+        # return self.__dm.getGlobalIndicesDirichlet()
 
     def getGlobalIndicesNoSlip(self):
-        return self.__dm.getGlobalIndicesNoSlip()
+        nsIndices = self.__bc.getNoSlipIndices()
+        return nsIndices
+        # return self.__dm.getGlobalIndicesNoSlip()
 
     # -- Mat Building --
     def getLocalCellRange(self):
@@ -187,6 +190,7 @@ class Domain:
         localOperators = self.__elem.getElemKLEOperators(cornerCoords)
         nodes = self.__dm.getGlobalNodesFromCell(cell, shared=True)
         return nodes, localOperators
+
 
     # -- apply values to vec
 
@@ -578,11 +582,11 @@ if __name__ == "__main__":
 
     testData = {
         "free-slip": {
-            "down": [None, 0],
-            "left": [1, 0],
+            "up": [1, 0],
             "right": [1, 0]},
         "no-slip": {
-            "up": [1, 1]
+            "left": [1, 1],
+            "down": [None, 0]
         }
     }
 
