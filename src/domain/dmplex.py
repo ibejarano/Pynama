@@ -67,7 +67,7 @@ class Domain:
 
     def setUp(self):
         self.setUpLabels()
-        self.setUpBoundaryConditions()
+        # self.setUpBoundaryConditions()
 
     def setUpBoundaryConditions(self, fsFaces =[], nsFaces=[]):
         self.__fsFaces = fsFaces
@@ -184,7 +184,7 @@ class Domain:
     def applyFunctionVecToVec(self,nodes, f_vec, vec, dof):
         return self.__dm.applyFunctionVecToVec(nodes, f_vec, vec, dof)
 
-
+    # -- view methods
     def view(self):
         print("Domain info")
         if self.__dm == None:
@@ -194,6 +194,14 @@ class Domain:
         print(f"Element Type : {self.__elem}")
         print(f"Total number of Elements: {self.getNumOfElements()}")
         print(f"Total number of Nodes: {self.getNumOfNodes()}")
+
+    def viewNodesCoords(self):
+        print(" ===== Nodes Coordinates =====")
+        coordArr = self.__dm.fullCoordVec.getArray()
+        dim = self.__dm.getDimension()
+        totalNodes = int(len(coordArr) / dim)
+        for node in range(totalNodes):
+            print(f"Node: {node}  --- Coords {coordArr[node*dim:node*dim+dim]}")
 
 class DMPlexDom(PETSc.DMPlex):
     comm = MPI.COMM_WORLD
