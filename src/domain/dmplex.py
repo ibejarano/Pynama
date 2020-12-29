@@ -78,11 +78,10 @@ class Domain:
     def setUpBoundaryConditions(self, data: dict):
         bcs = BoundaryConditions()
         bcs.setBoundaryConditions(data)
-        boundaries = bcs.getBoundaries()
-        for boundary in boundaries:
-            name = boundary.getName()
-            boundaryNodes = self.__dm.getBorderNodes(name)
-            boundary.setIndices(boundaryNodes)
+        boundariesNames = bcs.getBoundariesNames()
+        for bName in boundariesNames:
+            nodes = self.__dm.getBorderNodes(bName)
+            bcs.setBoundaryNodes(bName, nodes)
         self.__bc = bcs
         
     def setUpLabels(self):
