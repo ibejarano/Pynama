@@ -66,10 +66,11 @@ class BoundaryConditions:
         return set(inds.getIndices())
 
 class Boundary:
-    def __init__(self, name, t, values):
+    def __init__(self, name, typ, values=None, func=None):
+        # TODO : Handle if func is passed as arg
         self.__name = name
-        self.__type = t
-        self.__values = values
+        self.__type = typ
+        self.__values = np.array(values)
         self.__dofsConstrained = []  # 0, 1 ( 2 for dim = 3)
         for dof, val in enumerate(values):
             if val == None:
@@ -80,8 +81,15 @@ class Boundary:
     def setType(self, t):
         self.__type = t
 
+    def getType(self):
+        return self.__type
+
     def setValues(self, vals):
-        self.__values = vals
+        self.__values = np.array(vals)
+
+    def getValues(self):
+        arr = self.__values[ self.__values != None ]
+        return arr
 
     def getName(self):
         return self.__name
@@ -89,8 +97,8 @@ class Boundary:
     def __repr__(self):
         return f"Boundary Name:{self.__name}:: Type: {self.__type} :: Values: {self.__values} :: DOFS Constrained {self.__dofsConstrained} \n "
 
-    def setIndices(self, nodes: list):
-        """Set Degrees of freedom that belongs to this boundary
+    def setNodes(self, nodes: list):
+        """Set Nodes that belongs to this boundary. This method transform it in a PETSc IS object that can handle dofs or nodes.
 
         Args:
             nodes (list): List of Nodes of this boundary
@@ -99,7 +107,11 @@ class Boundary:
         pInds = IS().createBlock(dofs, nodes)
         self.__inds = pInds
 
-    def getIndices(self):
+    def getDofsConstrained(self):
+        """Returns an array with dofs constrained in this boundary
+        Returns:
+            [numpy array]: dofs constrained in this boundary
+        """
         return self.__inds.getIndices()
 
     def getNodes(self):
@@ -113,6 +125,7 @@ class Boundary:
         """
         try:
             self.__inds.destroy()
+            return self.__inds
         except:
             print("IS doesnt exists")
 
