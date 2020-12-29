@@ -10,6 +10,8 @@ class BoundaryConditions:
         self.__nsBoundaries = list()
         self.__fsBoundaries = list()
         self.__type = None
+        self.__ByName = dict()
+        self.__ByType = { "free-slip": [], "no-slip": []}
 
     def setBoundaryConditions(self, data):
         # data its the dictionary with key 'boundary-conditions'
@@ -32,7 +34,9 @@ class BoundaryConditions:
             self.__setUpBoundaries('no-slip', data['no-slip'])
         else:
             raise Exception("Boundary Conditions not defined")
-        # print(self.__boundaries)
+
+    def getType(self):
+        return self.__type
 
     def __setUpBoundaries(self, t, sides):
         for name, vals in sides.items():
@@ -47,9 +51,38 @@ class BoundaryConditions:
             self.__nsBoundaries.append(boundary)
         else:
             raise Exception("Wrong boundary type")
+        self.__ByType[typ].append(boundary)
+        self.__ByName[name] = boundary
 
-    def getBoundaries(self):
-        return self.__boundaries
+    def getNames(self, bcs=None):
+        if bcs == None:
+            bcs = self.__boundaries
+        bNames = list()
+        for b in bcs:
+            bNames.append(b.getName()) 
+        return bNames
+
+    def getNamesByType(self, bcType):
+        bcs = self.__ByType[bcType]
+        return self.getNames(bcs)
+
+    def setBoundaryNodes(self, bName, nodes):
+        try:
+            boundary = self.__ByName[bName]
+            boundary.setNodes(nodes)
+        except:
+            raise Exception("Boundary Not found")
+
+    def getIndicesByType(self, bcType):
+        inds = IS().createGeneral([])
+        boundaries = self.__ByType[bcType]
+        if len(boundaries) == 0:
+            return set()
+        else:
+            for bc in self.__ByType[bcType]:
+                bcIS = bc.getIS()
+                inds = bcIS.union(inds)
+            return set(inds.getIndices())
 
     def getNoSlipIndices(self):
         inds = IS().createGeneral([])
