@@ -78,7 +78,7 @@ class Domain:
     def setUpBoundaryConditions(self, data: dict):
         bcs = BoundaryConditions()
         bcs.setBoundaryConditions(data)
-        boundariesNames = bcs.getBoundariesNames()
+        boundariesNames = bcs.getNames()
         for bName in boundariesNames:
             nodes = self.__dm.getBorderNodes(bName)
             bcs.setBoundaryNodes(bName, nodes)
