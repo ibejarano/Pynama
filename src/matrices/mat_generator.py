@@ -43,7 +43,7 @@ class Mat:
         orhs_nnz_ind = np.zeros(locElRow)
 
         # FIXME check performance only dim 2
-        glNodesDIR = set([ int(i/2) for i in list(self.globalIndicesDIR)[::2]])
+        glNodesDIR = set([ int(i/self.dim) for i in list(self.globalIndicesDIR)[::self.dim]])
         # print(glNodesDIR)
         for indRow, indSet in enumerate(ind_d):
             if (indRow + rStart) in glNodesDIR:
@@ -60,7 +60,7 @@ class Mat:
         # Dirichlet conditions despite the number of DoF conditioned
         drhs_nnz, orhs_nnz = self.createNNZWithArray(drhs_nnz_ind, orhs_nnz_ind, self.dim, self.dim)
 
-        nodesDIR = set([ int(i/2) for i in list(indicesDIR)[::2]])
+        nodesDIR = set([ int(i/self.dim) for i in list(indicesDIR)[::self.dim]])
 
         for indRow in set(range(rStart, rEnd)) & set(nodesDIR):
             minInd = (indRow - rStart) * self.dim
