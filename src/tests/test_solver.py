@@ -37,7 +37,7 @@ class TestKle2D(unittest.TestCase):
         del fem
 
 class TestKle3D(unittest.TestCase):
-    def setFemProblem(self, case, **kwargs):
+    def setFemProblem(self, case, bc, **kwargs):
         with open(f'src/cases/{case}.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
         if case == 'uniform':
@@ -45,13 +45,33 @@ class TestKle3D(unittest.TestCase):
         else:
             # fem = CustomFuncCase(yamlData, case=case , **kwargs)
             raise Exception("Test case not implemented")
-        fem.setUp()
+
+        fem.setUpDomain()
+        if bc:
+            fem.dom.setUpBoundaryConditions(bc)
+        fem.createMesh()
+        fem.bcNodes = fem.dom.getBoundaryNodes()
+        fem.setUpEmptyMats()
+        fem.buildKLEMats()
+        fem.buildOperators()
+
+
+        if fem.dim == 2:
+            fem.cteValue = [1,0]
+        elif fem.dim == 3:
+            fem.cteValue = [1, 0, 0]
+        else:
+            raise Exception("Wrong dim")
+
         fem.setUpSolver()
+
         return fem
 
     def test_solveKLE_uniform(self):
-        domain = {'lower':[0,0,0],'upper':[1,1,1],'nelem':[3,3,3], 'ngl':3}
-        fem = self.setFemProblem('uniform', **domain)
+        cte= [ 1, 0 , 0]
+        domain = {'lower':[0,0,0],'upper':[1,1,1],'nelem':[2,2,2], 'ngl':3}
+        bcs = {'free-slip': { 'down': cte, 'up': cte, 'back': cte, 'front': cte, 'left': cte, 'right': cte } }
+        fem = self.setFemProblem('uniform',bcs, **domain)
         exactVel, exactVort = fem.generateExactVecs()
         fem.solveKLE(time=0.0, vort=exactVort)
         error = exactVel - fem.vel
