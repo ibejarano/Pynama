@@ -68,15 +68,18 @@ class Domain:
 
     def setUp(self):
         self.setUpLabels()
-        # self.setUpBoundaryConditions()
 
-    # def setUpBoundaryConditions(self, fsFaces =[], nsFaces=[]):
-    #     self.__fsFaces = fsFaces
-    #     self.__nsFaces = nsFaces
-    #     self.__dm.setBoundaryCondition(self.__fsFaces, self.__nsFaces)
+    def setDomainOption(self, **kwargs):
+        """Call this function to change the default YAML parameters
+        """        
+        pass
+
+    def setBoundaryConditionsOption(self, **kwargs):
+        pass
 
     def setUpBoundaryConditions(self, data: dict):
-        bcs = BoundaryConditions()
+        bNames = self.__dm.getBordersNames()
+        bcs = BoundaryConditions(bNames)
         bcs.setBoundaryConditions(data)
         boundariesNames = bcs.getNames()
         for bName in boundariesNames:
@@ -161,12 +164,12 @@ class Domain:
 
     # -- Indices -- 
     def getGlobalIndicesDirichlet(self):
-        fsIndices = self.__bc.getFreeSlipIndices()
+        fsIndices = self.__bc.getIndicesByType('free-slip')
         return fsIndices
         # return self.__dm.getGlobalIndicesDirichlet()
 
     def getGlobalIndicesNoSlip(self):
-        nsIndices = self.__bc.getNoSlipIndices()
+        nsIndices = self.__bc.getIndicesByType('no-slip')
         return nsIndices
         # return self.__dm.getGlobalIndicesNoSlip()
 

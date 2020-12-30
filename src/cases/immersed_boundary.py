@@ -19,6 +19,7 @@ from common.timer import Timer
 class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
         super().setUp()
+        self.readBoundaryCondition(self.config['boundary-conditions'])
         self.setUpBodies()
         cells = self.getAffectedCells(10)
         self.collectedNodes, self.maxNodesPerLag = self.collectNodes(cells)

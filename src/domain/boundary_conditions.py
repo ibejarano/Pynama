@@ -3,15 +3,16 @@ import numpy as np
 
 
 class BoundaryConditions:
-    types = ["constant", "only FS", "only NS", "FS NS"]
+    types = ["only FS", "only NS", "FS NS"]
 
-    def __init__(self):
+    def __init__(self, sideNames):
         self.__boundaries = list()
         self.__nsBoundaries = list()
         self.__fsBoundaries = list()
         self.__type = None
         self.__ByName = dict()
         self.__ByType = { "free-slip": [], "no-slip": []}
+        self.__borderNames = sideNames
 
     def setBoundaryConditions(self, data):
         # data its the dictionary with key 'boundary-conditions'
@@ -19,9 +20,10 @@ class BoundaryConditions:
         if "constant" in data:
             if "free-slip" in data or "no-slip" in data:
                 print("WARNING: Only constant bc its assumed")
-            self.__type = "constant"
+            self.__type = "only FS"
             # FIXME: Instead of None pass all the borders
-            self.__setUpBoundaries(data['constant'], None)
+            vals = data['constant']['vel']
+            self.__setUpBoundaries('free-slip', None, True, vals)
         elif "free-slip" in data and "no-slip" in data:
             self.__type = "FS NS"
             self.__setUpBoundaries('free-slip', data['free-slip'])
@@ -38,9 +40,13 @@ class BoundaryConditions:
     def getType(self):
         return self.__type
 
-    def __setUpBoundaries(self, t, sides):
-        for name, vals in sides.items():
-            self.__setBoundary(name, t, vals)
+    def __setUpBoundaries(self, t, sides, cte=False, cteValues=None):
+        if cte:
+            for name in self.__borderNames:
+                self.__setBoundary(name, t, cteValues) 
+        else:   
+            for name, vals in sides.items():
+                self.__setBoundary(name, t, vals)
 
     def __setBoundary(self, name, typ, values):
         boundary = Boundary(name, typ, values)
