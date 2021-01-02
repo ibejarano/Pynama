@@ -14,6 +14,18 @@ class BoundaryConditions:
         self.__ByType = { "free-slip": [], "no-slip": []}
         self.__borderNames = sideNames
 
+    def __repr__(self):
+        txt = " --== Boundary Conditions ==--\n"
+        txt += "   Name   |   Type   |   Values   |   Dofs Contrained   \n"
+        for b in self.__boundaries:
+            name = b.getName()
+            typ = b.getType()
+            val = b.getValues()
+            dirs = b.getDirectionsConstrained()
+            msg = f"{name:10}|{typ:10}|{str(val):12}|{dirs:12}\n"
+            txt+=msg
+        return txt
+
     def setBoundaryConditions(self, data):
         # data its the dictionary with key 'boundary-conditions'
         assert len(data.keys()) < 3, "Wrong Boundary Conditions defined"
@@ -133,8 +145,15 @@ class Boundary:
     def getName(self):
         return self.__name
 
+    def getDirectionsConstrained(self):
+        xyz = np.array(('x', 'y', 'z'))
+        return str(xyz[self.__dofsConstrained])
+
     def __repr__(self):
-        return f"Boundary Name:{self.__name}:: Type: {self.__type} :: Values: {self.__values} :: DOFS Constrained {self.__dofsConstrained} \n "
+        return f"Boundary Name:{self.__name}:: Type: {self.__type} :: Values: {self.__values} :: DOFS Constrained {self.__dofsConstrained}\n"
+    
+    def __str__(self):
+        return f"Boundary Name:{self.__name}:: Type: {self.__type} :: Values: {self.__values} :: DOFS Constrained {self.__dofsConstrained}\n"
 
     def setNodes(self, nodes: list):
         """Set Nodes that belongs to this boundary. This method transform it in a PETSc IS object that can handle dofs or nodes.
