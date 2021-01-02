@@ -20,7 +20,7 @@ class Spectral(Element):
         self.nnode = ngl ** dim
         self.nnodedge = ngl - 2
         self.nnodcell = (ngl - 2) ** dim
-        self.elemType = 'Spectral{}D({})'.format(dim, ngl)
+        self.elemType = 'Spectral{}D(NGL={})'.format(dim, ngl)
 
         if dim == 2:
             self.indWCurl=[[0,0,1],[1,0,0]]
@@ -35,6 +35,9 @@ class Spectral(Element):
             self.setUpSpectralMats3D(ngl)
         else:
             raise Exception
+
+    def __repr__(self):
+        return self.elemType
 
     def setUpSpectralMats2D(self, ngl):
         nodes1D, operWei = lobattoPoints(ngl)
