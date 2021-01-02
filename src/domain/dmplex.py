@@ -2,239 +2,26 @@ import petsc4py
 import sys
 petsc4py.init(sys.argv)
 from petsc4py import PETSc
-from .indices import IndicesManager
-from .elements.spectral import Spectral
-from .boundary_conditions import BoundaryConditions
+from indices import IndicesManager
 import numpy as np
 import logging
 from mpi4py import MPI
 from math import pi, floor
 
-def checkOption(optName, optKwargs):
-    OptDB = PETSc.Options()
-    optStr = OptDB.getString(optName, False)
-    if optStr:
-        print(f"Setting {optName} from options: {optStr}")
-        return optStr
-    elif optName in optKwargs:
-        print(f"Setting {optName} from args: {optKwargs[optName]}")
-        return optKwargs[optName]
-    else:
-        return False
-
-class Domain:
-    def __init__(self, data:dict={}, comm=PETSc.COMM_WORLD, **kwargs):
-        # 1. Gmsh file wins to all
-        self.logger = logging.getLogger(f"{[comm.rank]} - Domain:")
-        domainData = checkOption("gmsh-file", kwargs)
-        if domainData:
-            self.logger.info("Setting up with options: gmsh-file")
-            self.__meshType = 'gmsh'
-        elif 'gmsh-file' in data:
-            self.__meshType = 'gmsh'
-            domainData = data['gmsh-file']
-            self.logger.info("Setting up with gmsh file from yaml")
-        else:
-            self.__meshType = 'box'
-            if 'box-mesh' in data:
-                domainData = data['box-mesh']
-                self.logger.info("Setting up with Box from yaml")
-                availableOptions = ("nelem", "lower", "upper")
-                for opt in availableOptions:
-                    optConfigured = checkOption(opt, kwargs)
-                    if optConfigured:
-                        self.logger.info(f"Setting {opt} with options")
-                        try:
-                            optConfigured = eval(optConfigured)
-                        except:
-                            optConfigured = optConfigured
-                        domainData[opt] = optConfigured
-
-            else:
-                raise Exception("Domain not defined")
-
-        nglOpt = checkOption("ngl", kwargs)
-        if nglOpt:
-            self.__ngl = nglOpt
-            self.logger.info(f"Setting NGL w/ options : {self.__ngl}")
-        else:
-            self.__ngl = data['ngl']
-            self.logger.info(f"NGL : {self.__ngl}")
-
-        self.createDomain(domainData)
-        self.setUpIndexing()
-        dim = self.__dm.getDimension()
-        self.setUpSpectralElement(Spectral(self.__ngl, dim))
-
-    def setUp(self):
-        self.setUpLabels()
-
-    def setDomainOption(self, **kwargs):
-        """Call this function to change the default YAML parameters
-        """        
-        pass
-
-    def setBoundaryConditionsOption(self, **kwargs):
-        pass
-
-    def setUpBoundaryConditions(self, data: dict):
-        bNames = self.__dm.getBordersNames()
-        bcs = BoundaryConditions(bNames)
-        bcs.setBoundaryConditions(data)
-        boundariesNames = bcs.getNames()
-        for bName in boundariesNames:
-            nodes = self.__dm.getBorderNodes(bName)
-            bcs.setBoundaryNodes(bName, nodes)
-        self.__bc = bcs
-        
-    def setUpLabels(self):
-        self.__dm.setLabelToBorders()
-
-    def createDomain(self, inp):
-        if self.__meshType == 'box':
-            dm = BoxDom(inp)
-        elif self.__meshType == 'gmsh':
-            dm = GmshDom(inp)
-        else:
-            raise Exception("Mesh Type not defined")
-
-        self.__dm = dm
-
-    def getMeshType(self):
-        return self.__meshType
-
-    def getDimension(self):
-        return self.__dm.getDimension()
-
-    def getNGL(self):
-        return self.__ngl
-
-    def getNumOfElements(self):
-        return self.__dm.getTotalElements()
-
-    def setUpIndexing(self):
-        self.__dm.setFemIndexing(self.__ngl)
-
-    def setUpSpectralElement(self, elem):
-        self.__elem = elem
-
-    # -- Coordinates methods ---
-    def getExtremeCoords(self):
-        lower, upper = self.__dm.getBoundingBox()
-        return lower, upper
-
-    def computeFullCoordinates(self):
-        self.__dm.computeFullCoordinates(self.__elem)
-
-    def getFullCoordVec(self):
-        return self.__dm.fullCoordVec
-
-    def getCellCentroid(self, cell):
-        dim = self.__dm.getDimension()
-        cornerCoords = self.__dm.getCellCornersCoords(cell).reshape((2**dim), dim)
-        return np.mean(cornerCoords, axis=0)
-
-    def getNodesCoordinates(self, nodes):
-        return self.__dm.getNodesCoordinates(nodes=nodes)
-
-    # -- Get / SET Nodes methods --
-    def getNumOfNodes(self):
-        return self.__dm.getTotalNodes()
-
-    def getBoundaryNodes(self):
-        return self.__dm.getNodesFromLabel("External Boundary")
-
-    def getAllNodes(self):
-        return self.__dm.getAllNodes()
-
-    def getNodesCoordsFromEntities(self, entities):
-        nodes = self.__dm.getGlobalNodesFromEntities(entities, shared=True)
-        coords = self.__dm.getNodesCoordinates(nodes)
-        return nodes, coords
-
-    def getBorderNodesWithNormal(self, cell, cellNodes):
-        return self.__dm.getBorderNodesWithNormal(cell, cellNodes)
-
-    def getBorderNodes(self, borderName):
-        return self.__dm.getBorderNodes(borderName)
-
-    # -- Mat Index Generator --
-    def getMatIndices(self):
-        return self.__dm.getMatIndices()
-
-    # -- Indices -- 
-    def getGlobalIndicesDirichlet(self):
-        fsIndices = self.__bc.getIndicesByType('free-slip')
-        return fsIndices
-        # return self.__dm.getGlobalIndicesDirichlet()
-
-    def getGlobalIndicesNoSlip(self):
-        nsIndices = self.__bc.getIndicesByType('no-slip')
-        return nsIndices
-        # return self.__dm.getGlobalIndicesNoSlip()
-
-    # -- Mat Building --
-    def getLocalCellRange(self):
-        return self.__dm.cellStart, self.__dm.cellEnd
-
-    def computeLocalKLEMats(self, cell):
-        cornerCoords = self.__dm.getCellCornersCoords(cell)
-        localMats = self.__elem.getElemKLEMatrices(cornerCoords)
-        nodes = self.__dm.getGlobalNodesFromCell(cell, shared=True)
-        # Build velocity and vorticity DoF indices
-        indicesVel = self.__dm.getVelocityIndex(nodes)
-        indicesW = self.__dm.getVorticityIndex(nodes)
-        inds = (indicesVel, indicesW)
-        return nodes, inds , localMats
-
-    def computeLocalOperators(self, cell):
-        cornerCoords = self.__dm.getCellCornersCoords(cell)
-        localOperators = self.__elem.getElemKLEOperators(cornerCoords)
-        nodes = self.__dm.getGlobalNodesFromCell(cell, shared=True)
-        return nodes, localOperators
-
-
-    # -- apply values to vec
-
-    def applyValuesToVec(self, nodes, vals, vec):
-        return self.__dm.applyValuesToVec(nodes, vals, vec)
-
-    def applyFunctionVecToVec(self,nodes, f_vec, vec, dof):
-        return self.__dm.applyFunctionVecToVec(nodes, f_vec, vec, dof)
-
-    # -- view methods
-    def view(self):
-        print("Domain info")
-        if self.__dm == None:
-            print(f"Domain not Setted up")
-        print(f"Domain dimensions: {self.__dm.getDimension()}")
-        print(f"Mesh Type : {self.__meshType}")
-        print(f"Element Type : {self.__elem}")
-        print(f"Total number of Elements: {self.getNumOfElements()}")
-        print(f"Total number of Nodes: {self.getNumOfNodes()}")
-
-    def viewNodesCoords(self):
-        print(" ===== Nodes Coordinates =====")
-        coordArr = self.__dm.fullCoordVec.getArray()
-        dim = self.__dm.getDimension()
-        totalNodes = int(len(coordArr) / dim)
-        for node in range(totalNodes):
-            print(f"Node: {node}  --- Coords {coordArr[node*dim:node*dim+dim]}")
-
 class DMPlexDom(PETSc.DMPlex):
-    comm = MPI.COMM_WORLD
+    comm = PETSc.COMM_WORLD
     def __init__(self):
+        super().__init__()
         self.logger = logging.getLogger(f"[{self.comm.rank}] Class")
-        self.logger.debug("Domain Instance Created")
+        self.logger.info("DMPLEX Instance Created")
+
+    def create(self):
         self.createLabel('External Boundary')
         self.markBoundaryFaces('External Boundary',0)
         self.distribute()
         self.dim = self.getDimension()
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
-
-        if not self.comm.rank:
-            self.logger.debug("DM Plex Box Mesh created")
 
         if self.dim == 2:
             self.namingConvention = ["down", "right" , "up", "left"]
@@ -562,18 +349,20 @@ class DMPlexDom(PETSc.DMPlex):
 
 class BoxDom(DMPlexDom):
     """Estrucuted DMPlex Mesh"""
-    def __init__(self, data):
+    def create(self, data):
         lower = data['lower']
         upper = data['upper']
         faces = data['nelem']
         self.createBoxMesh(faces=faces, lower=lower, upper=upper, simplex=False)
-        super().__init__()
+        self.logger.info("Box mesh generated")
+        super().create()
 
 class GmshDom(DMPlexDom):
     """Unstructured DMPlex Mesh"""
-    def __init__(self, fileName: str):
+    def create(self, fileName: str):
         self.createFromFile(fileName)
-        super().__init__()
+        self.logger.info("Mesh generated from Gmsh file")
+        super().create()
 
 if __name__ == "__main__":
     data = {"ngl":2, "box-mesh": {
