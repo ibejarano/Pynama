@@ -79,13 +79,11 @@ class TestDomainInterface(unittest.TestCase):
 
 class TestBoxDMPLEX2D(unittest.TestCase):
 
-    # Test Roadmap
-    ## 1. Separate dmplex from indicesmanager
-
     def setUp(self):
         ngl = 3
         data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [3,4]}
-        self.dom = BoxDom(data2D)
+        self.dom = BoxDom()
+        self.dom.create(data2D)
         self.dom.setFemIndexing(ngl)
 
     def test_cell_start_end(self):
@@ -123,7 +121,8 @@ class TestNglIndexing2D(unittest.TestCase):
         self.doms = list()
         data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [2,3]}
         for ngl in range(2, 10 , 2):
-            dm = BoxDom(data2D)
+            dm = BoxDom()
+            dm.create(data2D)
             dm.setFemIndexing(ngl)
             self.doms.append(dm)
 
@@ -150,7 +149,8 @@ class TestBoxDMPLEX3D(unittest.TestCase):
 
     def setUp(self):
         data3D = {'lower': [0,0,0] , 'upper':[0.6,0.8,1], "nelem": [3,4,5]}
-        self.dom = BoxDom(data3D)
+        self.dom = BoxDom()
+        self.dom.create(data3D)
         self.dom.setFemIndexing(3)
 
     def test_generate_dmplex(self):
@@ -209,7 +209,8 @@ class TestNglIndexing3D(unittest.TestCase):
         self.doms = list()
         data3D = {'lower': [0,0,0] , 'upper':[0.6,0.8,1], "nelem": [2,3,4]}
         for ngl in range(2, 10 , 2):
-            dm = BoxDom(data3D)
+            dm = BoxDom()
+            dm.create(data3D)
             dm.setFemIndexing(ngl)
             self.doms.append(dm)
 
@@ -244,7 +245,8 @@ class DomainModTests2D(unittest.TestCase):
     def setUp(self):
         ngl = 2
         data2D = {'lower': [0,0] , 'upper':[1,1], "nelem": [2,2]}
-        self.dom = BoxDom(data2D)
+        self.dom = BoxDom()
+        self.dom.create(data2D)
         self.dom.setFemIndexing(ngl)
 
         dim = self.dom.getDimension()
@@ -256,7 +258,8 @@ class DomainModTests2D(unittest.TestCase):
     def test_get_all_global_nodes_ngls(self):
         data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [2,3]}
         for ngl in range(2, 14):
-            dom = BoxDom(data2D)
+            dom = BoxDom()
+            dom.create(data2D)
             dom.setFemIndexing(ngl)
             allNodes = dom.getAllNodes()
             total = 12 + 17*(ngl-2) + 6*((ngl-2)**2)
