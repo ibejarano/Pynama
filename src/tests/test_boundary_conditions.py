@@ -54,14 +54,16 @@ class TestBoundary(unittest.TestCase):
 
 
 class TestBoundaryConditions(unittest.TestCase):
+    def setUp(self):
+        self.bcNames = ['up','down', 'right', 'left']
+
     def test_set_up_onlyFS(self):
         testData = {"free-slip": {
                 "down": [None, 0],
                 "right": [1, 0],
                 "left": [1, 0],
                 "up": [1, 1]}}
-
-        bcs = BoundaryConditions()
+        bcs = BoundaryConditions(self.bcNames)
         bcs.setBoundaryConditions(testData)
         assert "only FS" == bcs.getType()
 
@@ -77,7 +79,7 @@ class TestBoundaryConditions(unittest.TestCase):
                 "left": [1, 0],
                 "up": [1, 1]}}
 
-        bcs = BoundaryConditions()
+        bcs = BoundaryConditions(self.bcNames)
         bcs.setBoundaryConditions(testData)
         assert "only NS" == bcs.getType()
 
@@ -94,7 +96,7 @@ class TestBoundaryConditions(unittest.TestCase):
                 "left": [1, 0],
                 "up": [1, 1]}}
 
-        bcs = BoundaryConditions()
+        bcs = BoundaryConditions(self.bcNames)
         bcs.setBoundaryConditions(testData)
         assert "FS NS" == bcs.getType()
 
@@ -119,7 +121,7 @@ class TestBoundaryConditions(unittest.TestCase):
         "left": [1, 0],
         "up": [1, 1]}}
 
-        bcs = BoundaryConditions()
+        bcs = BoundaryConditions(self.bcNames)
         bcs.setBoundaryConditions(testData)
 
         bcs.setBoundaryNodes("down", nodes_down)
