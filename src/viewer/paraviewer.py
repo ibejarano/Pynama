@@ -7,8 +7,11 @@ import yaml
 access_rights = 0o755
 
 class Paraviewer:
-    def __init__(self, dim, comm, saveDir=None):
-        self.comm = comm
+    comm = PETSc.COMM_WORLD
+    def __init__(self):
+        self.logger = logging.getLogger(f"[{self.comm.rank}]:Viewer:")
+
+    def configure(self, dim, saveDir=None):
         self.saveDir = '.' if not saveDir else saveDir
         if not os.path.isdir(self.saveDir):
             os.makedirs(f"./{self.saveDir}")
@@ -31,11 +34,13 @@ class Paraviewer:
                             comm=self.comm)
 
         ViewHDF5.view(obj=coords)
+        self.logger.debug("Mesh saved")
         ViewHDF5.destroy()
 
     def saveData(self, step, time, *vecs):
         self.saveVec(vecs, step)
         self.saveStepInXML(step, time, vecs=vecs)
+        self.logger.debug("Step saved")
 
     def saveVec(self, vecs, step):
         name = self.h5name

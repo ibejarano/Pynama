@@ -2,7 +2,7 @@ import yaml
 from petsc4py import PETSc
 from mpi4py import MPI
 # Local packages
-from domain.dmplex import DMPlexDom, Domain
+from domain.domain import Domain
 from domain.elements.spectral import Spectral
 from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
@@ -41,11 +41,15 @@ class BaseProblem(object):
 
     def setUp(self):
         self.setUpDomain()
+        self.setUpViewer()
         self.createMesh()
         self.bcNodes = self.dom.getBoundaryNodes()
         self.setUpEmptyMats()
         self.buildKLEMats()
         self.buildOperators()
+
+    def setUpViewer(self):
+        self.viewer = Paraviewer()
 
     def setUpDomain(self):
         domain = self.config.get("domain")
@@ -88,7 +92,7 @@ class BaseProblem(object):
 
     def createMesh(self, saveMesh=True):
         saveDir = self.config.get("save-dir")
-        self.viewer = Paraviewer(self.dim ,self.comm, saveDir)
+        self.viewer.configure(self.dim, saveDir)
         self.dom.computeFullCoordinates()
         if saveMesh:
             self.viewer.saveMesh(self.dom.getFullCoordVec())
@@ -144,28 +148,6 @@ class BaseProblem(object):
         self.viewer.saveData(step, time, self.vel, self.vort)
         # self.viewer.newSaveVec([self.vel, self.vort], step)
         self.viewer.writeXmf(self.caseName)
-        if not self.comm.rank:
-            self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
-
-    def convergedStepFunctionKLET(self, ts):
-        time = ts.time
-        step = ts.step_number
-        self.solveKLE(time, self.vort)
-        incr = ts.getTimeStep()
-        # self.viewer.newSaveVec([self.vel, self.vort], step)
-        exactVel, exactVort = self.generateExactVecs(time)
-        errorVel = exactVel - self.vel
-        errorVort = exactVort - self.vort
-        self.saveError2.append((errorVel).norm(norm_type=2))
-        self.saveError8.append((errorVel).norm(norm_type=3))
-        self.saveTime.append(time)
-        self.saveStep.append(step)
-        errorVort.setName("ErrorVort")
-        errorVel.setName("ErrorVel")
-        exactVort.setName("ExactVort")
-        exactVel.setName("ExactVel")
-        self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort,errorVel,errorVort)
-        self.viewer.writeXmf(self.caseName)        
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
 
