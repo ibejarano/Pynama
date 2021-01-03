@@ -2,10 +2,10 @@ import petsc4py
 import sys
 petsc4py.init(sys.argv)
 from petsc4py import PETSc
-from indices import IndicesManager
-from elements.spectral import Spectral
-from boundary_conditions import BoundaryConditions
-from dmplex import GmshDom, BoxDom
+from .indices import IndicesManager
+from .elements.spectral import Spectral
+from .boundary_conditions import BoundaryConditions
+from .dmplex import GmshDom, BoxDom
 import numpy as np
 import logging
 from mpi4py import MPI
@@ -34,14 +34,16 @@ class Domain:
         self.__elem = None
 
     def create(self):
+        assert self.domData, "Domain not defined"
+
         if 'box-mesh' in self.domData:
             self.__meshType = 'box'
             dm = BoxDom()
             cfg = self.domData['box-mesh']
-        elif 'gmsh' in self.domData:
+        elif 'gmsh-file' in self.domData:
             self.__meshType = 'gmsh'
             dm = GmshDom()
-            cfg = self.domData('gmsh')
+            cfg = self.domData['gmsh-file']
         else:
             raise Exception("Mesh Type not defined")
 
@@ -52,11 +54,11 @@ class Domain:
         self.logger.info(f"DMPlex type: {self.__meshType} created")
 
     def configure(self, data):
-        assert 'domain' in data
-        assert 'boundary-conditions' in data
+        if 'domain' in data:
+            self.domData = data['domain']
 
-        self.domData = data['domain']
-        self.bcData = data['boundary-conditions']
+        if 'boundary-conditions' in data:
+            self.bcData = data['boundary-conditions']
 
     def setOptions(self, **kwargs):
         domOpts = ('ngl')
@@ -91,6 +93,8 @@ class Domain:
         self.setUpBoundaryConditions()
 
     def setUpBoundaryConditions(self):
+        assert self.bcData, "Boundary Conditions Not defined"
+
         bNames = self.__dm.getBordersNames()
         bcs = BoundaryConditions(bNames)
         bcs.setBoundaryConditions(self.bcData)

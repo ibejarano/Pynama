@@ -1,5 +1,6 @@
 import unittest
-from domain.dmplex import Domain, BoxDom, GmshDom
+from domain.dmplex import BoxDom, GmshDom
+from domain.domain import Domain
 from domain.elements.spectral import Spectral
 import numpy as np
 import numpy.testing as np_test
@@ -13,11 +14,20 @@ class TestDomainInterface(unittest.TestCase):
         "lower": [0,0],
         "upper": [1,1]
     }}
-        self.dataBoxMesh = dataBoxMesh
+        self.dataBoxMesh = {"domain": dataBoxMesh}
         self.dataGmsh = {"ngl": 3 , "gmsh-file": "src/tests/test.msh"}
+        self.dataGmsh = {"domain": self.dataGmsh}
+
+    def create_dom(self, data, **kwargs):
+        dom = Domain()
+        dom.configure(data)
+        dom.setOptions(**kwargs)
+        dom.create()
+        dom.setUpIndexing()
+        return dom
 
     def test_create_boxmesh(self):
-        dom = Domain(self.dataBoxMesh)
+        dom = self.create_dom(self.dataBoxMesh)
         test_type = dom.getMeshType()
         test_ngl = dom.getNGL()
         test_numOfElem = dom.getNumOfElements()
@@ -28,7 +38,7 @@ class TestDomainInterface(unittest.TestCase):
         assert test_numOfNodes == 25
 
     def test_create_gmsh(self):
-        dom = Domain(self.dataGmsh)
+        dom = self.create_dom(self.dataGmsh)
         test_type = dom.getMeshType()
         test_ngl = dom.getNGL()
         test_numOfElem = dom.getNumOfElements()
@@ -40,10 +50,10 @@ class TestDomainInterface(unittest.TestCase):
 
     def test_box_set_from_opts_ngl(self):
         ngl_ref = 7
-        dom = Domain(self.dataBoxMesh, ngl=ngl_ref)
+        dom = self.create_dom(self.dataBoxMesh, ngl=ngl_ref)
         ngl_test = dom.getNGL()
 
-        nelem = self.dataBoxMesh['box-mesh']['nelem']
+        nelem = self.dataBoxMesh['domain']['box-mesh']['nelem']
         ref_numOfNodes = (ngl_ref*nelem[0] - 1)*(ngl_ref*nelem[1] - 1)
 
         test_numOfNodes = dom.getNumOfNodes()
@@ -52,7 +62,7 @@ class TestDomainInterface(unittest.TestCase):
 
     def test_gmsh_set_from_opts_ngl(self):
         ngl_ref = 8
-        dom = Domain(self.dataGmsh, ngl=ngl_ref)
+        dom = self.create_dom(self.dataGmsh, ngl=ngl_ref)
         test_numOfNodes = dom.getNumOfNodes()
 
         ngl_test = dom.getNGL()
@@ -60,7 +70,7 @@ class TestDomainInterface(unittest.TestCase):
         assert test_numOfNodes == 1688 # This number is from Gmsh
 
     def test_set_from_opts_nelem(self):
-        dom = Domain(self.dataBoxMesh, nelem=[4,4])
+        dom = self.create_dom(self.dataBoxMesh, nelem=[4,4])
         test_numOfElem = dom.getNumOfElements()
         assert test_numOfElem == 16
 

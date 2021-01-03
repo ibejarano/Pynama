@@ -2,7 +2,7 @@ import petsc4py
 import sys
 petsc4py.init(sys.argv)
 from petsc4py import PETSc
-from indices import IndicesManager
+from .indices import IndicesManager
 import numpy as np
 import logging
 from mpi4py import MPI
