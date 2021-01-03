@@ -28,23 +28,8 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.mNodes = self.buildIBMMatrix()
 
     def readBoundaryCondition(self, bc):
-        self.nu = self.mu / self.rho
-        try:
-            re = bc['constant']['re']
-            self.logger.info(f"Material Properties: density={self.rho} ; viscosity={self.mu}")
-            directionAngle = bc['constant']['direction']
-            angleRadian = radians(directionAngle)
-            L = eval(bc['constant']['longRef'])
-            velRef = re*(self.mu/self.rho) / L
-            self.U_ref = velRef
-            self.cteValue = [cos(angleRadian)*velRef,sin(angleRadian)*velRef]
-            self.re = re
-        except:
-            vel = bc['constant']['vel']
-            self.U_ref = vel[0]
-            self.cteValue = [self.U_ref, 0]
-            self.re = self.U_ref / self.nu
-        self.logger.info(f"Velocity Free Stream: {self.cteValue}")
+        re = bc['constant']['re']
+        self.re = re
 
     def setUpDomain(self):
         super().setUpDomain()

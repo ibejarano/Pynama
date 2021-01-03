@@ -11,6 +11,7 @@ from solver.ksp_solver import KspSolver
 from common.timer import Timer
 import logging
 import numpy as np
+from math import cos, sin, radians
 
 class BaseProblem(object):
     def __init__(self, config,**kwargs):
@@ -50,9 +51,17 @@ class BaseProblem(object):
         self.viewer = Paraviewer()
 
     def setUpDomain(self):
-        # domain = self.config.get("domain")
-        self.dom = None
         self.dom = Domain()
+        if 'constant' in self.config['boundary-conditions']:
+            bc = self.config['boundary-conditions']
+            re = bc['constant']['re']
+            directionAngle = bc['constant']['direction']
+            angleRadian = radians(directionAngle)
+            L = eval(bc['constant']['longRef'])
+            velRef = re*(self.mu/self.rho) / L
+            self.U_ref = velRef
+            self.cteValue = [cos(angleRadian)*velRef,sin(angleRadian)*velRef]
+            self.config['boundary-conditions']['constant']['vel'] = self.cteValue
         self.dom.configure(self.config)
         self.dom.setOptions(**self.opts)
         self.dom.setUp()
@@ -60,7 +69,7 @@ class BaseProblem(object):
         self.dim = self.dom.getDimension()
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
-        
+
     def readMaterialData(self):
         materialData = self.config.get("material-properties")
         self.rho = materialData['rho']
@@ -79,9 +88,6 @@ class BaseProblem(object):
         else:
             raise Exception("No Gmsh Implemented")
 
-        self.dim = len(self.nelem)
-        self.dim_w = 1 if self.dim == 2 else 3
-        self.dim_s = 3 if self.dim == 2 else 6
         if "ngl" in kwargs:
             self.ngl = kwargs['ngl']
         else:

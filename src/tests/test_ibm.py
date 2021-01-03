@@ -4,18 +4,28 @@ import yaml
 from cases.immersed_boundary import ImmersedBoundaryStatic
 
 class TestSearch(unittest.TestCase):
+    # def setUp(self):
+    #     # creates eulerian grid
+    #     # creates a body with dl = h
+    #     # it must
+    #     # set malla 10x10 de 10 de largo y 10 alto
+    #     # self.h = 1
+    #     case = 'ibm-static'
+    #     domain = {"nelem": [10,10] , "ngl": 3, "lower":[-5,-5] ,"upper":[5,5]}
+    #     with open(f'src/cases/{case}.yaml') as f:
+    #         yamlData = yaml.load(f, Loader=yaml.Loader)
+    #     self.fem = ImmersedBoundaryStatic(yamlData, case=case, **domain)
+    #     self.fem.setUp()
+
+    caseYaml = 'ibm-static'
+    caseOpts = {"nelem": [10,10] , "ngl": 3, "lower":[-5,-5] ,"upper":[5,5]}
     def setUp(self):
-        # creates eulerian grid
-        # creates a body with dl = h
-        # it must
-        # set malla 10x10 de 10 de largo y 10 alto
-        # self.h = 1
-        case = 'ibm-static'
-        domain = {"nelem": [10,10] , "ngl": 3, "lower":[-5,-5] ,"upper":[5,5]}
-        with open(f'src/cases/{case}.yaml') as f:
+        with open(f'src/cases/{self.caseYaml}.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
-        self.fem = ImmersedBoundaryStatic(yamlData, case=case, **domain)
-        self.fem.setUp()
+        fem = ImmersedBoundaryStatic(yamlData, case=self.caseYaml, **self.caseOpts)
+        fem.setUp()
+        fem.setUpSolver()
+        self.fem = fem
 
     def test_total_euler_nodes_finded(self):
         cells = self.fem.getAffectedCells(1)
