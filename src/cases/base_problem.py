@@ -3,14 +3,12 @@ from petsc4py import PETSc
 from mpi4py import MPI
 # Local packages
 from domain.domain import Domain
-from domain.elements.spectral import Spectral
 from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
 from matrices.mat_generator import Mat, Operators
 from matrices.mat_ns import MatNS
 from solver.ksp_solver import KspSolver
 from common.timer import Timer
-from math import sqrt
 import logging
 import numpy as np
 
@@ -52,18 +50,17 @@ class BaseProblem(object):
         self.viewer = Paraviewer()
 
     def setUpDomain(self):
-        domain = self.config.get("domain")
+        # domain = self.config.get("domain")
         self.dom = None
-        self.dom = Domain(domain, **self.opts)
+        self.dom = Domain()
+        self.dom.configure(self.config)
+        self.dom.setOptions(**self.opts)
+        self.dom.setUp()
 
         self.dim = self.dom.getDimension()
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
-
-        self.dom.setUp()
-        bcData = self.config.get("boundary-conditions")
-        self.dom.setUpBoundaryConditions(bcData)
-
+        
     def readMaterialData(self):
         materialData = self.config.get("material-properties")
         self.rho = materialData['rho']
