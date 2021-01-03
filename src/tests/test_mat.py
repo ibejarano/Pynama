@@ -1,4 +1,5 @@
 from cases.uniform import UniformFlow
+from domain.domain import Domain
 import unittest
 import yaml
 import numpy as np
@@ -8,11 +9,15 @@ from matrices.mat_generator import Mat
 class TestMat2D(unittest.TestCase):
 
     def setUp(self):
-        domain = {'lower':[0,0],'upper':[1,1],'nelem':[2,2], 'ngl':3}
-        fem = self.setFemProblem('uniform', **domain)
+        box = {'lower':[0,0],'upper':[1,1],'nelem':[2,2]}
+        domain = {"domain": {"box-mesh": box, "ngl": 3}}
+        dom = Domain()
+        dom.configure(domain)
+        dom.create()
+        dom.setUpIndexing()
         dim = 2
         self.mat = Mat(dim)
-        rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = fem.dom.getMatIndices()
+        rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = dom.getMatIndices()
         self.rStart = rStart
         self.rEnd = rEnd
         self.d_nnz_ind = d_nnz_ind
@@ -59,11 +64,15 @@ class TestMat2D(unittest.TestCase):
 
 class TestMat3D(TestMat2D):
     def setUp(self):
-        domain = {'lower':[0,0,0],'upper':[1,1,1],'nelem':[2,2,2], 'ngl':3}
-        fem = self.setFemProblem('uniform', **domain)
+        box = {'lower':[0,0,0],'upper':[1,1,1],'nelem':[2,2,2]}
+        domain = {"domain": {"box-mesh": box, "ngl": 3}}
+        dom = Domain()
+        dom.configure(domain)
+        dom.create()
+        dom.setUpIndexing()
         dim = 3
         self.mat = Mat(dim)
-        rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = fem.dom.getMatIndices()
+        rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = dom.getMatIndices()
         self.rStart = rStart
         self.rEnd = rEnd
         self.d_nnz_ind = d_nnz_ind
