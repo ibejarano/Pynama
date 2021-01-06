@@ -4,7 +4,7 @@ petsc4py.init(sys.argv)
 from petsc4py import PETSc
 from .indices import IndicesManager
 from .elements.spectral import Spectral
-from .boundary_conditions import BoundaryConditions
+from boundaries.boundary_conditions import BoundaryConditions
 from .dmplex import GmshDom, BoxDom
 import numpy as np
 import logging
