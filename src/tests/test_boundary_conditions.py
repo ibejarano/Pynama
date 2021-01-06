@@ -82,6 +82,46 @@ class TestBoundaryConditions(unittest.TestCase):
         assert len(bcsFSNames) == 4
         assert bcsNSNames == []
 
+    def test_set_up_custom_func(self):
+        custFS = {"name": 'taylor_green', "attributes": ['velocity', 'vorticity']}
+        testData = {"custom-func": custFS}
+
+        bcs = BoundaryConditions(self.bcNames)
+        bcs.setBoundaryConditions(testData)
+        assert "FS" == bcs.getType()
+
+        bcsFSNames = bcs.getNamesByType('free-slip')
+        bcsNSNames = bcs.getNamesByType('no-slip')
+        assert len(bcsFSNames) == len(self.bcNames)
+        assert bcsNSNames == []
+
+        bordersThatNeedsCoords = bcs.getBordersNeedsCoords()
+        for bName in self.bcNames:
+            assert bName in bordersThatNeedsCoords
+
+    def test_set_up_custom_and_uniform(self):
+        valsFS = {"velocity": [1,0], "vorticity": [0]}
+        custFS = {"name": 'taylor_green', "attributes": ['velocity', 'vorticity']}
+
+        testData = {"free-slip": {
+                "down": valsFS,
+                "right": {"custom-func": custFS},
+                "left": {"custom-func": custFS},
+                "up": valsFS}}
+
+        bcs = BoundaryConditions(self.bcNames)
+        bcs.setBoundaryConditions(testData)
+        assert "FS" == bcs.getType()
+
+        bcsFSNames = bcs.getNamesByType('free-slip')
+        bcsNSNames = bcs.getNamesByType('no-slip')
+        assert len(bcsFSNames) == len(self.bcNames)
+        assert bcsNSNames == []
+
+        bordersThatNeedsCoords = bcs.getBordersNeedsCoords()
+        assert "right" in bordersThatNeedsCoords
+        assert "left" in bordersThatNeedsCoords
+
     def test_set_up_onlyNS(self):
         valsNS = {"velocity": [1,0]}
 

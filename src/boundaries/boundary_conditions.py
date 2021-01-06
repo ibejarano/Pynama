@@ -41,8 +41,8 @@ class BoundaryConditions:
             self.__setUpBoundaries('free-slip', self.__borderNames, valsDict)
         elif "custom-func" in data:
             self.__type = "FS"
-            funcName = data['custom-func']
-            attrs = data['attributes']
+            funcName = data['custom-func']['name']
+            attrs = data['custom-func']['attributes']
             self.__setFunctionBoundaries(funcName, attrs)
         elif "free-slip" in data and "no-slip" in data:
             self.__type = "FS-NS"
@@ -98,6 +98,7 @@ class BoundaryConditions:
         boundary = FunctionBoundary(borderName , funcName , attrs , dim)
         self.__fsBoundaries.append(boundary)
         self.__ByName[borderName] = boundary
+        self.__ByType['free-slip'].append(boundary)
         self.__needsCoords.append(borderName)
 
     def getNames(self, bcs=None):
@@ -111,6 +112,9 @@ class BoundaryConditions:
     def getNamesByType(self, bcType):
         bcs = self.__ByType[bcType]
         return self.getNames(bcs)
+
+    def getBordersNeedsCoords(self):
+        return self.__needsCoords
 
     def setBoundaryNodes(self, bName, nodes):
         try:
