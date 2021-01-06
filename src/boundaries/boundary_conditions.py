@@ -1,19 +1,22 @@
 from petsc4py.PETSc import IS, Vec
 import numpy as np
-import importlib
+from .boundary import Boundary, FunctionBoundary
 
 class BoundaryConditions:
-    types = ["only FS", "only NS", "FS NS"]
-
-    def __init__(self, sideNames):
+    types = ["FS", "NS", "FS-NS"]
+    bcTypesAvailable = ("uniform", "custom-func", "free-slip", "no-slip")
+    def __init__(self, sides: list):
         self.__boundaries = list()
         self.__nsBoundaries = list()
         self.__fsBoundaries = list()
         self.__type = None
         self.__ByName = dict()
         self.__ByType = { "free-slip": [], "no-slip": []}
-        self.__borderNames = sideNames
-        self.__dim = 2 if len(sideNames) == 4 else 3
+
+        self.__borderNames = list()
+        for s in sides:
+            self.__borderNames = b["name"]
+        self.__dim = 2 if len(sides) == 4 else 3
 
     def __repr__(self):
         txt = " --== Boundary Conditions ==--\n"
@@ -29,7 +32,6 @@ class BoundaryConditions:
 
     def setBoundaryConditions(self, data):
         # data its the dictionary with key 'boundary-conditions'
-        assert len(data.keys()) < 3, "Wrong Boundary Conditions defined"
         if "uniform" in data:
             if "free-slip" in data or "no-slip" in data:
                 print("WARNING: Only constant bc its assumed")
@@ -40,15 +42,30 @@ class BoundaryConditions:
             vort = [0] if dim == 2 else [0, 0 , 0]
             self.__setUpBoundaries('free-slip', None, True, vel=vals, vort=vort)
         elif "free-slip" in data and "no-slip" in data:
-            self.__type = "FS NS"
+            self.__type = "FS-NS"
             self.__setUpBoundaries('free-slip', data['free-slip'])
             self.__setUpBoundaries('no-slip', data['no-slip'])
         elif "free-slip" in data:
-            self.__type = "only FS"
+            self.__type = "FS"
             self.__setUpBoundaries('free-slip', data['free-slip'])
         elif "no-slip" in data:
-            self.__type = "only NS"
+            self.__type = "NS"
             self.__setUpBoundaries('no-slip', data['no-slip'])
+        else:
+            raise Exception("Boundary Conditions not defined")
+
+    def newsetBC(self, data):
+        bcTypes = data.keys()
+        if 'uniform' in bcTypes:
+            pass
+        elif 'custom-func' in bcTypes:
+            pass
+        elif "free-slip" in bcTypes and "no-slip" in bcTypes:
+            pass
+        elif "free-slip" in bcTypes:
+            pass
+        elif "no-slip" in bcTypes:
+            pass
         else:
             raise Exception("Boundary Conditions not defined")
 
@@ -74,6 +91,17 @@ class BoundaryConditions:
             raise Exception("Wrong boundary type")
         self.__ByType[typ].append(boundary)
         self.__ByName[name] = boundary
+
+    def __setFunctionBoundaries(self, funcName, attrs):
+        for borderName in self.__borderNames:
+            self.__setFunctionBoundary(borderName, funcName, attrs)
+
+    def __setFunctionBoundary(self, borderName, funcName, attrs):
+        dim = self.__dim
+        boundary = FunctionBoundary(borderName , funcName , attrs , dim)
+        boundary.setNodes(self.nodes)
+        boundary.setNodesCoordinates(self.coords)
+        self.__fsBoundaries.append(boundary)
 
     def getNames(self, bcs=None):
         if bcs == None:
@@ -119,105 +147,3 @@ class BoundaryConditions:
             inds = bcIS.union(inds)
         return set(inds.getIndices())
 
-class Boundary:
-    def __init__(self, name, typ, vel, vort, dim):
-        # TODO : Handle if func is passed as arg
-        self.__name = name
-        self.__type = typ
-
-        self.__vel = np.array(vel)
-        self.__vort = np.array(vort)
-
-        self.__dofsConstrained = dim
-
-    def setType(self, t):
-        self.__type = t
-
-    def getType(self):
-        return self.__type
-
-    def setValues(self, vals):
-        self.__values = np.array(vals)
-
-    def getValues(self, node=None, t=None):
-        arr = self.__values[ self.__values != None ]
-        return arr
-
-    def getName(self):
-        return self.__name
-
-    def getDirectionsConstrained(self):
-        xyz = np.array(('x', 'y', 'z'))
-        return str(xyz[self.__dofsConstrained])
-
-    def __repr__(self):
-        return f"Boundary Name:{self.__name}:: Type: {self.__type} :: Velocity: {self.__vel} :: DOFS Constrained {self.__dofsConstrained}\n"
-    
-    def __str__(self):
-        return f"Boundary Name:{self.__name}:: Type: {self.__type} :: Velocity: {self.__vel} :: DOFS Constrained {self.__dofsConstrained}\n"
-
-    def setNodes(self, nodes: list):
-        """Set Nodes that belongs to this boundary. This method transform it in a PETSc IS object that can handle dofs or nodes.
-
-        Args:
-            nodes (list): List of Nodes of this boundary
-        """
-        pInds = IS().createBlock(self.__dofsConstrained, nodes)
-        self.__inds = pInds
-        self.__size = len(pInds.getIndices())
-
-    def getDofsConstrained(self):
-        """Returns an array with dofs constrained in this boundary
-        Returns:
-            [numpy array]: dofs constrained in this boundary
-        """
-        return self.__inds.getIndices()
-
-    def getNodes(self):
-        return self.__inds.getBlockIndices()
-
-    def getSize(self):
-        return self.__size
-
-    def getIS(self):
-        return self.__inds
-
-    def destroy(self):
-        """Free memory from the nodes or dofs saved
-        """
-        try:
-            self.__inds.destroy()
-            return self.__inds
-        except:
-            print("IS doesnt exists")
-
-
-class FunctionBoundary(Boundary):
-
-    def __init__(self, name, func_name ,attrs , dim):
-        super().__init__(name, 'free-slip', None, None, dim)
-        self.funcName = func_name
-        self.setFunctions(attrs)
-
-    def setFunctions(self, attrs):
-        relativePath = f".{self.funcName}"
-        functionLib = importlib.import_module(relativePath, package='functions')
-        for attr in attrs:
-            func = getattr(functionLib, attr)
-            setattr(self, f"{attr}Func", func)
-
-    def setNodesCoordinates(self, arr):
-        iSet = self.getIS()
-        dim = iSet.getBlockSize()
-        arr.shape = ( len(self.getNodes()) , dim)
-        self.__coords = arr
-
-    def getValues(self, attrName, t, nu):
-        func = getattr(self, f"{attrName}Func")
-        alphaFunc = getattr(self, "alphaFunc")
-        alpha = alphaFunc(t, nu)
-        arr = func(self.__coords, alpha)
-        return arr
-
-    def getNodesCoordinates(self):
-        return self.__coords
