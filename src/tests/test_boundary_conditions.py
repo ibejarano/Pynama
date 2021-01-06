@@ -1,5 +1,5 @@
 from boundaries.boundary_conditions import BoundaryConditions
-from boundaries.boundary import Boundary
+from boundaries.boundary import Boundary, FunctionBoundary
 import unittest
 import numpy as np
 import numpy.testing as np_test
@@ -62,18 +62,20 @@ class TestBasicBoundary3D(TestBasicBoundary):
     nodesInBorder =  [0, 11, 24, 78]
 
 class TestBoundaryConditions(unittest.TestCase):
-    def setUp(self):
-        self.bcNames = ['up','down', 'right', 'left']
+    bcNames = ['up','down', 'right', 'left']
 
     def test_set_up_onlyFS(self):
+        valsFS = {"velocity": [1,0], "vorticity": [0]}
         testData = {"free-slip": {
-                "down": [None, 0],
-                "right": [1, 0],
-                "left": [1, 0],
-                "up": [1, 1]}}
+                "down": valsFS,
+                "right": valsFS,
+                "left": valsFS,
+                "up": valsFS}}
+
+
         bcs = BoundaryConditions(self.bcNames)
         bcs.setBoundaryConditions(testData)
-        assert "only FS" == bcs.getType()
+        assert "FS" == bcs.getType()
 
         bcsFSNames = bcs.getNamesByType('free-slip')
         bcsNSNames = bcs.getNamesByType('no-slip')
@@ -81,15 +83,17 @@ class TestBoundaryConditions(unittest.TestCase):
         assert bcsNSNames == []
 
     def test_set_up_onlyNS(self):
+        valsNS = {"velocity": [1,0]}
+
         testData = {"no-slip": {
-                "down": [None, 0],
-                "right": [1, 0],
-                "left": [1, 0],
-                "up": [1, 1]}}
+                "down": valsNS,
+                "right": valsNS,
+                "left": valsNS,
+                "up": valsNS}}
 
         bcs = BoundaryConditions(self.bcNames)
         bcs.setBoundaryConditions(testData)
-        assert "only NS" == bcs.getType()
+        assert "NS" == bcs.getType()
 
         bcsFSNames = bcs.getNamesByType('free-slip')
         bcsNSNames = bcs.getNamesByType('no-slip')
@@ -97,16 +101,20 @@ class TestBoundaryConditions(unittest.TestCase):
         assert bcsFSNames == []
 
     def test_set_up_FSNS(self):
+
+        valsFS = {"velocity": [1,0], "vorticity": [0]}
+        valsNS = {"velocity": [1,0]}
+
         testData = {"free-slip": {
-                "down": [None, 0],
-                "right": [1, 0]},
+                "down": valsFS,
+                "right":valsFS},
                     "no-slip": {
-                "left": [1, 0],
-                "up": [1, 1]}}
+                "left": valsNS,
+                "up": valsNS }}
 
         bcs = BoundaryConditions(self.bcNames)
         bcs.setBoundaryConditions(testData)
-        assert "FS NS" == bcs.getType()
+        assert "FS-NS" == bcs.getType()
 
         bcsFSNames = bcs.getNamesByType('free-slip')
         bcsNSNames = bcs.getNamesByType('no-slip')
@@ -122,12 +130,15 @@ class TestBoundaryConditions(unittest.TestCase):
         nodes_up = [6 , 7 , 8]
         nodes_left = [8 , 9 , 10 , 11, 0]
 
+        valsFS = {"velocity": [1,0], "vorticity": [0]}
+        valsNS = {"velocity": [2,0]}
+
         testData = {"free-slip": {
-        "down": [None, 0],
-        "right": [1, 0]},
+        "down": valsFS,
+        "right": valsFS},
             "no-slip": {
-        "left": [1, 0],
-        "up": [1, 1]}}
+        "left": valsNS,
+        "up": valsNS}}
 
         bcs = BoundaryConditions(self.bcNames)
         bcs.setBoundaryConditions(testData)

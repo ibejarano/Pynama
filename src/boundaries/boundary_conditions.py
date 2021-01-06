@@ -1,5 +1,6 @@
 from petsc4py.PETSc import IS, Vec
 import numpy as np
+import logging
 from .boundary import Boundary, FunctionBoundary
 
 class BoundaryConditions:
@@ -12,11 +13,11 @@ class BoundaryConditions:
         self.__type = None
         self.__ByName = dict()
         self.__ByType = { "free-slip": [], "no-slip": []}
-
-        self.__borderNames = list()
-        for s in sides:
-            self.__borderNames = b["name"]
+        self.__needsCoords = list()
+        self.__borderNames = sides
         self.__dim = 2 if len(sides) == 4 else 3
+
+        self.logger = logging.getLogger("Boundary Conditions:")
 
     def __repr__(self):
         txt = " --== Boundary Conditions ==--\n"
@@ -34,54 +35,50 @@ class BoundaryConditions:
         # data its the dictionary with key 'boundary-conditions'
         if "uniform" in data:
             if "free-slip" in data or "no-slip" in data:
-                print("WARNING: Only constant bc its assumed")
-            self.__type = "only FS"
-            # FIXME: Instead of None pass all the borders
-            dim = len(vel)
-            vel = data['uniform']['vel']
-            vort = [0] if dim == 2 else [0, 0 , 0]
-            self.__setUpBoundaries('free-slip', None, True, vel=vals, vort=vort)
+                self.logger.warning("WARNING: Only constant bc its assumed")
+            self.__type = "FS"
+            valsDict = data['uniform']
+            self.__setUpBoundaries('free-slip', self.__borderNames, valsDict)
+        elif "custom-func" in data:
+            self.__type = "FS"
+            funcName = data['custom-func']
+            attrs = data['attributes']
+            self.__setFunctionBoundaries(funcName, attrs)
         elif "free-slip" in data and "no-slip" in data:
             self.__type = "FS-NS"
-            self.__setUpBoundaries('free-slip', data['free-slip'])
-            self.__setUpBoundaries('no-slip', data['no-slip'])
+            self.__setPerBoundaries('free-slip', data['free-slip'])
+            self.__setPerBoundaries('no-slip', data['no-slip'])
         elif "free-slip" in data:
             self.__type = "FS"
-            self.__setUpBoundaries('free-slip', data['free-slip'])
+            self.__setPerBoundaries('free-slip', data['free-slip'])
         elif "no-slip" in data:
             self.__type = "NS"
-            self.__setUpBoundaries('no-slip', data['no-slip'])
-        else:
-            raise Exception("Boundary Conditions not defined")
-
-    def newsetBC(self, data):
-        bcTypes = data.keys()
-        if 'uniform' in bcTypes:
-            pass
-        elif 'custom-func' in bcTypes:
-            pass
-        elif "free-slip" in bcTypes and "no-slip" in bcTypes:
-            pass
-        elif "free-slip" in bcTypes:
-            pass
-        elif "no-slip" in bcTypes:
-            pass
+            self.__setPerBoundaries('no-slip', data['no-slip'])
         else:
             raise Exception("Boundary Conditions not defined")
 
     def getType(self):
         return self.__type
 
-    def __setUpBoundaries(self, t, sides, cte=False, cteValues=None):
-        if cte:
-            for name in self.__borderNames:
-                self.__setBoundary(name, t, cteValues) 
-        else:   
-            for name, vals in sides.items():
-                self.__setBoundary(name, t, vals)
+    def __setUpBoundaries(self, t, sides, vals: dict):
+        for nameSide in sides:
+            self.__setBoundary(nameSide, t, vals)
 
-    def __setBoundary(self, name, typ, values):
-        boundary = Boundary(name, typ, values)
+    def __setPerBoundaries(self, t, sidesDict: dict):
+        for name, vals in sidesDict.items():
+            if "custom-func" in vals:
+                funcName = vals['custom-func']['name']
+                attrs = vals['custom-func']['attributes']
+                self.__setFunctionBoundary(name, funcName, attrs)
+            else:
+                self.__setBoundary(name, t , vals)
+
+    def __setBoundary(self, name, typ, vals: dict):
+        boundary = Boundary(name, typ, self.__dim)
+
+        for attrName, val in vals.items():
+            boundary.setValues(attrName, val)
+
         self.__boundaries.append(boundary)
         if typ == 'free-slip':
             self.__fsBoundaries.append(boundary)
@@ -99,9 +96,9 @@ class BoundaryConditions:
     def __setFunctionBoundary(self, borderName, funcName, attrs):
         dim = self.__dim
         boundary = FunctionBoundary(borderName , funcName , attrs , dim)
-        boundary.setNodes(self.nodes)
-        boundary.setNodesCoordinates(self.coords)
         self.__fsBoundaries.append(boundary)
+        self.__ByName[borderName] = boundary
+        self.__needsCoords.append(borderName)
 
     def getNames(self, bcs=None):
         if bcs == None:
