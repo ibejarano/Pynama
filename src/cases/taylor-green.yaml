@@ -19,8 +19,6 @@ time-solver:
   end-time: 5
 
 boundary-conditions:
-  free-slip:
-    up: [0,0]
-    down: [0,0]
-    left: [0,0]
-    right: [0,0]
+  custom-func:
+    name: taylor_green
+    attributes: ['velocity', 'vorticity']

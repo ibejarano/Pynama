@@ -19,8 +19,6 @@ time-solver:
   end-time: 100
 
 boundary-conditions:
-  free-slip:
-    up: [1, 0]
-    down: [1, 0]
-    left: [1, 0]
-    right: [1, 0]
+  uniform:
+    velocity: [1, 0]
+    vorticity: [0]

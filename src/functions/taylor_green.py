@@ -44,13 +44,3 @@ def vorticity(coord, alpha):
     y_ = 2 * pi * coord[:,1] / Ly
     vort = -2 * pi * (1.0 / Lx + 1.0 / Ly) * np.cos(x_) * np.cos(y_) * alpha
     return vort
-
-if __name__ == "__main__":
-    lista = [[0,0],[0.5,0.5],[1,1]]
-    coords = np.array(lista)
-    a = alpha(1, 0)
-    arr = velocity_array(coords, a)
-    print("numpy", arr)
-    for i in lista:
-        vals = velocity(i, 1, 0)
-        print(vals)
