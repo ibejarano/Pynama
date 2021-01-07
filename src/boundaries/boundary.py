@@ -40,10 +40,10 @@ class Boundary:
         return str(xyz[self.__dofsConstrained])
 
     def __repr__(self):
-        return f"Boundary Name:{self.__name}:: Type: {self.__type} :: Velocity: {self.__vel} :: DOFS Constrained {self.__dofsConstrained}\n"
+        return f"Boundary Name:{self.__name}:: Type: {self.__type}  :: DOFS Constrained {self.__dofsConstrained}\n"
     
     def __str__(self):
-        return f"Boundary Name:{self.__name}:: Type: {self.__type} :: Velocity: {self.__vel} :: DOFS Constrained {self.__dofsConstrained}\n"
+        return f"Boundary Name:{self.__name}:: Type: {self.__type}  :: DOFS Constrained {self.__dofsConstrained}\n"
 
     def setNodes(self, nodes: list):
         """Set Nodes that belongs to this boundary. This method transform it in a PETSc IS object that can handle dofs or nodes.
