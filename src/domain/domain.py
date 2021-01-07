@@ -218,6 +218,10 @@ class Domain:
         nodes = self.__dm.getGlobalNodesFromCell(cell, shared=True)
         return nodes, localOperators
 
+    # -- apply Boundary Conditions to vec 
+    def applyBoundaryConditions(self, vec, varName):
+        assert self.__bc, "Boundary conditions not defined"
+        self.__bc.setValuesToVec(vec, varName)
 
     # -- apply values to vec
 

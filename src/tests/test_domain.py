@@ -85,8 +85,9 @@ class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
     }}
 
     dim = 2
-
-    bcUniform = {"uniform": {"velocity": [1,0] ,"vorticity": [0] }}
+    sides = ['left', 'right', 'up', 'down']
+    uniformValues = {"velocity": [1,5] ,"vorticity": [8] }
+    bcUniform = {"uniform": uniformValues }
     bcCustomFunc = {"custom-func": {"name": "taylor_green", "attributes": ['velocity', 'vorticity']}}
 
     def create_dom(self, bc, **kwargs):
@@ -98,7 +99,6 @@ class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
         dom.setOptions(**kwargs)
         dom.create()
         dom.setUpIndexing()
-        # dim = self.__dm.getDimension()
         dom.setUpSpectralElement(Spectral(self.dataBoxMesh['ngl'], self.dim))
         dom.setUpLabels()
         dom.computeFullCoordinates()
@@ -107,30 +107,71 @@ class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
     def test_setup_bc_uniform(self):
         dom = self.create_dom(self.bcUniform)
         dom.setUpBoundaryConditions()
+        dom.setUpBoundaryCoordinates()
 
     def test_setup_bc_custom_func(self):
-        dom = self.create_dom(self.bcCustomFunc)
-        dom.setUpBoundaryConditions()
+        if self.dim == 3:
+            raise Exception("Not implemented for 3d")
+        else:
+            dom = self.create_dom(self.bcCustomFunc)
+            dom.setUpBoundaryConditions()
+            dom.setUpBoundaryCoordinates()
 
     def test_setup_coords_bc_custom_func(self):
         dom = self.create_dom(self.bcCustomFunc)
         dom.setUpBoundaryConditions()
         dom.setUpBoundaryCoordinates()
 
-    def test_create_bc_uniform_custom_fc(self):
-        pass
+    def test_create_fs_bc_uniform_custom_fc(self):
+        bcData = {"free-slip": {}}
+        for s in self.sides:
+            bcData['free-slip'][s] = self.uniformValues
+        dom = self.create_dom(bcData)
+        dom.setUpBoundaryConditions()
+        dom.setUpBoundaryCoordinates()
 
     def test_get_fs_indices(self):
-        pass
+        dom = self.create_dom(self.bcUniform)
+        dom.setUpBoundaryConditions()
+        dom.setUpBoundaryCoordinates()
+        dirInds = dom.getGlobalIndicesDirichlet()
+        nsInds = dom.getGlobalIndicesNoSlip()
+
+        assert len(dirInds) == 32
+        assert len(nsInds) == 0
 
     def test_get_ns_indices(self):
-        pass
+        bcData = {"no-slip": {}}
+        for s in self.sides:
+            bcData['no-slip'][s] = self.uniformValues
+
+        dom = self.create_dom(bcData)
+        dom.setUpBoundaryConditions()
+        dom.setUpBoundaryCoordinates()
+        dirInds = dom.getGlobalIndicesDirichlet()
+        nsInds = dom.getGlobalIndicesNoSlip()
+
+        assert len(dirInds) == 0
+        assert len(nsInds) == 32
 
     def test_set_vec_bc_constant_values(self):
-        pass
+        dom = self.create_dom(self.bcUniform)
+        dom.setUpBoundaryConditions()
+        dom.setUpBoundaryCoordinates()
+
+        total_nodes = len(dom.getAllNodes())
+        dirInds = dom.getGlobalIndicesDirichlet()
+        ref = self.uniformValues['velocity'] # in 2d [1, 5]
+        arr_ref = np.zeros(total_nodes*self.dim)
+        for i in list(dirInds)[::2]:
+            arr_ref[i:i+self.dim] = ref
+        vec_ref = PETSc.Vec().createWithArray(arr_ref)
+
+        
+        vec_test = PETSc.Vec().createSeq(total_nodes*self.dim)
+        dom.applyBoundaryConditions(vec_test, "velocity")
+        
+        np_test.assert_array_almost_equal(vec_test, vec_ref, decimal=14)
 
     def test_set_vec_bc_func_all_values(self):
-        pass
-
-    def test_set_vec_bc_func_and_uniform_values(self):
         pass

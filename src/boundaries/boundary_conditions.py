@@ -157,3 +157,9 @@ class BoundaryConditions:
             inds = bcIS.union(inds)
         return set(inds.getIndices())
 
+    def setValuesToVec(self, vec, name ):
+        for b in self.__boundaries:
+            arr = b.getValues(name)
+            inds = b.getDofsConstrained()
+            vec.setValues(inds, arr, addv=False)
+        vec.assemble()
