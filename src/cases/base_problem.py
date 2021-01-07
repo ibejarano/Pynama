@@ -96,7 +96,6 @@ class BaseProblem(object):
     def createMesh(self, saveMesh=True):
         saveDir = self.config.get("save-dir")
         self.viewer.configure(self.dim, saveDir)
-        self.dom.computeFullCoordinates()
         if saveMesh:
             self.viewer.saveMesh(self.dom.getFullCoordVec())
         if not self.comm.rank:
