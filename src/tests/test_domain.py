@@ -8,15 +8,14 @@ from math import sqrt
 from petsc4py import PETSc
 
 class TestDomainInterface(unittest.TestCase):
-    def setUp(self):
-        dataBoxMesh = {"ngl":3, "box-mesh": {
-        "nelem": [2,2],
-        "lower": [0,0],
-        "upper": [1,1]
-    }}
-        self.dataBoxMesh = {"domain": dataBoxMesh}
-        self.dataGmsh = {"ngl": 3 , "gmsh-file": "src/tests/test.msh"}
-        self.dataGmsh = {"domain": self.dataGmsh}
+    dataBoxMesh = {"ngl":3, "box-mesh": {
+    "nelem": [2,2],
+    "lower": [0,0],
+    "upper": [1,1]
+}}
+    dataBoxMesh = {"domain": dataBoxMesh}
+    dataGmsh = {"ngl": 3 , "gmsh-file": "src/tests/test.msh"}
+    dataGmsh = {"domain": dataGmsh}
 
     def create_dom(self, data, **kwargs):
         dom = Domain()
@@ -77,247 +76,61 @@ class TestDomainInterface(unittest.TestCase):
     def test_set_from_opts_hmin(self):
         pass
 
-class TestBoxDMPLEX2D(unittest.TestCase):
 
-    def setUp(self):
-        ngl = 3
-        data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [3,4]}
-        self.dom = BoxDom()
-        self.dom.create(data2D)
-        self.dom.setFemIndexing(ngl)
+class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
+    dataBoxMesh = {"ngl":3, "box-mesh": {
+    "nelem": [2,2],
+    "lower": [0,0],
+    "upper": [1,1]
+    }}
 
-    def test_cell_start_end(self):
-        self.assertEqual(self.dom.cellStart, 0)
-        self.assertEqual(self.dom.cellEnd, 12)
+    dim = 2
 
-    def test_cell_corners_coords(self):
-        coords_cell_0 = np.array([[0,0 ],[0.2,0],[0.2,0.2],[0,0.2]])
-        coords_cell_0.shape = 8
-        coord= self.dom.getCellCornersCoords(0)
-        np_test.assert_array_almost_equal(coords_cell_0, coord, decimal=13)
+    bcUniform = {"uniform": {"velocity": [1,0] ,"vorticity": [0] }}
+    bcCustomFunc = {"custom-func": {"name": "taylor_green", "attributes": ['velocity', 'vorticity']}}
 
-    def test_borders_nodes(self):
-        total = 28
-        bordersNodes = self.dom.getBordersNodes()
-        bordersNodes_alt = self.dom.getNodesFromLabel("External Boundary")
-        assert type(bordersNodes) == set
-        assert len(bordersNodes) == total
+    def create_dom(self, bc, **kwargs):
+        dom = Domain()
+        data = dict()
+        data['domain'] = self.dataBoxMesh
+        data['boundary-conditions'] = bc
+        dom.configure(data)
+        dom.setOptions(**kwargs)
+        dom.create()
+        dom.setUpIndexing()
+        # dim = self.__dm.getDimension()
+        dom.setUpSpectralElement(Spectral(self.dataBoxMesh['ngl'], self.dim))
+        dom.setUpLabels()
+        dom.computeFullCoordinates()
+        return dom
 
-        assert type(bordersNodes_alt) == set
-        assert len(bordersNodes_alt) == total
+    def test_setup_bc_uniform(self):
+        dom = self.create_dom(self.bcUniform)
+        dom.setUpBoundaryConditions()
 
-        np_test.assert_equal(bordersNodes, bordersNodes_alt)
+    def test_setup_bc_custom_func(self):
+        dom = self.create_dom(self.bcCustomFunc)
+        dom.setUpBoundaryConditions()
 
-    def test_border_nodes(self):
-        borderNames = self.dom.getBordersNames()
-        for b in borderNames:
-            if b in ['up', 'down']:
-                assert len(self.dom.getBorderNodes(b)) == 7
-            else:
-                assert len(self.dom.getBorderNodes(b)) == 9
+    def test_setup_coords_bc_custom_func(self):
+        dom = self.create_dom(self.bcCustomFunc)
+        dom.setUpBoundaryConditions()
+        dom.setUpBoundaryCoordinates()
 
-class TestNglIndexing2D(unittest.TestCase):
-    def setUp(self):
-        self.doms = list()
-        data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [2,3]}
-        for ngl in range(2, 10 , 2):
-            dm = BoxDom()
-            dm.create(data2D)
-            dm.setFemIndexing(ngl)
-            self.doms.append(dm)
+    def test_create_bc_uniform_custom_fc(self):
+        pass
 
-    def test_borders_nodes_num(self):
-        cornerNodes = 10
-        for dom in self.doms:
-            ngl = dom.getNGL()
-            total = cornerNodes + 10*(ngl-2)
-            assert len(dom.getBordersNodes()) == total
+    def test_get_fs_indices(self):
+        pass
 
-    def test_border_nodes_num(self):
-        borderNames = self.doms[0].getBordersNames()
-        for dom in self.doms:
-            ngl = dom.getNGL()
-            for b in borderNames:
-                if b in ['up', 'down']:
-                    total = 3 + 2*(ngl-2)
-                    assert len(dom.getBorderNodes(b)) == total
-                else:
-                    total = 4 + 3*(ngl-2)
-                    assert len(dom.getBorderNodes(b)) == total
+    def test_get_ns_indices(self):
+        pass
 
-class TestBoxDMPLEX3D(unittest.TestCase):
+    def test_set_vec_bc_constant_values(self):
+        pass
 
-    def setUp(self):
-        data3D = {'lower': [0,0,0] , 'upper':[0.6,0.8,1], "nelem": [3,4,5]}
-        self.dom = BoxDom()
-        self.dom.create(data3D)
-        self.dom.setFemIndexing(3)
+    def test_set_vec_bc_func_all_values(self):
+        pass
 
-    def test_generate_dmplex(self):
-        assert self.dom.getDimension() == 3
-
-    def test_cell_start_end(self):
-        self.assertEqual(self.dom.cellStart, 0)
-        self.assertEqual(self.dom.cellEnd, 3*4*5)
-
-    def test_cell_corners_coords(self):
-        coords_cell_0 = np.array(
-            [[0,0,0 ] , [0,0.2,0],
-            [0.2,0.2,0], [0.2,0,0],
-            [0,0,0.2 ],[0.2,0,0.2],
-            [0.2,0.2,0.2],
-            [0,0.2,0.2]
-        ])
-        coords_cell_0.shape = 8*3
-        coord= self.dom.getCellCornersCoords(0)
-        np_test.assert_array_almost_equal(coords_cell_0, coord, decimal=13)
-
-
-    def test_border_names(self):
-        borderNames = self.dom.getBordersNames()
-
-        assert len(borderNames) == 6
-        for b in borderNames:
-            assert b in ['up', 'down', 'left', 'right', 'front', 'back']
-
-    def test_borders_nodes(self):
-        totalArc = 28*11
-        totalFace = 35*2
-        total = totalArc + totalFace
-        bordersNodes = self.dom.getBordersNodes()
-        bordersNodes_alt = self.dom.getNodesFromLabel("External Boundary")
-        assert type(bordersNodes) == set
-        assert len(bordersNodes) == total
-
-        assert type(bordersNodes_alt) == set
-        assert len(bordersNodes_alt) == total
-
-        np_test.assert_equal(bordersNodes, bordersNodes_alt)
-
-    def test_border_nodes(self):
-        borderNames = self.dom.getBordersNames()
-        for b in borderNames:
-            if b in ['up', 'down']:
-                assert len(self.dom.getBorderNodes(b)) == 7*11
-            elif b in ['left', 'right']:
-                assert len(self.dom.getBorderNodes(b)) == 9*11
-            else:
-                assert len(self.dom.getBorderNodes(b)) == 7*9
-
-class TestNglIndexing3D(unittest.TestCase):
-    def setUp(self):
-        self.doms = list()
-        data3D = {'lower': [0,0,0] , 'upper':[0.6,0.8,1], "nelem": [2,3,4]}
-        for ngl in range(2, 10 , 2):
-            dm = BoxDom()
-            dm.create(data3D)
-            dm.setFemIndexing(ngl)
-            self.doms.append(dm)
-
-    def test_borders_nodes_num(self):
-        edges = 36 + 68
-        cells = 52
-        cornerNodes = 54
-        for dom in self.doms:
-            ngl = dom.getNGL()
-            total = cornerNodes + edges*(ngl-2) + cells*((ngl-2)**2)
-            assert len(dom.getBordersNodes()) == total
-
-    def test_border_nodes_num(self):
-        borderNames = self.doms[0].getBordersNames()
-        for dom in self.doms:
-            ngl = dom.getNGL()
-            for b in borderNames:
-                if b in ['up', 'down']:
-                    total = 15 + 22*(ngl-2) + 8*((ngl-2)**2)
-                    assert len(dom.getBorderNodes(b)) == total
-                elif b in ['right', 'left']:
-                    total = 20 + 31*(ngl-2) + 12*((ngl-2)**2)
-                    assert len(dom.getBorderNodes(b)) == total
-                elif b in ['front', 'back']:
-                    total = 12 + 17*(ngl-2) + 6*((ngl-2)**2)
-                    assert len(dom.getBorderNodes(b)) == total
-                else:
-                    raise Exception("Not found Border")
-
-class DomainModTests2D(unittest.TestCase):
-
-    def setUp(self):
-        ngl = 2
-        data2D = {'lower': [0,0] , 'upper':[1,1], "nelem": [2,2]}
-        self.dom = BoxDom()
-        self.dom.create(data2D)
-        self.dom.setFemIndexing(ngl)
-
-        dim = self.dom.getDimension()
-        spectral2D = Spectral(ngl,dim)
-        self.dom.computeFullCoordinates(spectral2D)
-
-        self.testVelVec = self.dom.createGlobalVec()
-
-    def test_get_all_global_nodes_ngls(self):
-        data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [2,3]}
-        for ngl in range(2, 14):
-            dom = BoxDom()
-            dom.create(data2D)
-            dom.setFemIndexing(ngl)
-            allNodes = dom.getAllNodes()
-            total = 12 + 17*(ngl-2) + 6*((ngl-2)**2)
-            assert len(allNodes) == total
-            del dom
-
-    def test_get_nodes_coordinates_2D(self):
-        allNodes = self.dom.getAllNodes()
-        coords = [[0., 0. ], [0.5, 0. ], [1.,  0. ], [0.,  0.5], [0.5, 0.5], [1.,  0.5], [0.,  1. ], [0.5, 1. ], [1.,  1. ]]
-        test_coords = self.dom.getNodesCoordinates(allNodes)
-        np_test.assert_array_almost_equal(coords, test_coords)
-
-#     # TODO: implement 3D tests
-
-    def test_set_function_vec_to_vec_2D(self):
-        np_coords = np.array([[0., 0. ], [0.5, 0. ], [1.,  0. ], [0.,  0.5], [0.5, 0.5], [1.,  0.5], [0.,  1. ], [0.5, 1. ], [1.,  1. ]])
-        result = np.sqrt(np_coords)
-        allNodes = self.dom.getAllNodes()
-
-        f = lambda coords : (sqrt(coords[0]),sqrt(coords[1]))
-        dim = self.dom.getDimension()
-        self.dom.applyFunctionVecToVec(allNodes, f, self.testVelVec,dim)
-        test_result = self.testVelVec.getArray().reshape(9,2)
-        np_test.assert_array_almost_equal(result, test_result, decimal=12)
-
-    def test_set_function_vec_to_vec_2D_some_nodes(self):
-        np_coords = np.array([[0., 0. ], [1, 1. ], [1.,  1. ], [0.,  0.5], [1., 1.], [1.,  1.], [1.,  1. ], [0.5, 1. ], [1.,  1. ]])
-        result = np.sqrt(np_coords)
-
-        self.testVelVec.set(1.0)
-        someNodes = [0,3,7] 
-        f = lambda coords : (sqrt(coords[0]),sqrt(coords[1]))
-
-        dim = self.dom.getDimension()
-        self.dom.applyFunctionVecToVec(someNodes, f, self.testVelVec, dim)
-        test_result = self.testVelVec.getArray().reshape(9,2)
-        np_test.assert_array_almost_equal(result, test_result, decimal=12)
-
-    def test_set_function_scalar_to_vec_2D(self):
-        vecScalar = PETSc.Vec().createSeq(9)
-
-        result = np.array([0,0.5,1,0.5,1.,1.5,1,1.5,2])
-
-        allNodes = self.dom.getAllNodes()
-        f = lambda coord: (coord[0]+coord[1])
-        self.dom.applyFunctionScalarToVec(allNodes, f , vecScalar)
-        test_result = vecScalar.getArray()
-        np_test.assert_array_almost_equal(result, test_result, decimal=12)
-
-    def test_set_constant_to_vec_2D(self):
-
-        cteValue = [3 , 5]
-
-        result = np.array( [3,5]* 9).reshape(9, 2)
-        vec = PETSc.Vec().createSeq(18)
-        self.dom.applyValuesToVec(self.dom.getAllNodes(), cteValue, vec)
-        test_result = vec.getArray().reshape(9,2)
-        np_test.assert_array_almost_equal(result, test_result, decimal=12)
-
-    # def test_set_function_to_vec(self):
-    #     raise NotImplementedError
+    def test_set_vec_bc_func_and_uniform_values(self):
+        pass
