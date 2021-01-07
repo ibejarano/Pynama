@@ -96,6 +96,7 @@ class BoundaryConditions:
     def __setFunctionBoundary(self, borderName, funcName, attrs):
         dim = self.__dim
         boundary = FunctionBoundary(borderName , funcName , attrs , dim)
+        self.__boundaries.append(boundary)
         self.__fsBoundaries.append(boundary)
         self.__ByName[borderName] = boundary
         self.__ByType['free-slip'].append(boundary)
@@ -116,12 +117,20 @@ class BoundaryConditions:
     def getBordersNeedsCoords(self):
         return self.__needsCoords
 
+    def getIndicesByName(self, name):
+        border = self.__ByName[name]
+        return border.getDofsConstrained()
+
     def setBoundaryNodes(self, bName, nodes):
         try:
             boundary = self.__ByName[bName]
             boundary.setNodes(nodes)
         except:
             raise Exception("Boundary Not found")
+
+    def setBoundaryCoords(self, bName, coords):
+        border = self.__ByName[bName]
+        border.setNodesCoordinates(coords)
 
     def getIndicesByType(self, bcType):
         inds = IS().createGeneral([])
