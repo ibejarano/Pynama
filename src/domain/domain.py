@@ -10,6 +10,7 @@ import numpy as np
 import logging
 from mpi4py import MPI
 from math import pi, floor
+import copy
 
 def checkOption(optName, optKwargs):
     OptDB = PETSc.Options()
@@ -53,7 +54,8 @@ class Domain:
         del self.domData
         self.logger.info(f"DMPlex type: {self.__meshType} created")
 
-    def configure(self, data):
+    def configure(self, inp):
+        data = copy.deepcopy(inp)
         if 'domain' in data:
             self.domData = data['domain']
 
@@ -90,7 +92,10 @@ class Domain:
         dim = self.__dm.getDimension()
         self.setUpSpectralElement(Spectral(self.__ngl, dim))
         self.setUpLabels()
+
         self.setUpBoundaryConditions()
+        self.computeFullCoordinates()
+        self.setUpBoundaryCoordinates()
 
     def setUpBoundaryConditions(self):
         assert self.bcData, "Boundary Conditions Not defined"
@@ -102,9 +107,17 @@ class Domain:
         for bName in boundariesNames:
             nodes = self.__dm.getBorderNodes(bName)
             bcs.setBoundaryNodes(bName, nodes)
-        self.__bc = bcs
 
+        self.__bc = bcs
         del self.bcData
+
+    def setUpBoundaryCoordinates(self):
+        bordersWithCoords = self.__bc.getBordersNeedsCoords()
+        # print(bordersWithCoords)
+        for borderName in bordersWithCoords:
+            inds = self.__bc.getIndicesByName(borderName)
+            coords = self.getCoordinates(inds)
+            self.__bc.setBoundaryCoords(borderName, coords)
         
     def setUpLabels(self):
         self.__dm.setLabelToBorders()
@@ -145,6 +158,9 @@ class Domain:
 
     def getNodesCoordinates(self, nodes):
         return self.__dm.getNodesCoordinates(nodes=nodes)
+
+    def getCoordinates(self, indices):
+        return self.__dm.getNodesCoordinates(indices=indices)
 
     # -- Get / SET Nodes methods --
     def getNumOfNodes(self):
