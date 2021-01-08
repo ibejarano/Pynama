@@ -69,15 +69,6 @@ class CustomFuncCase(FreeSlip):
         exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort, self.dim_w)
         return exactVel, exactVort
 
-    def applyBoundaryConditions(self, time):
-        self.vel.set(0.0)
-        fvel_coords = lambda coords: self.velFunction(coords, self.nu, t=time)
-        fvort_coords = lambda coords: self.vortFunction(coords, self.nu, t=time)
-        self.vel = self.dom.applyFunctionVecToVec(self.bcNodes, fvel_coords, self.vel, self.dim)
-        self.vort = self.dom.applyFunctionVecToVec(self.bcNodes, fvort_coords, self.vort, self.dim_w)
-        self.vel.assemble()
-        self.vort.assemble()
-
     def solveKLETests(self, steps=10):
         self.logger.info("Running KLE Tests")
         startTime = self.ts.getTime()
