@@ -21,12 +21,19 @@ class BoundaryConditions:
 
     def __repr__(self):
         txt = " --== Boundary Conditions ==--\n"
-        txt += "   Name   |   Type   |   Values   |   Dofs Contrained   \n"
+        txt += "   Name   |   Type   |   Values   |   Nodes   \n"
         for b in self.__boundaries:
             name = b.getName()
             typ = b.getType()
-            val = b.getValues()
-            dirs = b.getDirectionsConstrained()
+            try:
+                val = b.getValues()
+            except:
+                val = "Not defined"
+            try:
+                dirs = b.getNodes()
+                dirs = str(dirs)
+            except:
+                dirs = "Not Defined"
             msg = f"{name:10}|{typ:10}|{str(val):12}|{dirs:12}\n"
             txt+=msg
         return txt
