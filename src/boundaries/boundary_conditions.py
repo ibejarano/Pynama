@@ -160,6 +160,9 @@ class BoundaryConditions:
     def setValuesToVec(self, vec, name, t, nu):
         for b in self.__boundaries:
             arr = b.getValues(name, t, nu)
-            inds = b.getDofsConstrained()
+            if self.__dim == 2 and name == 'vorticity':
+                inds = b.getNodes()
+            else:
+                inds = b.getDofsConstrained()
             vec.setValues(inds, arr, addv=False)
         vec.assemble()

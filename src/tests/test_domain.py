@@ -7,7 +7,7 @@ import numpy.testing as np_test
 from math import sqrt
 from petsc4py import PETSc
 
-from functions.taylor_green import velocity_test
+from functions.taylor_green import velocity_test, vorticity_test
 
 class TestDomainInterface(unittest.TestCase):
     dataBoxMesh = {"ngl":3, "box-mesh": {
@@ -87,6 +87,7 @@ class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
     }}
 
     dim = 2
+    dim_w = 1
     sides = ['left', 'right', 'up', 'down']
     uniformValues = {"velocity": [1,5] ,"vorticity": [8] }
     bcUniform = {"uniform": uniformValues }
@@ -156,7 +157,7 @@ class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
         assert len(dirInds) == 0
         assert len(nsInds) == 32
 
-    def test_set_vec_bc_constant_values(self):
+    def test_set_vec_bc_constant_values_velocity(self):
         dom = self.create_dom(self.bcUniform)
         dom.setUpBoundaryConditions()
         dom.setUpBoundaryCoordinates()
@@ -175,7 +176,7 @@ class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
         
         np_test.assert_array_almost_equal(vec_test, vec_ref, decimal=14)
 
-    def test_set_vec_bc_func_all_values(self):
+    def test_set_vec_bc_func_all_values_velocity(self):
         dom = self.create_dom(self.bcCustomFunc)
         dom.setUpBoundaryConditions()
         dom.setUpBoundaryCoordinates()
@@ -195,3 +196,24 @@ class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
         vec_test = PETSc.Vec().createSeq(total_nodes*self.dim)
         dom.applyBoundaryConditions(vec_test, "velocity", t, nu)
         np_test.assert_array_almost_equal(vec_test, vec_ref, decimal=15)
+
+    def test_set_vec_bc_constant_values_vorticity(self):
+        dom = self.create_dom(self.bcUniform)
+        dom.setUpBoundaryConditions()
+        dom.setUpBoundaryCoordinates()
+
+        total_nodes = len(dom.getAllNodes())
+        dirInds = dom.getGlobalIndicesDirichlet()
+        if self.dim == 2:
+            dirInds = [ int(i/self.dim) for i in dirInds ]
+        ref = self.uniformValues['vorticity'] # in 2d [8]
+        arr_ref = np.zeros(total_nodes*self.dim_w)
+        for i in dirInds:
+            arr_ref[i:i+self.dim_w] = ref
+
+        vec_ref = PETSc.Vec().createWithArray(arr_ref)
+
+        vec_test = PETSc.Vec().createSeq(total_nodes*self.dim_w)
+        dom.applyBoundaryConditions(vec_test, "vorticity")
+        
+        np_test.assert_array_almost_equal(vec_test, vec_ref, decimal=14)
