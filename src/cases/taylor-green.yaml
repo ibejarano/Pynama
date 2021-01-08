@@ -21,4 +21,4 @@ time-solver:
 boundary-conditions:
   custom-func:
     name: taylor_green
-    attributes: ['velocity', 'vorticity']
+    attributes: ['velocity', 'vorticity', 'alpha']
