@@ -30,7 +30,6 @@ class BaseProblem(object):
         self.logger = logging.getLogger(f"[{self.comm.rank}] {self.config.get('name')}")
         self.case = case
         self.caseName = self.config.get("name")
-        self.readDomainData(kwargs)
         self.readMaterialData()
         self.opts = kwargs
         if "chart" in kwargs:
@@ -52,16 +51,16 @@ class BaseProblem(object):
 
     def setUpDomain(self):
         self.dom = Domain()
-        if 'constant' in self.config['boundary-conditions']:
-            bc = self.config['boundary-conditions']
-            re = bc['constant']['re']
-            directionAngle = bc['constant']['direction']
-            angleRadian = radians(directionAngle)
-            L = eval(bc['constant']['longRef'])
-            velRef = re*(self.mu/self.rho) / L
-            self.U_ref = velRef
-            self.cteValue = [cos(angleRadian)*velRef,sin(angleRadian)*velRef]
-            self.config['boundary-conditions']['constant']['vel'] = self.cteValue
+        # if 'constant' in self.config['boundary-conditions']:
+        #     bc = self.config['boundary-conditions']
+        #     re = bc['constant']['re']
+        #     directionAngle = bc['constant']['direction']
+        #     angleRadian = radians(directionAngle)
+        #     L = eval(bc['constant']['longRef'])
+        #     velRef = re*(self.mu/self.rho) / L
+        #     self.U_ref = velRef
+        #     self.cteValue = [cos(angleRadian)*velRef,sin(angleRadian)*velRef]
+        #     self.config['boundary-conditions']['constant']['vel'] = self.cteValue
         self.dom.configure(self.config)
         self.dom.setOptions(**self.opts)
         self.dom.setUp()
@@ -75,23 +74,6 @@ class BaseProblem(object):
         self.rho = materialData['rho']
         self.mu = materialData['mu']
         self.nu = self.mu/self.rho
-
-    def readDomainData(self, kwargs):
-        domain = self.config.get("domain")
-        if "nelem" in kwargs:
-            self.nelem = kwargs['nelem']
-        elif "box-mesh" in domain:
-            self.nelem = domain['box-mesh']['nelem']
-            self.lower = domain['box-mesh']['lower']
-            self.upper = domain['box-mesh']['upper']
-
-        else:
-            raise Exception("No Gmsh Implemented")
-
-        if "ngl" in kwargs:
-            self.ngl = kwargs['ngl']
-        else:
-            self.ngl = domain['ngl']
 
     def createMesh(self, saveMesh=True):
         saveDir = self.config.get("save-dir")
@@ -120,19 +102,6 @@ class BaseProblem(object):
         self.ts.setUpTimes(sTime, eTime, maxSteps)
         self.ts.initSolver(self.evalRHS, self.convergedStepFunction)
 
-    def setUpTimeSolverTest(self):
-        options = self.config.get("time-solver")
-        self.ts = TsSolver(self.comm)
-        sTime = options['start-time']
-        eTime = options['end-time']
-        maxSteps = options['max-steps']
-        self.ts.setUpTimes(sTime, eTime, maxSteps)
-        self.saveError2 = []
-        self.saveError8 = []
-        self.saveStep = []
-        self.saveTime = []
-        self.ts.initSolver(self.evalRHS, self.convergedStepFunctionKLET)
-        
     def createNumProcVec(self, step):
         proc = self.vort.copy()
         proc.setName("num proc")
@@ -442,22 +411,6 @@ class FreeSlip(BaseProblem):
         self.applyBoundaryConditions(time)
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
-    def getKLEError(self, viscousTimes=None ,startTime=0.0, endTime=1.0, steps=10):
-        try:
-            assert viscousTimes !=None
-        except:
-            viscousTimes = np.arange(startTime, endTime, (endTime - startTime)/steps)
-
-        times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
-        errors = list()
-        for time in times:
-            exactVel, exactVort = self.generateExactVecs(time)
-            self.applyBoundaryConditions(time)
-            self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
-            error = (exactVel - self.vel).norm(norm_type=2)
-            errors.append(error)
-        return errors
-
     def buildKLEMats(self):
         # indices2one = set() 
         # cornerCoords = self.dom.getCellCornersCoords(cell=0)
@@ -512,3 +465,34 @@ class FreeSlip(BaseProblem):
         self.mat.assembleAll()
         if not self.comm.rank:
             self.logger.info(f"KLE Matrices builded")
+
+
+class BaseProblemTest(BaseProblem):
+    def setUpTimeSolverTest(self):
+        options = self.config.get("time-solver")
+        self.ts = TsSolver(self.comm)
+        sTime = options['start-time']
+        eTime = options['end-time']
+        maxSteps = options['max-steps']
+        self.ts.setUpTimes(sTime, eTime, maxSteps)
+        self.saveError2 = []
+        self.saveError8 = []
+        self.saveStep = []
+        self.saveTime = []
+        self.ts.initSolver(self.evalRHS, self.convergedStepFunctionKLET)
+
+    def getKLEError(self, viscousTimes=None ,startTime=0.0, endTime=1.0, steps=10):
+        try:
+            assert viscousTimes !=None
+        except:
+            viscousTimes = np.arange(startTime, endTime, (endTime - startTime)/steps)
+
+        times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
+        errors = list()
+        for time in times:
+            exactVel, exactVort = self.generateExactVecs(time)
+            self.applyBoundaryConditions(time)
+            self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+            error = (exactVel - self.vel).norm(norm_type=2)
+            errors.append(error)
+        return errors
