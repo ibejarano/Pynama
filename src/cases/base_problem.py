@@ -389,9 +389,6 @@ class FreeSlip(BaseProblem):
     def generateExactVecs(self, time):
         return 0, 0
 
-    def buildMatrices(self):
-        pass
-
     def setUpEmptyMats(self):
         self.mat = Mat(self.dim, self.comm)
         self.operator = Operators(self.dim, self.comm)
@@ -408,7 +405,10 @@ class FreeSlip(BaseProblem):
             self.logger.info(f"Empty Operators created")
 
     def solveKLE(self, time, vort):
-        self.applyBoundaryConditions(time)
+        self.vel.set(0.0)
+        self.dom.applyBoundaryConditions(self.vel, "velocity", time, self.nu)
+        self.dom.applyBoundaryConditions(vort, "vorticity", time, self.nu)
+
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def buildKLEMats(self):

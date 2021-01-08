@@ -113,7 +113,6 @@ class Domain:
 
     def setUpBoundaryCoordinates(self):
         bordersWithCoords = self.__bc.getBordersNeedsCoords()
-        # print(bordersWithCoords)
         for borderName in bordersWithCoords:
             inds = self.__bc.getIndicesByName(borderName)
             coords = self.getCoordinates(inds)
@@ -241,7 +240,11 @@ class Domain:
         print(f"Element Type : {self.__elem}")
         print(f"Total number of Elements: {self.getNumOfElements()}")
         print(f"Total number of Nodes: {self.getNumOfNodes()}")
-        print(self.__bc)
+        
+        if self.__bc != None:
+            print(self.__bc)
+        else:
+            print("Boundary conditions not defined")
 
     def viewNodesCoords(self):
         print(" ===== Nodes Coordinates =====")
