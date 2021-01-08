@@ -27,6 +27,16 @@ def velocity(coords, alpha=1):
     vel[:,1] = -np.sin(x_) * np.cos(y_) * alpha
     return vel.flatten()
 
+def velocity_test(coord, t, nu):
+    Lx= 1
+    Ly= 1
+    Uref = 1
+    x_ = 2 * pi * coord[0] / Lx
+    y_ = 2 * pi * coord[1] / Ly
+    expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
+    vel = [cos(x_) * sin(y_) * expon, -sin(x_) * cos(y_) * expon]
+    return vel
+
 def vorticityLegacy(coord, nu, t):
     Lx= 1
     Ly= 1

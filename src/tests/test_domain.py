@@ -7,6 +7,8 @@ import numpy.testing as np_test
 from math import sqrt
 from petsc4py import PETSc
 
+from functions.taylor_green import velocity_test
+
 class TestDomainInterface(unittest.TestCase):
     dataBoxMesh = {"ngl":3, "box-mesh": {
     "nelem": [2,2],
@@ -88,7 +90,7 @@ class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
     sides = ['left', 'right', 'up', 'down']
     uniformValues = {"velocity": [1,5] ,"vorticity": [8] }
     bcUniform = {"uniform": uniformValues }
-    bcCustomFunc = {"custom-func": {"name": "taylor_green", "attributes": ['velocity', 'vorticity']}}
+    bcCustomFunc = {"custom-func": {"name": "taylor_green", "attributes": ['velocity', 'vorticity', 'alpha']}}
 
     def create_dom(self, bc, **kwargs):
         dom = Domain()
@@ -174,4 +176,22 @@ class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
         np_test.assert_array_almost_equal(vec_test, vec_ref, decimal=14)
 
     def test_set_vec_bc_func_all_values(self):
-        pass
+        dom = self.create_dom(self.bcCustomFunc)
+        dom.setUpBoundaryConditions()
+        dom.setUpBoundaryCoordinates()
+        
+        t = 0
+        nu = 0.5/0.01
+
+        total_nodes = len(dom.getAllNodes())
+        dirInds = dom.getGlobalIndicesDirichlet()
+        arr_ref = np.zeros(total_nodes*self.dim)
+        for i in list(dirInds)[::2]:
+            coord = dom.getNodesCoordinates([int(i/self.dim)])
+            ref = velocity_test(coord[0], nu, t) 
+            arr_ref[i:i+self.dim] = ref
+        vec_ref = PETSc.Vec().createWithArray(arr_ref)
+        
+        vec_test = PETSc.Vec().createSeq(total_nodes*self.dim)
+        dom.applyBoundaryConditions(vec_test, "velocity", t, nu)
+        np_test.assert_array_almost_equal(vec_test, vec_ref, decimal=15)

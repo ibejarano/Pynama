@@ -219,9 +219,9 @@ class Domain:
         return nodes, localOperators
 
     # -- apply Boundary Conditions to vec 
-    def applyBoundaryConditions(self, vec, varName):
+    def applyBoundaryConditions(self, vec, varName, t=None, nu=None):
         assert self.__bc, "Boundary conditions not defined"
-        self.__bc.setValuesToVec(vec, varName)
+        self.__bc.setValuesToVec(vec, varName, t, nu)
 
     # -- apply values to vec
 
