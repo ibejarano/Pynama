@@ -150,6 +150,11 @@ class Domain:
     def getFullCoordVec(self):
         return self.__dm.fullCoordVec
 
+    def getFullCoordArray(self):
+        dim = self.__dm.getDimension()
+        nodes = self.getNumOfNodes()
+        return self.__dm.fullCoordVec.getArray().reshape((nodes, dim))
+
     def getCellCentroid(self, cell):
         dim = self.__dm.getDimension()
         cornerCoords = self.__dm.getCellCornersCoords(cell).reshape((2**dim), dim)
@@ -160,6 +165,9 @@ class Domain:
 
     def getCoordinates(self, indices):
         return self.__dm.getNodesCoordinates(indices=indices)
+
+    def destroyCoordVec(self):
+        self.__dm.fullCoordVec.destroy()
 
     # -- Get / SET Nodes methods --
     def getNumOfNodes(self):
