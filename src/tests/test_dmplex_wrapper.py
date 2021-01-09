@@ -46,6 +46,18 @@ class TestBoxDMPLEX2D(unittest.TestCase):
             else:
                 assert len(self.dom.getBorderNodes(b)) == 9
 
+    def test_edge_width(self):
+        data2D = {'lower': [0,0] , 'upper':[0.6,0.8], "nelem": [4,4]}
+        dm = BoxDom()
+        dm.create(data2D)
+        dm.setFemIndexing(3)
+
+        width_test = dm.getEdgesWidth()
+
+        width_ref = (data2D['upper'][0] - data2D['lower'][0] )/ data2D['nelem'][0]
+
+        assert width_ref == width_test
+
 class TestNglIndexing2D(unittest.TestCase):
     def setUp(self):
         self.doms = list()
@@ -133,6 +145,18 @@ class TestBoxDMPLEX3D(unittest.TestCase):
                 assert len(self.dom.getBorderNodes(b)) == 9*11
             else:
                 assert len(self.dom.getBorderNodes(b)) == 7*9
+
+    def test_edge_width(self):
+        data3D = {'lower': [0,0,0] , 'upper':[0.8,0.8,0.8], "nelem": [4,4,4]}
+        dm = BoxDom()
+        dm.create(data3D)
+        dm.setFemIndexing(3)
+
+        width_test = dm.getEdgesWidth()
+
+        width_ref = (data3D['upper'][0] - data3D['lower'][0] )/ data3D['nelem'][0]
+
+        assert width_ref == width_test
 
 class TestNglIndexing3D(unittest.TestCase):
     def setUp(self):

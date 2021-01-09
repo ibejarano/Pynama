@@ -264,30 +264,3 @@ class Domain:
         totalNodes = int(len(coordArr) / dim)
         for node in range(totalNodes):
             print(f"Node: {node}  --- Coords {coordArr[node*dim:node*dim+dim]}")
-
-
-if __name__ == '__main__':
-    dom = Domain()
-    domData = {"ngl":2, "box-mesh": {
-        "nelem": [2,2],
-        "lower": [0,0],
-        "upper": [1,1]
-    }}
-
-    bcData = {
-        "free-slip": {
-            "up": [1, 0],
-            "right": [1, 0]},
-        "no-slip": {
-            "left": [1, 1],
-            "down": [None, 0]
-        }
-    }
-
-    data = {"domain": domData, "boundary-conditions": bcData}
-
-    dom.configure(data)
-    dom.setOptions(ngl=3)
-    dom.setOptions(nelem=[2,2,2], lower=[0,0,0], upper=[1,1,1])
-    dom.setUp()
-    dom.view()

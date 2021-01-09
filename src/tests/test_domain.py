@@ -217,3 +217,35 @@ class TestDomainInterfaceBoundaryConditions(unittest.TestCase):
         dom.applyBoundaryConditions(vec_test, "vorticity")
         
         np_test.assert_array_almost_equal(vec_test, vec_ref, decimal=14)
+
+
+class TestDomainMethodsBoxMesh(unittest.TestCase):
+    data = {"ngl":3, "box-mesh": {
+    "nelem": [5,5],
+    "lower": [-5,-5],
+    "upper": [8,8]
+}}
+    
+    uniformValues = {"velocity": [1,5] ,"vorticity": [8] }
+    bcUniform = {"uniform": uniformValues }
+
+    data = {"domain": data, "boundary-conditions": bcUniform}
+    
+    def setUp(self):
+        dom = Domain()
+        dom.configure(self.data)
+        dom.setOptions()
+        dom.setUp()
+        self.dom = dom
+
+    def test_nodes_separation(self):
+        boxData = self.data['domain']['box-mesh']
+        nelem = boxData['nelem'][0]
+        totalWidth = boxData['upper'][0] - boxData['lower'][0]
+
+        width_ref = totalWidth / nelem
+        width_ref /= (self.data['domain']['ngl']-1)
+
+        width_test = self.dom.getNodeSeparationIBM() 
+
+        assert width_ref == width_test
