@@ -239,6 +239,23 @@ class DMPlexDom(PETSc.DMPlex):
             arr = self.fullCoordVec.getValues(indices).reshape((numOfNodes,dim))
         return arr
 
+    def getEdgesWidth(self):
+        # bounding for dim = 2 are edges and for dim = 3 are faces
+        startEnt, endEnt = self.getDepthStratum(1)
+        coordinates = self.getCoordinatesLocal()
+        coordSection = self.getCoordinateSection()
+
+        # TODO: For future implementations:
+        # for e in range(startEnt, endEnt):
+        #     coord = self.vecGetClosure(coordSection,
+        #                                  coordinates,
+        #                                  e)
+        coord = self.vecGetClosure(coordSection, coordinates, startEnt).reshape(2,self.dim)
+        coord = coord[1] - coord[0]
+        norm = np.linalg.norm(coord)
+        return norm
+
+
     def getBorderNodesWithNormal(self, cell, intersect):
         nodes = list()
         normals = list()
