@@ -14,10 +14,12 @@ domain:
   # h-min: 0.04
 
 boundary-conditions:
-  constant:
+  uniform:
     re: 10
     direction: 0
-    longRef: '1'
+    Lref: '1'
+    rho: 0.5
+    mu: 0.01
 bodies:
   -
     type: "circle"
