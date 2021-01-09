@@ -182,6 +182,17 @@ class Domain:
     def getBorderNodes(self, borderName):
         return self.__dm.getBorderNodes(borderName)
 
+    def getNodeSeparationIBM(self):
+        dm = self.__dm
+        ## FIRST GIVE ME ONE EDGE
+        eWidth = dm.getEdgesWidth()
+        val = eWidth / (self.__ngl - 1)
+        return val
+
+    def getFreeStreamVelocity(self):
+        vel = self.__bc.getFreeStreamVelocity()
+        return np.linalg.norm(vel)
+
     # -- Mat Index Generator --
     def getMatIndices(self):
         return self.__dm.getMatIndices()

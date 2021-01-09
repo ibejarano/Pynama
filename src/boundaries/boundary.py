@@ -37,6 +37,10 @@ class Boundary:
     def getName(self):
         return self.__name
 
+    def getVelocitySetted(self):
+        val = getattr(self, 'velocity')
+        return val
+
     def getDirectionsConstrained(self):
         xyz = np.array(('x', 'y', 'z'))
         return str(xyz[self.__dofsConstrained])

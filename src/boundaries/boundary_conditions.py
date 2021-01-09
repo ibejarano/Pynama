@@ -1,6 +1,8 @@
 from petsc4py.PETSc import IS, Vec
 import numpy as np
 import logging
+from math import radians, sin, cos
+
 from .boundary import Boundary, FunctionBoundary
 
 class BoundaryConditions:
@@ -44,8 +46,8 @@ class BoundaryConditions:
             if "free-slip" in data or "no-slip" in data:
                 self.logger.warning("WARNING: Only constant bc its assumed")
             self.__type = "FS"
-            valsDict = data['uniform']
-            self.__setUpBoundaries('free-slip', self.__borderNames, valsDict)
+            vals = self.__handleUniform(data['uniform'])
+            self.__setUpBoundaries('free-slip', self.__borderNames, vals)
         elif "custom-func" in data:
             self.__type = "FS"
             funcName = data['custom-func']['name']
@@ -79,6 +81,35 @@ class BoundaryConditions:
                 self.__setFunctionBoundary(name, funcName, attrs)
             else:
                 self.__setBoundary(name, t , vals)
+
+    def __handleUniform(self, dataUniform: dict):
+        out = dict()
+        if "velocity" in dataUniform and "vorticity" not in dataUniform:
+            out['velocity']  = dataUniform['velocity']
+            out['vorticity'] = [0]
+        elif "re" in dataUniform:
+            try:
+                assert "mu" in dataUniform
+                assert "rho" in dataUniform
+                assert "Lref" in dataUniform
+                assert "direction" in dataUniform
+            except:
+                raise Exception("mu, rho, Lref AND/OR direction not defined")
+
+            re = dataUniform['re']
+            L = eval(dataUniform['Lref'])
+            mu = dataUniform['mu']
+            rho = dataUniform['rho']
+            direction = dataUniform['direction']
+            angleRadian = radians(direction)
+            velRef = re*(mu/rho) / L
+            out['velocity'] = [cos(angleRadian)*velRef,sin(angleRadian)*velRef]
+            out['vorticity'] = [0]
+
+        else:
+            out = dataUniform
+
+        return out
 
     def __setBoundary(self, name, typ, vals: dict):
         boundary = Boundary(name, typ, self.__dim)
@@ -173,3 +204,8 @@ class BoundaryConditions:
                 inds = b.getDofsConstrained()
             vec.setValues(inds, arr, addv=False)
         vec.assemble()
+
+    def getFreeStreamVelocity(self):
+        boundary = self.__boundaries[0]
+        vels = boundary.getVelocitySetted()
+        return vels
