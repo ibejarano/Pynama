@@ -9,17 +9,16 @@ import yaml
 OptDB = petsc4py.PETSc.Options()
 case = OptDB.getString('case', False)
 
-customFunctions = ['taylor-green','taylor-green2d-3d', 'senoidal', 'flat-plate']
+fsCases = ['uniform', 'taylor-green','taylor-green2d-3d', 'senoidal', 'flat-plate']
+nsCases = ['cavity']
 
-if case in customFunctions:
-    from cases.custom_func import CustomFuncCase as FemProblem
-elif case == 'uniform':
-    from cases.uniform import UniformFlow as FemProblem
+if case in fsCases:
+    from cases.custom_func import BaseProblem as FemProblem
 elif case == 'ibm-static':
     from cases.immersed_boundary import ImmersedBoundaryStatic as FemProblem
 elif case == 'ibm-dynamic':
     from cases.immersed_boundary import ImmersedBoundaryDynamic as FemProblem
-elif case == 'cavity':
+elif case in nsCases:
     from cases.cavity import Cavity as FemProblem
 else:
     print("Case not defined unabled to import")
@@ -148,7 +147,6 @@ def generateChartKLE(config):
         fem.logger.info(f"Total time: {fem.timerTotal.toc()} seconds")
     fem.getChartKLE()
 
-
 def timeSolving(config):
     fem = FemProblem(config)
     fem.setUp()
@@ -156,7 +154,7 @@ def timeSolving(config):
     if not fem.comm.rank:
         fem.logger.info("Solving problem...")
     fem.timer.tic()
-    fem.startSolver()
+    fem.ts.solve(fem.vort)
     if not fem.comm.rank:
         fem.logger.info(f"Solver Finished in {fem.timer.toc()} seconds")
         fem.logger.info(f"Total time: {fem.timerTotal.toc()} seconds")
