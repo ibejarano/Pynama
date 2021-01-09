@@ -51,16 +51,6 @@ class BaseProblem(object):
 
     def setUpDomain(self):
         self.dom = Domain()
-        # if 'constant' in self.config['boundary-conditions']:
-        #     bc = self.config['boundary-conditions']
-        #     re = bc['constant']['re']
-        #     directionAngle = bc['constant']['direction']
-        #     angleRadian = radians(directionAngle)
-        #     L = eval(bc['constant']['longRef'])
-        #     velRef = re*(self.mu/self.rho) / L
-        #     self.U_ref = velRef
-        #     self.cteValue = [cos(angleRadian)*velRef,sin(angleRadian)*velRef]
-        #     self.config['boundary-conditions']['constant']['vel'] = self.cteValue
         self.dom.configure(self.config)
         self.dom.setOptions(**self.opts)
         self.dom.setUp()
@@ -182,12 +172,6 @@ class BaseProblem(object):
         pass
 
     def computeInitialCondition(self, startTime):
-        pass
-
-    def applyBoundaryConditions(self, time):
-        pass
-
-    def readBoundaryCondition(self):
         pass
 
     def setUpSolver(self):
