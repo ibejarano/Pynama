@@ -19,7 +19,9 @@ from common.timer import Timer
 class ImmersedBoundaryStatic(FreeSlip):
     def setUp(self):
         super().setUp()
-        self.readBoundaryCondition(self.config['boundary-conditions'])
+
+        ## IBM Methods
+        self.U_ref = self.dom.getFreeStreamVelocity()
         self.setUpBodies()
         cells = self.getAffectedCells(10)
         self.collectedNodes, self.maxNodesPerLag = self.collectNodes(cells)
@@ -27,20 +29,15 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.createEmptyIBMMatrix()
         self.mNodes = self.buildIBMMatrix()
 
-    def readBoundaryCondition(self, bc):
-        re = bc['constant']['re']
-        self.re = re
-
     def setUpDomain(self):
         super().setUpDomain()
         meshType = self.dom.getMeshType()
+        ngl = self.dom.getNGL()
+        assert ngl < 4, "IBM Only implemented for NGL lower than 4"
         if meshType == 'box':
-            nelem = self.nelem
-            lower, upper = self.dom.getExtremeCoords()
-            height = upper[1]  -  lower[0]
-            self.h = (height/nelem[0]) / (self.ngl-1)
+            self.nodeSeparation = self.dom.getNodeSeparationIBM()
         elif meshType == 'gmsh':
-            self.h = self.config['domain']['h-min'] / (self.ngl-1)
+            self.nodeSeparation = self.config['domain']['h-min'] / (ngl-1)
         else:
             raise Exception("Mesh not defined")
 
@@ -49,8 +46,8 @@ class ImmersedBoundaryStatic(FreeSlip):
             assert 'bodies' in self.config
             bodies = self.config['bodies']
             self.body = BodiesContainer(bodies)
-            self.logger.info(f"Node separation: {self.h}")
-            self.body.createBodies(self.h)
+            self.logger.info(f"Node separation: {self.nodeSeparation}")
+            self.body.createBodies(self.nodeSeparation)
             self.body.setVelRef(self.U_ref)
             # self.body.viewBodies()
         except AssertionError:
@@ -114,8 +111,6 @@ class ImmersedBoundaryStatic(FreeSlip):
             #             "elapsedTimes": elapsedTimes
             #             }
             #     self.viewer.writeYaml(self.caseName, data)
-
-                
 
     def computeDragForce(self, dt):
         U = self.U_ref
@@ -217,8 +212,8 @@ class ImmersedBoundaryStatic(FreeSlip):
         self.H.assemble()
         self.S = self.H.copy().transpose()
         dl = self.body.getElementLong()
-        self.S.scale(dl*self.h)
-        self.H.scale(self.h**2)
+        self.S.scale(dl*self.nodeSeparation)
+        self.H.scale(self.nodeSeparation**2)
         A = self.H.matMult(self.S)
         self.ksp = KspSolver()
         self.ksp.createSolver(A, self.comm)
@@ -276,7 +271,7 @@ class ImmersedBoundaryStatic(FreeSlip):
         coordBodyNode = self.body.getNodeCoordinates(lagPoint)
         for coords in eulerCoords:
             dist = coords - coordBodyNode
-            d = self.body.getDiracs(dist, self.h)
+            d = self.body.getDiracs(dist, self.nodeSeparation)
             diracs.append(d)
         return diracs
 
