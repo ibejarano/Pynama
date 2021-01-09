@@ -14,11 +14,16 @@ domain:
     upper: [1,1]
 
 time-solver:
-  max-steps: 200
+  max-steps: 50
   start-time: 0
   end-time: 5
 
 boundary-conditions:
+  custom-func:
+    name: taylor_green
+    attributes: ['velocity', 'vorticity', 'alpha']
+
+initial-conditions:
   custom-func:
     name: taylor_green
     attributes: ['velocity', 'vorticity', 'alpha']

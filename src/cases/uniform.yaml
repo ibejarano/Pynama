@@ -20,5 +20,8 @@ time-solver:
 
 boundary-conditions:
   uniform:
-    velocity: [1, 0]
+    velocity: [4, 0]
     vorticity: [0]
+
+initial-conditions:
+  velocity: [4,0]
