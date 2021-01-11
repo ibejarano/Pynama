@@ -1,4 +1,4 @@
-from cases.uniform import UniformFlow
+from cases.base_problem import BaseProblem
 from domain.domain import Domain
 import unittest
 import yaml

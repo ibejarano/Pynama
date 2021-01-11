@@ -1,6 +1,6 @@
 import unittest
-from cases.uniform import UniformFlow
-from cases.custom_func import CustomFuncCase
+from cases.base_problem import BaseProblem as FemProblem
+# from cases.custom_func import CustomFuncCase
 import yaml
 from petsc4py import PETSc
 import numpy as np
@@ -11,7 +11,7 @@ class TestKleUniform2D(unittest.TestCase):
     def setUp(self):
         with open(f'src/cases/{self.caseYaml}.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
-        fem = UniformFlow(yamlData, case=self.caseYaml, **self.caseOpts)
+        fem = FemProblem(yamlData, case=self.caseYaml, **self.caseOpts)
         fem.setUp()
         fem.setUpSolver()
         self.fem = fem
@@ -26,14 +26,6 @@ class TestKleUniform2D(unittest.TestCase):
 class TestKleFunc2D(TestKleUniform2D):
     caseYaml = 'taylor-green'
     caseOpts = {'lower':[0,0],'upper':[1,1],'nelem':[10,10], "ngl": 5}
-    def setUp(self):
-        with open(f'src/cases/{self.caseYaml}.yaml') as f:
-            yamlData = yaml.load(f, Loader=yaml.Loader)
-        fem = CustomFuncCase(yamlData, case=self.caseYaml, **self.caseOpts)
-        fem.setUp()
-        fem.setUpSolver()
-        self.fem = fem
-
     def test_solveKLE(self):
         exactVel, exactVort = self.fem.generateExactVecs(0.0)
         self.fem.solveKLE(time=0.0, vort=exactVort)
