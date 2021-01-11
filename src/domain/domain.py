@@ -190,6 +190,9 @@ class Domain:
     def getBorderNodes(self, borderName):
         return self.__dm.getBorderNodes(borderName)
 
+    def getBoundarySharedIndices(self):
+        return self.__bc.getSharedIndices()
+
     def getNodeSeparationIBM(self):
         dm = self.__dm
         ## FIRST GIVE ME ONE EDGE
@@ -215,6 +218,12 @@ class Domain:
         nsIndices = self.__bc.getIndicesByType('no-slip')
         return nsIndices
         # return self.__dm.getGlobalIndicesNoSlip()
+
+    def getTangDofs(self):
+        return self.__bc.getNoSlipTangDofs()
+
+    def getNormalDofs(self):
+        return self.__bc.getNoSlipNormalDofs()        
 
     # -- Mat Building --
     def getLocalCellRange(self):
