@@ -28,7 +28,7 @@ class BoundaryConditions:
             name = b.getName()
             typ = b.getType()
             try:
-                val = b.getValues()
+                val = b.getVelocitySetted()
             except:
                 val = "Not defined"
             try:
@@ -114,8 +114,11 @@ class BoundaryConditions:
     def __setBoundary(self, name, typ, vals: dict):
         boundary = Boundary(name, typ, self.__dim)
 
-        for attrName, val in vals.items():
-            boundary.setValues(attrName, val)
+        if type(vals) == list:
+            boundary.setValues('velocity', vals)
+        else:
+            for attrName, val in vals.items():
+                boundary.setValues(attrName, val)
 
         self.__boundaries.append(boundary)
         if typ == 'free-slip':
@@ -188,6 +191,18 @@ class BoundaryConditions:
             inds = bcIS.union(inds)
         return set(inds.getIndices())
 
+    def getNoSlipTangDofs(self):
+        dofs = set()
+        for bc in self.__nsBoundaries:
+            dofs |= bc.getTangDofs()
+        return dofs
+
+    def getNoSlipNormalDofs(self):
+        dofs = set()
+        for bc in self.__nsBoundaries:
+            dofs |= bc.getNormalDofs()
+        return dofs
+
     def getFreeSlipIndices(self):
         inds = IS().createGeneral([])
         for bc in self.__fsBoundaries:
@@ -209,3 +224,10 @@ class BoundaryConditions:
         boundary = self.__boundaries[0]
         vels = boundary.getVelocitySetted()
         return vels
+
+    def getSharedIndices(self):
+        inds = IS().createGeneral([])
+        for bc in self.__boundaries:
+            bcIS = bc.getIS()
+            inds.union(bcIS)
+        return inds.getIndices()
