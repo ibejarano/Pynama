@@ -1,7 +1,7 @@
 import sys
 import petsc4py
 petsc4py.init(sys.argv)
-from cases.base_problem import FreeSlip
+from cases.base_problem import BaseProblem
 import numpy as np
 import yaml
 from mpi4py import MPI
@@ -16,7 +16,7 @@ import yaml
 from math import sqrt, sin, pi, ceil, erf, exp, cos, radians
 from common.timer import Timer
 
-class ImmersedBoundaryStatic(FreeSlip):
+class ImmersedBoundaryStatic(BaseProblem):
     def setUp(self):
         super().setUp()
 
