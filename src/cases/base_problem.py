@@ -305,10 +305,10 @@ class NoSlipFreeSlip(BaseProblem):
         self.mat = MatNS(self.dim, self.comm)
         self.operator = Operators(self.dim, self.comm)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
-        self.globalNodesDIR = self.dom.getGlobalIndicesDirichlet()
+        globalNodesDIR = self.dom.getGlobalIndicesDirichlet()
         globalNodesNS = self.dom.getGlobalIndicesNoSlip()
-        # print("globNS", globalNodesNS)
-        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, self.globalNodesDIR, globalNodesNS )
+
+        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalNodesDIR, globalNodesNS )
         if not self.comm.rank:
             self.logger.info(f"Empty KLE Matrices created")
 
@@ -322,85 +322,84 @@ class NoSlipFreeSlip(BaseProblem):
         self.solverFS.createSolver(self.mat.K + self.mat.Kfs, self.comm)
         self.velFS = self.vel.copy()
 
+    # def solveKLE(self, time, vort):
+    #     self.applyBoundaryConditions()
+    #     self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
+    #          + self.mat.Krhsfs * self.vel , self.velFS)
+    #     self.applyBoundaryConditionsFS()
+    #     vort = self.operator.Curl * self.velFS
+    #     self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
+
     def solveKLE(self, time, vort):
-        self.applyBoundaryConditions()
+        self.vel.set(0.0)
+
+        self.dom.applyBoundaryConditions(self.vel, "velocity", time, self.nu)
+        # self.dom.applyBoundaryConditions(self.vort, "vorticity", time, self.nu)
+
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
              + self.mat.Krhsfs * self.vel , self.velFS)
-        self.applyBoundaryConditionsFS()
+
+        self.dom.applyBoundaryConditions(self.velFS, "velocity", time, self.nu)
         vort = self.operator.Curl * self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def buildKLEMats(self):
         indices2one = set()  # matrix indices to be set to 1 for BC imposition
-        boundaryNodesNS = self.mat.globalIndicesNS
-        boundaryNodesDIR =  self.mat.globalIndicesDIR
-        # cornerCoords = self.dom.getCellCornersCoords(cell=0)
-        # locK, locRw, locRd = self.elemType.getElemKLEMatrices(cornerCoords)
+        # boundaryNodesNS = self.mat.globalIndicesNS
+        # boundaryNodesDIR =  self.mat.globalIndicesDIR
+
         indices2one = set()
         indices2onefs = set()
         cellStart , cellEnd = self.dom.getLocalCellRange()
 
-        print(boundaryNodesDIR, "DIR")
-        print(boundaryNodesNS, "NS")
-        exit()
+        globalTangIndicesNS = self.dom.getTangDofs()
+        globalNormalIndicesNS = self.dom.getNormalDofs()
+
         for cell in range(cellStart, cellEnd):
+            self.logger.info(f"Element: {cell}")
             # nodes = self.dom.getGlobalNodesFromCell(cell, shared=True)
             # Build velocity and vorticity DoF indices
             # indicesVel = self.dom.getVelocityIndex(nodes)
             # indicesW = self.dom.getVorticityIndex(nodes)
             nodes , inds , localMats = self.dom.computeLocalKLEMats(cell)
             locK, locRw, locRd = localMats
+            # print(inds)
             indicesVel, indicesW = inds
-            nodeBCintersectNS = boundaryNodesNS & set(nodes)
-            nodeBCintersectDIR = boundaryNodesDIR & set(nodes)
+            print("indicesVel , indicesW",inds)
+            # exit()
+            # nodeBCintersectNS = boundaryNodesNS & set(indicesVel)
+            # nodeBCintersectDIR = boundaryNodesDIR & set(indicesVel)
             dofFreeFSSetNS = set()  # local dof list free at FS sol
             dofSetFSNS = set()  # local dof list set at both solutions
-            # for node in nodeBCintersect:
-            #     localBoundaryNode = nodes.index(node)
-            #     nsNorm = set()
-            #     coord=self.dom.getNodesCoordinates([node])[0]
-            #     for i in range(self.dim):
-            #         if (coord[i]==self.upper[i]) or (coord[i]==self.lower[i]):
-            #             nsNorm.add(i)
-            #     dofSetFSNS.update([localBoundaryNode*self.dim + d
-            #                            for d in nsNorm])
-            #     dofFreeFSSetNS.update([localBoundaryNode*self.dim + d
-            #                             for d in (set(range(self.dim)) - nsNorm)])
 
-            if nodeBCintersectNS:
-                borderNodes, normals = self.dom.getBorderNodesWithNormal(cell, nodeBCintersectNS)
-                for i, globBorderNodes in enumerate(borderNodes):
-                    tangentialDofs = list(range(self.dim))
-                    tangentialDofs.pop(normals[i])
-                    localNodes = [ nodes.index(node) for node in globBorderNodes ]
-                    normalDof = normals[i]
-                    # print(f"{[self.comm.rank]} {nodes = } {globBorderNodes = } {normals = } {localNodes = } ")
-                    dofSetFSNS.update( [locNode * self.dim + normalDof for locNode in localNodes ]  )
-                    dofFreeFSSetNS.update( [locNode * self.dim + dof for locNode in localNodes for dof in tangentialDofs] )
-                dofFreeFSSetNS -= dofSetFSNS
+            normalDofs = globalNormalIndicesNS & set(indicesVel)
+            tangentialDofs = globalTangIndicesNS & set(indicesVel)
+            tangentialDofs -= normalDofs
+            # print("vel", indicesVel)
+            # print("normal", normalDofs)
+            # print("tang", tangentialDofs)
 
-            if nodeBCintersectDIR:
-                borderNodes, _ = self.dom.getBorderNodesWithNormal(cell, nodeBCintersectDIR)
-                for i, globBorderNodes in enumerate(borderNodes):
-                    localNodes = [ nodes.index(node) for node in globBorderNodes ]
-                    dofSetFSNS.update( [locNode*self.dim + dof for locNode in localNodes for dof in range(self.dim)])
+            locNormalDof = [ indicesVel.index(i) for i in normalDofs ]
+            locTangDof = [ indicesVel.index(i) for i in tangentialDofs ]
 
-            dofFree = list(set(range(len(indicesVel)))
-                           - dofFreeFSSetNS - dofSetFSNS)
-            dof2beSet = list(dofFreeFSSetNS | dofSetFSNS)
-            dofFreeFSSetNS = list(dofFreeFSSetNS)
-            dofSetFSNS = list(dofSetFSNS)
+            dofFree = list(set(range(len(indicesVel))) 
+                    - set(locNormalDof) 
+                    - set(locTangDof)
+                    )
+
+            dofFreeFSSetNS = locNormalDof
+            dofSetFSNS = locTangDof
+            dof2beSet = list(set(dofFreeFSSetNS) | set(dofSetFSNS))
             gldofFreeFSSetNS = [indicesVel[ii] for ii in dofFreeFSSetNS]
-            print("gldofFreeFSSetNS", gldofFreeFSSetNS)
+            # print("gldofFreeFSSetNS", gldofFreeFSSetNS)
             gldofSetFSNS = [indicesVel[ii] for ii in dofSetFSNS]
-            print("gldofSetFSNS", gldofSetFSNS)
+            # print("gldofSetFSNS", gldofSetFSNS)
             gldof2beSet = [indicesVel[ii] for ii in dof2beSet]
-            print("gldof2beSet", gldof2beSet)
+            # print("gldof2beSet", gldof2beSet)
             gldofFree = [indicesVel[ii] for ii in dofFree]
-            print("gldofFree", gldofFree)
-            
-            exit()
-            if nodeBCintersectNS | nodeBCintersectDIR:
+
+
+            if normalDofs | tangentialDofs:
                 self.mat.Krhs.setValues(
                 gldofFree, gldof2beSet,
                 -locK[np.ix_(dofFree, dof2beSet)], addv=True)
