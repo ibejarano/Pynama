@@ -33,11 +33,13 @@ class MatNS(Mat):
         drhs_nnz_ind = np.zeros(locElRow)
         orhs_nnz_ind = np.zeros(locElRow)
 
+        globalNodesNS = set([ int(i/self.dim) for i in list(globalIndicesNS)[::self.dim]])
+
         for indRow, indSet in enumerate(ind_d):
-            drhs_nnz_ind[indRow] = len(indSet & globalIndicesNS)
+            drhs_nnz_ind[indRow] = len(indSet & globalNodesNS)
 
         for indRow, indSet in enumerate(ind_o):
-            orhs_nnz_ind[indRow] = len(indSet & globalIndicesNS)
+            orhs_nnz_ind[indRow] = len(indSet & globalNodesNS)
 
         # FIXME: This reserves self.dim nonzeros for each node with
         # Dirichlet conditions despite the number of DoF conditioned
@@ -46,14 +48,12 @@ class MatNS(Mat):
         dns_nnz_ind = np.zeros(locElRow)
         ons_nnz_ind = np.zeros(locElRow)
 
-        globalNodesNS = set([ int(i/self.dim) for i in list(globalIndicesNS)[::self.dim]])
-
         for ind, indSet in enumerate(ind_d):
             if (ind + rStart) not in globalNodesNS:
                 dns_nnz_ind[ind] = len(indSet & globalNodesNS)
             elif (ind + rStart) in globalNodesNS:
                 # FIXME: len() can be distributed on each set operation
-                dns_nnz_ind[ind] = len(indSet & globalNodesNS)
+                dns_nnz_ind[ind] = len(indSet | (indSet & globalNodesNS))
         for ind, indSet in enumerate(ind_o):
             if (ind + rStart) not in globalNodesNS:
                 ons_nnz_ind[ind] = len(indSet & globalNodesNS)
@@ -97,6 +97,7 @@ class MatNS(Mat):
         self.Kfs = self.createEmptyMat(vel_dofs,vel_dofs,dns_nnz, ons_nnz)
         self.Rwfs =self.createEmptyMat(vel_dofs,vort_dofs, dwns_nnz, owns_nnz)
         self.Rdfs =self.createEmptyMat(vel_dofs,locElRow, ddns_nnz, odns_nnz)
+        
         self.Krhsfs = self.createEmptyMat(vel_dofs,vel_dofs, drhsns_nnz, orhsns_nnz)
         self.K = self.createEmptyMat(vel_dofs, vel_dofs,d_nnz, o_nnz )
         self.Rw = self.createEmptyMat(vel_dofs, vort_dofs, dw_nnz, ow_nnz)
