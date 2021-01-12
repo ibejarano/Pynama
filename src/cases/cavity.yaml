@@ -8,15 +8,22 @@ material-properties:
 domain:
   ngl: 3
   box-mesh:
-    nelem: [30,30]
+    nelem: [20,20]
     lower: [0,0]
-    upper: [1,1]
+    upper: [6,6]
   
 time-solver:
-  max-steps: 150
+  max-steps: 500
   start-time: 0
-  end-time: 10
+  end-time: 1000
 
 boundary-conditions:
   no-slip:
-    up: [1 ,0 ]
+    up: [0.1 ,0 ]
+    down: [0, 0]
+    left: [0, 0]
+    right: [0, 0]
+
+initial-conditions:
+  velocity: [0, 0]
+  vorticity: [0]
