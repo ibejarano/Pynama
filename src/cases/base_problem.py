@@ -281,8 +281,8 @@ class BaseProblem(object):
                 self.vel.setValues( inds , velArr)
 
     def setUpEmptyMats(self):
-        self.mat = Mat(self.dim, self.comm)
-        self.operator = Operators(self.dim, self.comm)
+        self.mat = Mat(self.dim)
+        self.operator = Operators(self.dim)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
         d_nnz_ind_op = d_nnz_ind.copy()
@@ -302,8 +302,8 @@ class BaseProblem(object):
 
 class NoSlipFreeSlip(BaseProblem):
     def setUpEmptyMats(self):
-        self.mat = MatNS(self.dim, self.comm)
-        self.operator = Operators(self.dim, self.comm)
+        self.mat = MatNS(self.dim)
+        self.operator = Operators(self.dim)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
         globalNodesDIR = self.dom.getGlobalIndicesDirichlet()
         globalNodesNS = self.dom.getGlobalIndicesNoSlip()

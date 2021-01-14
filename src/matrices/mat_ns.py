@@ -3,11 +3,11 @@ from matrices.mat_generator import Mat
 import numpy as np
 
 class MatNS(Mat):
-    def __init__(self, dim, comm):
+    comm = PETSc.COMM_WORLD
+    def __init__(self, dim):
         self.dim = dim
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
-        self.comm = comm
 
     def assembleAll(self):
         self.K.assemble()

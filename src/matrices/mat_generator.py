@@ -3,12 +3,12 @@ import numpy as np
 import logging
 
 class Mat:
-    def __init__(self, dim, comm=PETSc.COMM_WORLD):
+    comm = PETSc.COMM_WORLD
+    def __init__(self, dim):
         self.dim = dim
-        self.logger = logging.getLogger(f"[{comm.rank}]:MatClass")
+        self.logger = logging.getLogger(f"[{self.comm.rank}]:MatClass")
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
-        self.comm = comm
         self.mats = list()
 
     def assembleAll(self):
@@ -51,6 +51,7 @@ class Mat:
             else:
                 drhs_nnz_ind[indRow] = len(indSet & glNodesDIR)
                 d_nnz_ind[indRow] = d_nnz_ind[indRow] - len(indSet & glNodesDIR)
+                
         for indRow, indSet in enumerate(ind_o):
             orhs_nnz_ind[indRow] = len(indSet & glNodesDIR)
 
