@@ -6,7 +6,7 @@ import importlib
 from domain.domain import Domain
 from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
-from matrices.mat_generator import Mat, Operators
+from matrices.mat_fs import MatFS, Operators
 from matrices.mat_ns import MatNS
 from solver.ksp_solver import KspSolver
 from common.timer import Timer
@@ -281,7 +281,7 @@ class BaseProblem(object):
                 self.vel.setValues( inds , velArr)
 
     def setUpEmptyMats(self):
-        self.mat = Mat(self.dim)
+        self.mat = MatFS(self.dim)
         self.operator = Operators(self.dim)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
         globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()

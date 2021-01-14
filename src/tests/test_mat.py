@@ -4,7 +4,7 @@ import unittest
 import yaml
 import numpy as np
 import numpy.testing as np_test
-from matrices.mat_generator import Mat
+from matrices.mat_fs import MatFS as Mat
 
 class TestMat2D(unittest.TestCase):
 

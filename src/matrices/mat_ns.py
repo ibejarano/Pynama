@@ -1,8 +1,8 @@
 from petsc4py import PETSc
-from matrices.mat_generator import Mat
+from matrices.mat_fs import MatFS
 import numpy as np
 
-class MatNS(Mat):
+class MatNS(MatFS):
     comm = PETSc.COMM_WORLD
     def __init__(self, dim):
         self.dim = dim
@@ -104,7 +104,7 @@ class MatNS(Mat):
         self.Rd = self.createEmptyMat(vel_dofs, locElRow, dd_nnz, od_nnz)
         self.Krhs = self.createEmptyMat(vel_dofs, vel_dofs, drhs_nnz, orhs_nnz)
 
-class MatFSNS(Mat):
+class MatFSNS(MatFS):
     def __init__(self, dim, comm):
         self.dim = dim
         self.dim_w = 1 if self.dim == 2 else 3

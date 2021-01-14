@@ -2,7 +2,7 @@ from petsc4py import PETSc
 import numpy as np
 import logging
 
-class Mat:
+class MatFS:
     comm = PETSc.COMM_WORLD
     def __init__(self, dim):
         self.dim = dim
@@ -44,7 +44,6 @@ class Mat:
 
         # FIXME check performance only dim 2
         glNodesDIR = set([ int(i/self.dim) for i in list(self.globalIndicesDIR)[::self.dim]])
-        # print(glNodesDIR)
         for indRow, indSet in enumerate(ind_d):
             if (indRow + rStart) in glNodesDIR:
                 drhs_nnz_ind[indRow] = 1
@@ -55,26 +54,19 @@ class Mat:
         for indRow, indSet in enumerate(ind_o):
             orhs_nnz_ind[indRow] = len(indSet & glNodesDIR)
 
-        # Create array of NNZ from d_nnz_ind and o_nnz_ind to create K
         d_nnz, o_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim, self.dim )
-        # FIXME: This reserves self.dim nonzeros for each node with
-        # Dirichlet conditions despite the number of DoF conditioned
         drhs_nnz, orhs_nnz = self.createNNZWithArray(drhs_nnz_ind, orhs_nnz_ind, self.dim, self.dim)
 
-        nodesDIR = set([ int(i/self.dim) for i in list(indicesDIR)[::self.dim]])
+        indicesDIR = list(indicesDIR)
 
-        for indRow in set(range(rStart, rEnd)) & set(nodesDIR):
-            minInd = (indRow - rStart) * self.dim
-            maxInd = (indRow - rStart + 1) * self.dim
+        d_nnz[indicesDIR] = 1
+        o_nnz[indicesDIR] = 0
 
-            d_nnz[minInd:maxInd] = [1] * self.dim
-            o_nnz[minInd:maxInd] = [0] * self.dim
+        dw_nnz[indicesDIR] = 0
+        ow_nnz[indicesDIR] = 0
 
-            dw_nnz[minInd:maxInd] = [0] * self.dim
-            ow_nnz[minInd:maxInd] = [0] * self.dim
-
-            dw_nnz[minInd:maxInd] = [0] * self.dim
-            ow_nnz[minInd:maxInd] = [0] * self.dim
+        dw_nnz[indicesDIR] = 0
+        ow_nnz[indicesDIR] = 0
 
         self.K = self.createEmptyMat(vel_dofs, vel_dofs,d_nnz, o_nnz )
         self.K.setName("K")
@@ -124,7 +116,7 @@ class Mat:
         return f"{name:{5}} | {info['memory']:{16}} | {info['nz_unneeded']:{10}}"
     
 
-class Operators(Mat):
+class Operators(MatFS):
     def createAll(self, rStart, rEnd, d_nnz_ind, o_nnz_ind):
         locElRow = rEnd - rStart
         self.createCurl(d_nnz_ind, o_nnz_ind,locElRow)
