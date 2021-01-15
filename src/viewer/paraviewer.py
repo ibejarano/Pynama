@@ -13,7 +13,7 @@ class Paraviewer:
 
     def configure(self, dim, saveDir=None):
         self.saveDir = '.' if not saveDir else saveDir
-        if not os.path.isdir(self.saveDir):
+        if not self.comm.rank and not os.path.isdir(self.saveDir):
             os.makedirs(f"./{self.saveDir}")
         self.h5name = "vec-data"
         self.xmlWriter = XmlGenerator(dim, self.h5name)
