@@ -42,7 +42,6 @@ class BaseProblem(object):
         self.setUpDomain()
         self.setUpViewer()
         self.createMesh()
-        self.bcNodes = self.dom.getBoundaryNodes()
         self.setUpEmptyMats()
         self.buildKLEMats()
         self.buildOperators()
@@ -170,7 +169,7 @@ class BaseProblem(object):
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
     def buildKLEMats(self):
-        globalBCNodes = self.bcNodes
+        globalBCNodes = self.dom.getNodesDirichlet(collect=True)
         cellStart , cellEnd = self.dom.getLocalCellRange()
 
         for cell in range(cellStart, cellEnd):
@@ -281,14 +280,17 @@ class BaseProblem(object):
                 self.logger.info("Computing Curl to initial velocity to get initial Vorticity")
                 self.vel.setValues( inds , velArr)
 
+        self.vort.assemble()
+        self.vel.assemble()
+
     def setUpEmptyMats(self):
         self.mat = MatFS(self.dim)
         self.operator = Operators(self.dim)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
-        globalIndicesDIR = self.dom.getGlobalNodesDirichlet()
+        localNodesDir = self.dom.getNodesDirichlet()
         d_nnz_ind_op = d_nnz_ind.copy()
 
-        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)
+        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, localNodesDir)
         if not self.comm.rank:
             self.logger.info(f"Empty KLE Matrices created")
 
