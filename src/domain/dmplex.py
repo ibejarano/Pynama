@@ -45,7 +45,6 @@ class DMPlexDom(PETSc.DMPlex):
         indGlobSec = self.getDefaultGlobalSection()
         self.cellStart, self.cellEnd = self.getHeightStratum(0)
         self.indicesManager.setGlobalIndicesSection(indGlobSec)
-
         if not self.comm.rank:
             self.logger.debug("FEM/SEM Indexing SetUp")
 
@@ -70,7 +69,6 @@ class DMPlexDom(PETSc.DMPlex):
         self.setDefaultSection(fullCoordSec)
         self.fullCoordVec = self.createGlobalVec()
         self.fullCoordVec.setName('NodeCoordinates')
-        self.logger.debug("Full coord vec size %s", self.fullCoordVec.size)
 
         for cell in range(self.cellEnd - self.cellStart):
             coords = self.getCellCornersCoords(cell)
@@ -88,6 +86,7 @@ class DMPlexDom(PETSc.DMPlex):
             self.fullCoordVec.setValues(indicesGlobales, totCoord)
 
         self.fullCoordVec.assemble()
+        self.startNode = int(self.fullCoordVec.owner_range[0]/self.dim)
         self.nodes = [int(node/coordsComponents) for node in range(self.fullCoordVec.owner_range[0],
         self.fullCoordVec.owner_range[1], coordsComponents)]
 
