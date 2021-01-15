@@ -3,12 +3,6 @@ from matrices.mat_fs import MatFS
 import numpy as np
 
 class MatNS(MatFS):
-    comm = PETSc.COMM_WORLD
-    def __init__(self, dim):
-        self.dim = dim
-        self.dim_w = 1 if self.dim == 2 else 3
-        self.dim_s = 3 if self.dim == 2 else 6
-
     def assembleAll(self):
         self.K.assemble()
         self.Rw.assemble()
@@ -56,7 +50,7 @@ class MatNS(MatFS):
             if (ind + rStart) not in globalNodesNS:
                 ons_nnz_ind[ind] = len(indSet & globalNodesNS)
             elif (ind + rStart) in globalNodesNS:
-                ons_nnz_ind[ind] = len(indSet & globalNodesNS)
+                ons_nnz_ind[ind] = len(indSet | (indSet & globalNodesNS))
 
         dns_nnz, ons_nnz =self.createNNZWithArray(dns_nnz_ind, ons_nnz_ind, self.dim, self.dim)
 
