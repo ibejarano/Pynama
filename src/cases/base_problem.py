@@ -310,10 +310,10 @@ class NoSlipFreeSlip(BaseProblem):
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
 
         # TODO Add a new MAT to handle global nodes DIR
-        globalNodesDIR = self.dom.getGlobalNodesDirichlet()
-        globalNodesNS = self.dom.getGlobalNodesNoSlip()
+        localNodesDIR = self.dom.getNodesDirichlet(collect=True)
+        localNodesNS = self.dom.getNodesNoSlip(collect=True)
 
-        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalNodesNS )
+        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, localNodesNS )
         if not self.comm.rank:
             self.logger.info(f"Empty KLE Matrices created")
 
@@ -344,9 +344,9 @@ class NoSlipFreeSlip(BaseProblem):
         indices2one = set() 
         indices2onefs = set()
         cellStart , cellEnd = self.dom.getLocalCellRange()
-
-        globalTangIndicesNS = self.dom.getTangDofs()
-        globalNormalIndicesNS = self.dom.getNormalDofs()
+        globalTangIndicesNS = self.dom.getTangDofs(collect=True)
+        globalNormalIndicesNS = self.dom.getNormalDofs(collect=True)
+        
         for cell in range(cellStart, cellEnd):
             nodes , inds , localMats = self.dom.computeLocalKLEMats(cell)
             locK, locRw, locRd = localMats
@@ -423,7 +423,6 @@ class NoSlipFreeSlip(BaseProblem):
                               addv=True)
         self.mat.assembleAll()
         self.mat.setIndices2One(indices2one)
-
         for indd in indices2onefs:
             self.mat.Kfs.setValues(indd, indd, -1, addv=True)
 

@@ -223,15 +223,15 @@ class Domain:
         return nsIndices
         # return self.__dm.getGlobalIndicesNoSlip()
 
-    def getGlobalNodesNoSlip(self):
-        nodes = self.__bc.getNodesByType('no-slip')
+    def getNodesNoSlip(self, collect=False):
+        nodes = self.__bc.getNodesByType('no-slip', allGather=collect)
         return nodes
 
-    def getTangDofs(self):
-        return self.__bc.getNoSlipTangDofs()
+    def getTangDofs(self, collect=False):
+        return self.__bc.getNoSlipTangDofs(allGather=collect)
 
-    def getNormalDofs(self):
-        return self.__bc.getNoSlipNormalDofs()        
+    def getNormalDofs(self, collect=False):
+        return self.__bc.getNoSlipNormalDofs(allGather=collect)        
 
     # -- Mat Building --
     def getLocalCellRange(self):
