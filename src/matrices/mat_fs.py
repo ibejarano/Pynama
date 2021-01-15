@@ -22,7 +22,7 @@ class MatFS:
     def getGlobalIndices(self, localIndices):
         globalIndices = set()
         if self.isParallel():
-            collectIndices = self.comm.allgather([localIndices])
+            collectIndices = self.comm.tompi4py().allgather([localIndices])
             for remoteIndices in collectIndices:
                 globalIndices |= remoteIndices[0]
         else:
@@ -55,7 +55,7 @@ class MatFS:
         d_nnz, o_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim, self.dim )
         drhs_nnz, orhs_nnz = self.createNNZWithArray(drhs_nnz_ind, orhs_nnz_ind, self.dim, self.dim)
 
-        indicesDIR = [ node*self.dim + dof for node in nodesDir for dof in range(self.dim) ]
+        indicesDIR = [ node*self.dim-(rStart*self.dim) + dof for node in nodesDir for dof in range(self.dim) ]
 
         d_nnz[indicesDIR] = 1
         o_nnz[indicesDIR] = 0
