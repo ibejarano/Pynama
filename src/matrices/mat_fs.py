@@ -29,8 +29,8 @@ class MatFS:
             globalIndices = localIndices
         return globalIndices
         
-    def createEmptyKLEMats(self,rStart, rEnd ,  d_nnz_ind , o_nnz_ind, ind_d, ind_o, indicesDIR):
-        self.globalIndicesDIR = self.getGlobalIndices(indicesDIR)
+    def createEmptyKLEMats(self,rStart, rEnd ,  d_nnz_ind , o_nnz_ind, ind_d, ind_o, nodesDir):
+        globalNodesDir = self.getGlobalIndices(nodesDir)
         locElRow = rEnd - rStart
         vel_dofs = locElRow * self.dim
         vort_dofs = locElRow * self.dim_w
@@ -42,22 +42,20 @@ class MatFS:
         drhs_nnz_ind = np.zeros(locElRow)
         orhs_nnz_ind = np.zeros(locElRow)
 
-        # FIXME check performance only dim 2
-        glNodesDIR = set([ int(i/self.dim) for i in list(self.globalIndicesDIR)[::self.dim]])
         for indRow, indSet in enumerate(ind_d):
-            if (indRow + rStart) in glNodesDIR:
+            if (indRow + rStart) in globalNodesDir:
                 drhs_nnz_ind[indRow] = 1
             else:
-                drhs_nnz_ind[indRow] = len(indSet & glNodesDIR)
-                d_nnz_ind[indRow] = d_nnz_ind[indRow] - len(indSet & glNodesDIR)
+                drhs_nnz_ind[indRow] = len(indSet & globalNodesDir)
+                d_nnz_ind[indRow] = d_nnz_ind[indRow] - len(indSet & globalNodesDir)
                 
         for indRow, indSet in enumerate(ind_o):
-            orhs_nnz_ind[indRow] = len(indSet & glNodesDIR)
+            orhs_nnz_ind[indRow] = len(indSet & globalNodesDir)
 
         d_nnz, o_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim, self.dim )
         drhs_nnz, orhs_nnz = self.createNNZWithArray(drhs_nnz_ind, orhs_nnz_ind, self.dim, self.dim)
 
-        indicesDIR = list(indicesDIR)
+        indicesDIR = [ node*self.dim + dof for node in nodesDir for dof in range(self.dim) ]
 
         d_nnz[indicesDIR] = 1
         o_nnz[indicesDIR] = 0

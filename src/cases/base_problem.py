@@ -215,7 +215,8 @@ class BaseProblem(object):
             self.mat.Rw.setValues(gldofFree, indicesW,
                               locRw[np.ix_(dofFree, range(len(indicesW)))], addv=True)
 
-        self.mat.setIndices2One(self.mat.globalIndicesDIR)
+        globalIndicesDIR = [node*self.dim + dof for node in globalBCNodes for dof in range(self.dim) ] 
+        self.mat.setIndices2One(globalIndicesDIR)
         self.mat.assembleAll()
         if not self.comm.rank:
             self.logger.info(f"KLE Matrices builded")
@@ -284,7 +285,7 @@ class BaseProblem(object):
         self.mat = MatFS(self.dim)
         self.operator = Operators(self.dim)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
-        globalIndicesDIR = self.dom.getGlobalIndicesDirichlet()
+        globalIndicesDIR = self.dom.getGlobalNodesDirichlet()
         d_nnz_ind_op = d_nnz_ind.copy()
 
         self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalIndicesDIR)
