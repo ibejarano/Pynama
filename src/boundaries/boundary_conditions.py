@@ -184,6 +184,19 @@ class BoundaryConditions:
                 inds = bcIS.union(inds)
             return set(inds.getIndices())
 
+    def getNodesByType(self, bcType):
+        inds = set()
+        boundaries = self.__ByType[bcType]
+        if len(boundaries) == 0:
+            return set()
+        else:
+            for bc in self.__ByType[bcType]:
+                bcIS = bc.getIS()
+                # bcIS.view()
+                inds |= set(bcIS.getBlockIndices())
+
+            return inds
+
     def getNoSlipIndices(self):
         inds = IS().createGeneral([])
         for bc in self.__nsBoundaries:

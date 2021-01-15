@@ -214,6 +214,10 @@ class Domain:
         return fsIndices
         # return self.__dm.getGlobalIndicesDirichlet()
 
+    def getGlobalNodesDirichlet(self):
+        nodes = self.__bc.getNodesByType('free-slip')
+        return nodes
+
     def getGlobalIndicesNoSlip(self):
         nsIndices = self.__bc.getIndicesByType('no-slip')
         return nsIndices
