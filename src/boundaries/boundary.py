@@ -28,7 +28,7 @@ class Boundary:
         try:
            val = getattr(self, attrName)
            nodesNum = len(self.getNodes())
-           assert nodesNum > 0, f"Nodes not defined in boundary {self.__name} "
+        #    assert nodesNum > 0, f"Nodes not defined in boundary {self.__name} "
            arr = np.tile(val, nodesNum)
            return arr
         except AttributeError:

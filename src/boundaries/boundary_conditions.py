@@ -203,23 +203,33 @@ class BoundaryConditions:
                 inds |= locIndices
             return inds
 
-    def getNoSlipIndices(self):
+    def getNoSlipIndices(self, allGather=False):
         inds = IS().createGeneral([])
         for bc in self.__nsBoundaries:
             bcIS = bc.getIS()
             inds = bcIS.union(inds)
         return set(inds.getIndices())
 
-    def getNoSlipTangDofs(self):
+    def getNoSlipTangDofs(self, allGather=False):
         dofs = set()
         for bc in self.__nsBoundaries:
-            dofs |= bc.getTangDofs()
+            locTang = bc.getTangDofs()
+            if allGather:
+                collectIndices = self.comm.tompi4py().allgather(locTang)
+                for remoteIndices in collectIndices:
+                    locTang |= remoteIndices
+            dofs |= locTang
         return dofs
 
-    def getNoSlipNormalDofs(self):
+    def getNoSlipNormalDofs(self, allGather=False):
         dofs = set()
         for bc in self.__nsBoundaries:
-            dofs |= bc.getNormalDofs()
+            locDofs = bc.getNormalDofs()
+            if allGather:
+                collectIndices = self.comm.tompi4py().allgather(locDofs)
+                for remoteIndices in collectIndices:
+                    locDofs |= remoteIndices
+            dofs |= locDofs
         return dofs
 
     def getFreeSlipIndices(self):
