@@ -15,9 +15,9 @@ class MatNS(MatFS):
         self.Rd.assemble()
         self.Krhs.assemble()
 
-    def createEmptyKLEMats(self,rStart, rEnd ,  d_nnz_ind , o_nnz_ind, ind_d, ind_o, indicesDIR , indicesNS):
+    def createEmptyKLEMats(self,rStart, rEnd ,  d_nnz_ind , o_nnz_ind, ind_d, ind_o, nodesNS):
 
-        globalIndicesNS = self.getGlobalIndices(indicesNS)
+        globalNodesNS = self.getGlobalIndices(nodesNS)
         locElRow = rEnd - rStart
         vel_dofs = locElRow * self.dim
         vort_dofs = locElRow * self.dim_w
@@ -32,8 +32,6 @@ class MatNS(MatFS):
 
         drhs_nnz_ind = np.zeros(locElRow)
         orhs_nnz_ind = np.zeros(locElRow)
-
-        globalNodesNS = set([ int(i/self.dim) for i in list(globalIndicesNS)[::self.dim]])
 
         for indRow, indSet in enumerate(ind_d):
             drhs_nnz_ind[indRow] = len(indSet & globalNodesNS)
@@ -78,8 +76,6 @@ class MatNS(MatFS):
 
         drhsns_nnz, orhsns_nnz = self.createNNZWithArray(drhsns_nnz_ind,orhsns_nnz_ind, self.dim,self.dim)
 
-        # k numbers nodes
-        nodesNS = set([ int(i/self.dim) for i in list(indicesNS)[::self.dim]])
         for k in set(range(rStart, rEnd)) & set(nodesNS):
             minInd = (k - rStart) * self.dim
             maxInd = (k - rStart + 1) * self.dim

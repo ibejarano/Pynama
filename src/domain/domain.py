@@ -223,6 +223,10 @@ class Domain:
         return nsIndices
         # return self.__dm.getGlobalIndicesNoSlip()
 
+    def getGlobalNodesNoSlip(self):
+        nodes = self.__bc.getNodesByType('no-slip')
+        return nodes
+
     def getTangDofs(self):
         return self.__bc.getNoSlipTangDofs()
 

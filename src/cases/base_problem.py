@@ -306,10 +306,12 @@ class NoSlipFreeSlip(BaseProblem):
         self.mat = MatNS(self.dim)
         self.operator = Operators(self.dim)
         rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
-        globalNodesDIR = self.dom.getGlobalIndicesDirichlet()
-        globalNodesNS = self.dom.getGlobalIndicesNoSlip()
 
-        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalNodesDIR, globalNodesNS )
+        # TODO Add a new MAT to handle global nodes DIR
+        globalNodesDIR = self.dom.getGlobalNodesDirichlet()
+        globalNodesNS = self.dom.getGlobalNodesNoSlip()
+
+        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, globalNodesNS )
         if not self.comm.rank:
             self.logger.info(f"Empty KLE Matrices created")
 
