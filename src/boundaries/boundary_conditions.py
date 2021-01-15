@@ -1,4 +1,4 @@
-from petsc4py.PETSc import IS, Vec
+from petsc4py.PETSc import IS, Vec, COMM_WORLD
 import numpy as np
 import logging
 from math import radians, sin, cos
@@ -8,6 +8,7 @@ from .boundary import Boundary, FunctionBoundary
 class BoundaryConditions:
     types = ["FS", "NS", "FS-NS"]
     bcTypesAvailable = ("uniform", "custom-func", "free-slip", "no-slip")
+    comm = COMM_WORLD
     def __init__(self, sides: list):
         self.__boundaries = list()
         self.__nsBoundaries = list()
@@ -19,7 +20,7 @@ class BoundaryConditions:
         self.__borderNames = sides
         self.__dim = 2 if len(sides) == 4 else 3
 
-        self.logger = logging.getLogger("Boundary Conditions:")
+        self.logger = logging.getLogger(f"[{self.comm.rank}]Boundary Conditions:")
 
     def __repr__(self):
         txt = " --== Boundary Conditions ==--\n"
@@ -184,7 +185,7 @@ class BoundaryConditions:
                 inds = bcIS.union(inds)
             return set(inds.getIndices())
 
-    def getNodesByType(self, bcType):
+    def getNodesByType(self, bcType, allGather=False):
         inds = set()
         boundaries = self.__ByType[bcType]
         if len(boundaries) == 0:
@@ -192,9 +193,14 @@ class BoundaryConditions:
         else:
             for bc in self.__ByType[bcType]:
                 bcIS = bc.getIS()
-                # bcIS.view()
-                inds |= set(bcIS.getBlockIndices())
-
+                locIndices = set(bcIS.getBlockIndices())
+                if allGather:
+                    collectIndices = self.comm.tompi4py().allgather([locIndices])
+                    for remoteIndices in collectIndices:
+                        locIndices |= remoteIndices[0]
+                else:
+                    pass
+                inds |= locIndices
             return inds
 
     def getNoSlipIndices(self):
