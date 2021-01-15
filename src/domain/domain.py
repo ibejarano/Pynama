@@ -214,8 +214,8 @@ class Domain:
         return fsIndices
         # return self.__dm.getGlobalIndicesDirichlet()
 
-    def getGlobalNodesDirichlet(self):
-        nodes = self.__bc.getNodesByType('free-slip')
+    def getNodesDirichlet(self, collect=False):
+        nodes = self.__bc.getNodesByType('free-slip', allGather=collect)
         return nodes
 
     def getGlobalIndicesNoSlip(self):
@@ -283,9 +283,11 @@ class Domain:
             print("Boundary conditions not defined")
 
     def viewNodesCoords(self):
-        print(" ===== Nodes Coordinates =====")
+        if not self.comm.rank:
+            print(" ===== Nodes Coordinates =====")
+            print(" Proc Num | Node Global | Node Local |  Coord ")
         coordArr = self.__dm.fullCoordVec.getArray()
         dim = self.__dm.getDimension()
         totalNodes = int(len(coordArr) / dim)
         for node in range(totalNodes):
-            print(f"Node: {node}  --- Coords {coordArr[node*dim:node*dim+dim]}")
+            print(f"{self.comm.rank:9} | {(node+self.__dm.startNode):11} | {node:10} | {coordArr[node*dim:node*dim+dim]}")
