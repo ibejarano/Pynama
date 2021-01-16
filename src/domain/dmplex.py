@@ -313,6 +313,10 @@ class DMPlexDom(PETSc.DMPlex):
         self.setDefaultSection(localIndicesSection)
         return self.createMat()
 
+    def getNodesRange(self):
+       sec = self.indicesManager.getGlobalIndicesSection()
+       return sec.getOffsetRange()
+
     ## Matrix build ind
     # @profile
     def getMatIndices(self):
@@ -344,6 +348,28 @@ class DMPlexDom(PETSc.DMPlex):
         # self.logger.info(f"new one {alt_o}  ")
         # exit()
         return rStart, rEnd, alt_d, alt_o, ind_d, ind_o
+
+    def getConnectivityNodes(self):
+        conecMat = self.getDMConectivityMat()
+        rStart, rEnd = conecMat.getOwnershipRange()
+        locElRow = rEnd - rStart
+        ind_d = np.zeros(locElRow, dtype=set)
+        ind_o = np.zeros(locElRow, dtype=set)
+
+        nnz_diag = np.zeros(locElRow, dtype=np.int32)
+        nnz_off = np.zeros(locElRow, dtype=np.int32)
+
+        for row in range(rStart, rEnd):
+            cols, _ = conecMat.getRow(row)
+            locRow = row - rStart
+            mask_diag = np.logical_and(cols >= rStart,cols < rEnd)
+            mask_off = np.logical_or(cols < rStart,cols >= rEnd)
+            ind_d[locRow] = set(cols[mask_diag])
+            nnz_diag[locRow] = len(ind_d[locRow])
+            ind_o[locRow] = set(cols[mask_off])
+            nnz_off[locRow] = len(ind_o[locRow]) 
+        conecMat.destroy()
+        return ind_d, ind_o, nnz_diag, nnz_off
 
     def getNodesOverline(self, line: str, val: float, invert=False):
         assert line in ['x', 'y']

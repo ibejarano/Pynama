@@ -4,30 +4,20 @@ import logging
 
 class MatFS:
     comm = PETSc.COMM_WORLD
-    def __init__(self, dim):
-        self.dim = dim
+    def __init__(self):
         self.logger = logging.getLogger(f"[{self.comm.rank}]:MatClass")
-        self.dim_w = 1 if self.dim == 2 else 3
-        self.dim_s = 3 if self.dim == 2 else 6
-        self.mats = list()
+        self.kle = list()
+        self.operators = list()
+
+        self.__dom = None
+
+    def setDomain(self, dom):
+        self.__dom = dom
 
     def assembleAll(self):
-        for m in self.mats:
+        for m in self.kle:
             m.assemble()
             self.logger.debug(f"Mat {m.getName()} Assembled")
-
-    def isParallel(self):
-        return self.comm.size > 1
-
-    def getGlobalIndices(self, localIndices):
-        globalIndices = set()
-        if self.isParallel():
-            collectIndices = self.comm.tompi4py().allgather([localIndices])
-            for remoteIndices in collectIndices:
-                globalIndices |= remoteIndices[0]
-        else:
-            globalIndices = localIndices
-        return globalIndices
         
     def createEmptyKLEMats(self,rStart, rEnd ,  d_nnz_ind , o_nnz_ind, ind_d, ind_o, nodesDir):
         globalNodesDir = self.getGlobalIndices(nodesDir)
@@ -76,16 +66,73 @@ class MatFS:
         self.Krhs.setName("Krhs")
         self.mats = [self.K, self.Rw, self.Rd, self.Krhs]
 
+    def preAlloc_K_Krhs(self, ind_d, ind_o, d_nnz, o_nnz, locIndicesDir ,globalNodesDir):
+        dim = self.__dom.getDimension()
+        nodeStart, nodeEnd = self.__dom.getNodesRange()
+
+        locElRow = nodeEnd - nodeStart
+        vel_dofs = locElRow * dim
+
+        drhs_nnz = np.zeros(locElRow)
+        orhs_nnz = np.zeros(locElRow)
+
+        for node, connectivity in enumerate(ind_d):
+            if (node + nodeStart) in globalNodesDir:
+                drhs_nnz[node] = 1
+            else:
+                drhs_nnz[node] = len(connectivity & globalNodesDir)
+                d_nnz[node] = d_nnz[node] - len(connectivity & globalNodesDir)
+                
+        for node, connectivity in enumerate(ind_o):
+            orhs_nnz[node] = len(connectivity & globalNodesDir)
+
+        d_nnz_ind, o_nnz_ind = self.createNNZWithArray(d_nnz, o_nnz, dim, dim )
+        drhs_nnz_ind, orhs_nnz_ind = self.createNNZWithArray(drhs_nnz, orhs_nnz, dim, dim )
+
+        d_nnz_ind[locIndicesDir] = 1
+        o_nnz_ind[locIndicesDir] = 0
+
+        self.K = self.createEmptyMat(vel_dofs, vel_dofs, d_nnz_ind, o_nnz_ind)
+        self.K.setName("K")
+        self.Krhs = self.createEmptyMat(vel_dofs, vel_dofs, drhs_nnz_ind, orhs_nnz_ind)
+        self.Krhs.setName("Krhs")
+        self.kle.append(self.K)
+        self.kle.append(self.Krhs)
+
+    def preAlloc_Rd_Rw(self, diag_nnz, off_nnz, locIndicesDir):
+        dim, dim_w, _ = self.__dom.getDimensions()
+
+        locElRow = len(diag_nnz)
+        vel_dofs = locElRow * dim
+        vort_dofs = locElRow * dim_w
+
+        dw_nnz_ind, ow_nnz_ind = self.createNNZWithArray(diag_nnz, off_nnz, dim_w, dim)
+        dd_nnz_ind, od_nnz_ind = self.createNNZWithArray(diag_nnz, off_nnz, 1, dim)
+
+        dw_nnz_ind[locIndicesDir] = 0
+        ow_nnz_ind[locIndicesDir] = 0
+
+        dd_nnz_ind[locIndicesDir] = 0
+        od_nnz_ind[locIndicesDir] = 0
+
+        self.Rw = self.createEmptyMat(vel_dofs, vort_dofs, dw_nnz_ind, ow_nnz_ind)
+        self.Rw.setName("Rw")
+        self.Rd = self.createEmptyMat(vel_dofs, locElRow, dd_nnz_ind, od_nnz_ind)
+        self.Rd.setName("Rd")
+        self.kle.append(self.Rw)
+        self.kle.append(self.Rd)
+
+    def preAlloc_operators(self, nnz_diag, nnz_off):
+        self.operator = Operators()
+        dims = self.__dom.getDimensions()
+        self.operator.setDimensions(dims)
+        self.operator.createAll(nnz_diag, nnz_off)
+
     def createEmptyMat(self, rows, cols, d_nonzero, offset_nonzero):
         mat = PETSc.Mat().createAIJ(((rows, None), (cols, None)),
             nnz=(d_nonzero, offset_nonzero), comm=self.comm)
         mat.setUp()
         return mat
-
-    def createNonZeroIndex(self, d_nnz, o_nnz, dim1, dim2):
-        di_nnz = [x * dim1 for x in d_nnz for d in range(dim2)]
-        oi_nnz = [x * dim1 for x in o_nnz for d in range(dim2)]
-        return di_nnz, oi_nnz
 
     def createNNZWithArray(self, d_nnz: np.array, o_nnz: np.array, dim1: int, dim2: int):
         d_nnz = np.array(d_nnz, dtype=np.int32)
@@ -109,14 +156,92 @@ class MatFS:
             info = m.getInfo()
             print(self.formatMatInfo(m.getName(), info))
 
+    def build(self, buildKLE=True, buildOperators=True):
+        locNodesDirichlet = np.array(list(self.__dom.getNodesDirichlet()))
+        nodeStart, _ = self.__dom.getNodesRange()
+        locNodesDirichlet -= nodeStart
+        globNodesDirichlet = self.__dom.getNodesDirichlet(collect=True)
+
+        dim = self.__dom.getDimension()
+        locIndDirichlet = [ node*dim+dof for node in locNodesDirichlet for dof in range(dim) ]
+        conn_diag, conn_offset, nnz_diag, nnz_off = self.__dom.getConnectivity()
+
+        if buildOperators:
+            self.preAlloc_operators(nnz_diag, nnz_off)
+        if buildKLE:
+            self.preAlloc_Rd_Rw(nnz_diag, nnz_off, locIndDirichlet)
+            self.preAlloc_K_Krhs(conn_diag, conn_offset, nnz_diag, nnz_off, locIndDirichlet, globNodesDirichlet)
+
+        self.buildFS(globNodesDirichlet)
+        self.buildOperators()
+
+    def buildFS(self, globNodesDirichlet):
+        cellStart , cellEnd = self.__dom.getLocalCellRange()
+        dim = self.__dom.getDimension()
+        for cell in range(cellStart, cellEnd):
+            nodes , inds , localMats = self.__dom.computeLocalKLEMats(cell)
+            locK, locRw, _ = localMats
+            indicesVel, indicesW = inds
+            
+            nodeBCintersect = set(globNodesDirichlet) & set(nodes)
+            dofSetFSNS = set()
+
+            for node in nodeBCintersect:
+                localBoundaryNode = nodes.index(node)
+                # FIXME : No importa el bc, #TODO cuando agregemos NS si importa
+                for dof in range(dim):
+                    dofSetFSNS.add(localBoundaryNode*dim + dof)
+
+            dofFree = list(set(range(len(indicesVel)))
+                            - dofSetFSNS)
+            dof2beSet = list(dofSetFSNS)
+            dofSetFSNS = list(dofSetFSNS)
+            gldof2beSet = [indicesVel[ii] for ii in dof2beSet]
+            gldofFree = [indicesVel[ii] for ii in dofFree]
+            
+            if nodeBCintersect:
+                self.Krhs.setValues(
+                gldofFree, gldof2beSet,
+                -locK[np.ix_(dofFree, dof2beSet)], addv=True)
+
+            self.K.setValues(gldofFree, gldofFree,
+                             locK[np.ix_(dofFree, dofFree)], addv=True)
+
+            for indd in gldof2beSet:
+                self.K.setValues(indd, indd, 0, addv=True)
+
+            self.Rw.setValues(gldofFree, indicesW,
+                              locRw[np.ix_(dofFree, range(len(indicesW)))], addv=True)
+
+        globalIndicesDIR = [node*dim + dof for node in globNodesDirichlet for dof in range(dim) ] 
+        self.setIndices2One(globalIndicesDIR)
+        self.assembleAll()
+        if not self.comm.rank:
+            self.logger.info(f"KLE Matrices builded")
+
+    def buildOperators(self):
+        cellStart, cellEnd = self.__dom.getLocalCellRange()
+        for cell in range(cellStart, cellEnd):
+            nodes, localOperators = self.__dom.computeLocalOperators(cell)
+            self.operator.setValues(localOperators, nodes)
+        self.operator.assembleAll()
+        if not self.comm.rank:
+            self.logger.info(f"Operators Matrices builded")
+
+    def getOperators(self):
+        return self.operator
+
     @staticmethod
     def formatMatInfo(name, info):
         return f"{name:{5}} | {info['memory']:{16}} | {info['nz_unneeded']:{10}}"
     
 
 class Operators(MatFS):
-    def createAll(self, rStart, rEnd, d_nnz_ind, o_nnz_ind):
-        locElRow = rEnd - rStart
+    def setDimensions(self, dims):
+        self.dim, self.dim_w, self.dim_s = dims
+
+    def createAll(self, d_nnz_ind, o_nnz_ind):
+        locElRow = len(d_nnz_ind)
         self.createCurl(d_nnz_ind, o_nnz_ind,locElRow)
         self.createDivSrt(d_nnz_ind, o_nnz_ind,locElRow)
         self.createSrT(d_nnz_ind, o_nnz_ind,locElRow)

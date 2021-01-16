@@ -127,6 +127,12 @@ class Domain:
     def getDimension(self):
         return self.__dm.getDimension()
 
+    def getDimensions(self):
+        dim = self.__dm.getDimension()
+        dim_w = 1 if dim == 2 else 3
+        dim_s = 3 if dim == 2 else 6
+        return dim, dim_w, dim_s
+
     def getNGL(self):
         return self.__ngl
 
@@ -234,6 +240,12 @@ class Domain:
         return self.__bc.getNoSlipNormalDofs(allGather=collect)        
 
     # -- Mat Building --
+    def getNodesRange(self):
+        return self.__dm.getNodesRange()
+
+    def getConnectivity(self):
+        return self.__dm.getConnectivityNodes()
+
     def getLocalCellRange(self):
         return self.__dm.cellStart, self.__dm.cellEnd
 

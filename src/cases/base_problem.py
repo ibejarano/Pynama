@@ -42,9 +42,6 @@ class BaseProblem(object):
         self.setUpDomain()
         self.setUpViewer()
         self.createMesh()
-        self.setUpEmptyMats()
-        self.buildKLEMats()
-        self.buildOperators()
 
     def setUpViewer(self):
         self.viewer = Paraviewer()
@@ -73,16 +70,6 @@ class BaseProblem(object):
         if not self.comm.rank:
             self.logger.info(f"Mesh created")
 
-    # @profile
-    def buildOperators(self):
-        cellStart, cellEnd = self.dom.getLocalCellRange()
-        for cell in range(cellStart, cellEnd):
-            nodes, localOperators = self.dom.computeLocalOperators(cell)
-            self.operator.setValues(localOperators, nodes)
-        self.operator.assembleAll()
-        if not self.comm.rank:
-            self.logger.info(f"Operators Matrices builded")
-
     def setUpTimeSolver(self):
         options = self.config.get("time-solver")
         self.ts = TsSolver(self.comm)
@@ -90,6 +77,7 @@ class BaseProblem(object):
         eTime = options['end-time']
         maxSteps = options['max-steps']
         self.ts.setUpTimes(sTime, eTime, maxSteps)
+
         self.ts.initSolver(self.evalRHS, self.convergedStepFunction)
 
     def createNumProcVec(self, step):
@@ -160,7 +148,6 @@ class BaseProblem(object):
             self._VtensV.setValues(ind[5::self.dim_s], v_z * v_x , False)
         self._VtensV.assemble()
 
-
     def solveKLE(self, time, vort):
         self.vel.set(0.0)
         self.dom.applyBoundaryConditions(self.vel, "velocity", time, self.nu)
@@ -168,59 +155,11 @@ class BaseProblem(object):
 
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
-    def buildKLEMats(self):
-        globalBCNodes = self.dom.getNodesDirichlet(collect=True)
-        cellStart , cellEnd = self.dom.getLocalCellRange()
-
-        for cell in range(cellStart, cellEnd):
-            nodes , inds , localMats = self.dom.computeLocalKLEMats(cell)
-            locK, locRw, _ = localMats
-            indicesVel, indicesW = inds
-            
-            nodeBCintersect = set(globalBCNodes) & set(nodes)
-            dofFreeFSSetNS = set()  # local dof list free at FS sol
-            dofSetFSNS = set()  # local dof list set at both solutions
-
-            for node in nodeBCintersect:
-                localBoundaryNode = nodes.index(node)
-                # FIXME : No importa el bc, #TODO cuando agregemos NS si importa
-                for dof in range(self.dim):
-                    dofSetFSNS.add(localBoundaryNode*self.dim + dof)
-
-            dofFree = list(set(range(len(indicesVel)))
-                           - dofFreeFSSetNS - dofSetFSNS)
-            dof2beSet = list(dofFreeFSSetNS | dofSetFSNS)
-            dofFreeFSSetNS = list(dofFreeFSSetNS)
-            dofSetFSNS = list(dofSetFSNS)
-            gldof2beSet = [indicesVel[ii] for ii in dof2beSet]
-            gldofFree = [indicesVel[ii] for ii in dofFree]
-            
-            if nodeBCintersect:
-                self.mat.Krhs.setValues(
-                gldofFree, gldof2beSet,
-                -locK[np.ix_(dofFree, dof2beSet)], addv=True)
-                # indices2one.update(gldof2beSet)
-                # print(indices2one)
-                # FIXME: is the code below really necessary?
-                # for indd in gldof2beSet:
-                #     self.mat.Krhs.setValues(indd, indd, 0, addv=True)
-
-            self.mat.K.setValues(gldofFree, gldofFree,
-                             locK[np.ix_(dofFree, dofFree)], addv=True)
-
-            for indd in gldof2beSet:
-                self.mat.K.setValues(indd, indd, 0, addv=True)
-
-            self.mat.Rw.setValues(gldofFree, indicesW,
-                              locRw[np.ix_(dofFree, range(len(indicesW)))], addv=True)
-
-        globalIndicesDIR = [node*self.dim + dof for node in globalBCNodes for dof in range(self.dim) ] 
-        self.mat.setIndices2One(globalIndicesDIR)
-        self.mat.assembleAll()
-        if not self.comm.rank:
-            self.logger.info(f"KLE Matrices builded")
-
     def setUpSolver(self):
+        self.mat = MatFS()
+        self.mat.setDomain(self.dom)
+        self.mat.build()
+
         self.solver = KspSolver()
         self.solver.createSolver(self.mat.K, self.comm)
         self.vel = self.mat.K.createVecRight()
@@ -231,6 +170,8 @@ class BaseProblem(object):
 
         sK, eK = self.mat.K.getOwnershipRange()
         locRowsK = eK - sK
+
+        self.operator = self.mat.getOperators()
 
         self._VtensV = PETSc.Vec().createMPI(
             ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
@@ -282,21 +223,6 @@ class BaseProblem(object):
 
         self.vort.assemble()
         self.vel.assemble()
-
-    def setUpEmptyMats(self):
-        self.mat = MatFS(self.dim)
-        self.operator = Operators(self.dim)
-        rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
-        localNodesDir = self.dom.getNodesDirichlet()
-        d_nnz_ind_op = d_nnz_ind.copy()
-
-        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, localNodesDir)
-        if not self.comm.rank:
-            self.logger.info(f"Empty KLE Matrices created")
-
-        self.operator.createAll(rStart, rEnd, d_nnz_ind_op, o_nnz_ind)
-        if not self.comm.rank:
-            self.logger.info(f"Empty Operators created")
 
     def view(self):
         print(f"Case: {self.case}")
