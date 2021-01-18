@@ -1,5 +1,4 @@
 from petsc4py.PETSc import KSP, PC, COMM_WORLD
-from petsc4py.PETSc import PC
 import logging
 
 
@@ -25,6 +24,7 @@ class KleSolver:
             self.solverFS = KspSolver()
             self.solverFS.createSolver(K + Kfs)
             self.__velFS = K.createVecRight()
+            self.__velFS.setName('free-slip')
             self.__isNS = True
             
     def isNS(self):

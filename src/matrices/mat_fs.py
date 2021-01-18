@@ -1,7 +1,6 @@
 from petsc4py import PETSc
 import numpy as np
 import logging
-from solver.ksp_solver import KspSolver
 
 class MatFS:
     comm = PETSc.COMM_WORLD
@@ -68,11 +67,11 @@ class MatFS:
             ddns_nnz_ind = np.zeros(locElRow * dim, dtype=np.int32)
             odns_nnz_ind = np.zeros(locElRow * dim, dtype=np.int32)
 
-            dwns_nnz_ind = dw_nnz_ind[locIndicesDir]
-            owns_nnz_ind = ow_nnz_ind[locIndicesDir]
+            dwns_nnz_ind[locIndicesDir] = dw_nnz_ind[locIndicesDir]
+            owns_nnz_ind[locIndicesDir] = ow_nnz_ind[locIndicesDir]
 
-            ddns_nnz_ind = dd_nnz_ind[locIndicesDir]
-            odns_nnz_ind = od_nnz_ind[locIndicesDir]
+            ddns_nnz_ind[locIndicesDir] = dd_nnz_ind[locIndicesDir]
+            odns_nnz_ind[locIndicesDir] = od_nnz_ind[locIndicesDir]
 
             self.Rwfs =self.createEmptyMat(vel_dofs,vort_dofs, dwns_nnz_ind, owns_nnz_ind)
             self.Rwfs.setName("Rwfs")

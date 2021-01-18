@@ -8,7 +8,7 @@ from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
 from matrices.mat_fs import MatFS, Operators
 from matrices.mat_ns import MatNS
-from solver.ksp_solver import KleSolver
+from solver.kle_solver import KleSolver
 from common.timer import Timer
 import logging
 import numpy as np
@@ -96,7 +96,8 @@ class BaseProblem(object):
         incr = ts.getTimeStep()
         vort = ts.getSolution()
         vel = self.solverKLE.getSolution()
-        self.viewer.saveData(step, time, vel, vort)
+        velFS = self.solverKLE.getFreeSlipSolution()
+        self.viewer.saveData(step, time, vel, velFS, vort)
         self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
@@ -116,11 +117,10 @@ class BaseProblem(object):
         self.dom.applyBoundaryConditions(vel, "velocity", t, self.nu)
 
         if self.solverKLE.isNS():
-            self.logger.info("Solving ns")
             self.solverKLE.solveFS(vort)
             velFS = self.solverKLE.getFreeSlipSolution()
             self.dom.applyBoundaryConditions(velFS, "velocity", t, self.nu)
-            self.operator.Curl.mult(velFS, vort)
+            self.operator.Curl.mult(velFS, self.vort)
 
         self.solverKLE.solve(vort)
 
@@ -225,8 +225,8 @@ class BaseProblem(object):
         self.vort = vort
         self.ts.setSolution(vort)
 
-        self.viewer.saveData(0, initTime, vel, vort)
-        self.viewer.writeXmf(self.caseName)
+        # self.viewer.saveData(0, initTime, vel, vort)
+        # self.viewer.writeXmf(self.caseName)
 
     def view(self):
         print(f"Case: {self.case}")

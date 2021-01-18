@@ -117,6 +117,7 @@ class BoundaryConditions:
 
         if type(vals) == list:
             boundary.setValues('velocity', vals)
+            boundary.setValues('vorticity', [0] if self.__dim==2 else [0]*3)
         else:
             for attrName, val in vals.items():
                 boundary.setValues(attrName, val)

@@ -18,7 +18,7 @@ class MatNS(MatFS):
 
         for node, connect in enumerate(ind_d):
             if (node + nodeStart) not in globalNodesNS:
-                dns_nnz[ind] = len(connect & globalNodesNS)
+                dns_nnz[node] = len(connect & globalNodesNS)
             elif (node + nodeStart) in globalNodesNS:
                 # FIXME: len() can be distributed on each set operation
                 dns_nnz[node] = len(connect | (connect & globalNodesNS))
