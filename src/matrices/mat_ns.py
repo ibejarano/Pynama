@@ -3,9 +3,10 @@ from matrices.mat_fs import MatFS
 import numpy as np
 
 class MatNS(MatFS):
+    bcType ="NS"
     def preAlloc_Kfs_Krhsfs(self, ind_d, ind_o, globalNodesNS):
-        dim = self.__dom.getDimension()
-        nodeStart, nodeEnd = self.__dom.getNodesRange()
+        dim = self.dom.getDimension()
+        nodeStart, nodeEnd = self.dom.getNodesRange()
 
         locElRow = nodeEnd - nodeStart
         vel_dofs = locElRow * dim
@@ -46,12 +47,12 @@ class MatNS(MatFS):
     def buildNS(self):
         indices2one = set() 
         indices2onefs = set()
-        cellStart , cellEnd = self.__dom.getLocalCellRange()
-        globalTangIndicesNS = self.__dom.getTangDofs(collect=True)
-        globalNormalIndicesNS = self.__dom.getNormalDofs(collect=True)
+        cellStart , cellEnd = self.dom.getLocalCellRange()
+        globalTangIndicesNS = self.dom.getTangDofs(collect=True)
+        globalNormalIndicesNS = self.dom.getNormalDofs(collect=True)
         
         for cell in range(cellStart, cellEnd):
-            nodes , inds , localMats = self.__dom.computeLocalKLEMats(cell)
+            nodes , inds , localMats = self.dom.computeLocalKLEMats(cell)
             locK, locRw, locRd = localMats
             indicesVel, indicesW = inds
 
@@ -145,14 +146,14 @@ class MatNS(MatFS):
 
 
     def build(self, buildKLE=True, buildOperators=True):
-        locNodesNS = np.array(list(self.__dom.getNodesNoSlip()))
-        nodeStart, _ = self.__dom.getNodesRange()
+        locNodesNS = np.array(list(self.dom.getNodesNoSlip()))
+        nodeStart, _ = self.dom.getNodesRange()
         locNodesNS -= nodeStart
-        globNodesNS = self.__dom.getNodesNoSlip(collect=True)
+        globNodesNS = self.dom.getNodesNoSlip(collect=True)
 
-        dim = self.__dom.getDimension()
+        dim = self.dom.getDimension()
         locIndNS = [ node*dim+dof for node in locNodesNS for dof in range(dim) ]
-        conn_diag, conn_offset, nnz_diag, nnz_off = self.__dom.getConnectivity()
+        conn_diag, conn_offset, nnz_diag, nnz_off = self.dom.getConnectivity()
 
         if buildOperators:
             self.preAlloc_operators(nnz_diag, nnz_off)
