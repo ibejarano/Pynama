@@ -95,7 +95,6 @@ class BaseProblem(object):
         step = ts.step_number
         incr = ts.getTimeStep()
         self.viewer.saveData(step, time, self.vel, self.vort)
-        # self.viewer.newSaveVec([self.vel, self.vort], step)
         self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
@@ -230,23 +229,6 @@ class BaseProblem(object):
         print(f"NGL: {self.dom.getNGL() }")
 
 class NoSlipFreeSlip(BaseProblem):
-    def setUpEmptyMats(self):
-        self.mat = MatNS(self.dim)
-        self.operator = Operators(self.dim)
-        rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o = self.dom.getMatIndices()
-
-        # TODO Add a new MAT to handle global nodes DIR
-        localNodesDIR = self.dom.getNodesDirichlet(collect=True)
-        localNodesNS = self.dom.getNodesNoSlip(collect=True)
-
-        self.mat.createEmptyKLEMats(rStart, rEnd, d_nnz_ind, o_nnz_ind, ind_d, ind_o, localNodesNS )
-        if not self.comm.rank:
-            self.logger.info(f"Empty KLE Matrices created")
-
-        self.operator.createAll(rStart, rEnd, d_nnz_ind, o_nnz_ind)
-        if not self.comm.rank:
-            self.logger.info(f"Empty Operators created")
-
     def setUpSolver(self):
         super().setUpSolver()
         self.solverFS = KspSolver()
@@ -265,105 +247,6 @@ class NoSlipFreeSlip(BaseProblem):
         self.dom.applyBoundaryConditions(self.velFS, "velocity", time, self.nu)
         vort = self.operator.Curl * self.velFS
         self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
-
-    def buildKLEMats(self):
-        indices2one = set() 
-        indices2onefs = set()
-        cellStart , cellEnd = self.dom.getLocalCellRange()
-        globalTangIndicesNS = self.dom.getTangDofs(collect=True)
-        globalNormalIndicesNS = self.dom.getNormalDofs(collect=True)
-        
-        for cell in range(cellStart, cellEnd):
-            nodes , inds , localMats = self.dom.computeLocalKLEMats(cell)
-            locK, locRw, locRd = localMats
-            indicesVel, indicesW = inds
-
-            indicesVelSet = set(indicesVel)
-            normalDofs = globalNormalIndicesNS & indicesVelSet
-            tangentialDofs = globalTangIndicesNS & indicesVelSet
-            tangentialDofs -= normalDofs
-
-            gldofSetFSNS = list(normalDofs)
-            gldofFreeFSSetNS = list(tangentialDofs)
-            gldofFree = list(indicesVelSet - normalDofs - tangentialDofs)
-
-            dofFree = [ indicesVel.index(i) for i in gldofFree ]
-            locNormalDof = [ indicesVel.index(i) for i in normalDofs ]
-            locTangDof = [ indicesVel.index(i) for i in tangentialDofs ]
-
-            dofFreeFSSetNS = locTangDof
-            dofSetFSNS = locNormalDof
-            dof2beSet = list(set(dofFreeFSSetNS) | set(dofSetFSNS))
-            gldof2beSet = [indicesVel[ii] for ii in dof2beSet]
-
-            if normalDofs | tangentialDofs:
-                self.mat.Krhs.setValues(
-                gldofFree, gldof2beSet,
-                -locK[np.ix_(dofFree, dof2beSet)], addv=True)
-                indices2one.update(gldof2beSet)
-
-                # FIXME: is the code below really necessary?
-                for indd in gldof2beSet:
-                    self.mat.Krhs.setValues(indd, indd, 0, addv=True)
-                self.mat.Kfs.setValues(gldofFreeFSSetNS, gldofFree,
-                                    locK[np.ix_(dofFreeFSSetNS, dofFree)],
-                                    addv=True)
-
-                self.mat.Kfs.setValues(gldofFree, gldofFreeFSSetNS,
-                                    locK[np.ix_(dofFree, dofFreeFSSetNS)],
-                                    addv=True)
-
-                self.mat.Kfs.setValues(
-                    gldofFreeFSSetNS, gldofFreeFSSetNS,
-                    locK[np.ix_(dofFreeFSSetNS, dofFreeFSSetNS)],
-                    addv=True)
-
-                # Indices where diagonal entries should be reduced by 1
-                indices2onefs.update(gldofFreeFSSetNS)
-
-                self.mat.Rwfs.setValues(gldofFreeFSSetNS, indicesW,
-                                    locRw[dofFreeFSSetNS, :], addv=True)
-
-                self.mat.Rdfs.setValues(gldofFreeFSSetNS, nodes,
-                                    locRd[dofFreeFSSetNS, :], addv=True)
-                self.mat.Krhsfs.setValues(
-                        gldofFreeFSSetNS, gldofSetFSNS,
-                        - locK[np.ix_(dofFreeFSSetNS, dofSetFSNS)], addv=True)
-                self.mat.Krhsfs.setValues(
-                        gldofFree, gldofSetFSNS,
-                        - locK[np.ix_(dofFree, dofSetFSNS)], addv=True)
-                for indd in gldofSetFSNS:
-                        self.mat.Krhsfs.setValues(indd, indd, 0, addv=True)
-
-            self.mat.K.setValues(gldofFree, gldofFree,
-                             locK[np.ix_(dofFree, dofFree)], addv=True)
-
-            for indd in gldof2beSet:
-                self.mat.K.setValues(indd, indd, 0, addv=True)
-
-            self.mat.Rw.setValues(gldofFree, indicesW,
-                              locRw[np.ix_(dofFree, range(len(indicesW)))], addv=True)
-
-            self.mat.Rd.setValues(gldofFree, nodes,
-                              locRd[np.ix_(dofFree, range(len(nodes)))],
-                              addv=True)
-        self.mat.assembleAll()
-        self.mat.setIndices2One(indices2one)
-        for indd in indices2onefs:
-            self.mat.Kfs.setValues(indd, indd, -1, addv=True)
-
-        self.mat.Kfs.assemble()
-        self.mat.Rwfs.assemble()
-        self.mat.Rdfs.assemble()
-        self.mat.Krhsfs.assemble()
-
-        for indd in (indices2one - indices2onefs):
-            self.mat.Krhsfs.setValues(indd, indd, 1, addv=False)
-        self.mat.Krhsfs.assemble()
-
-        if not self.comm.rank:
-            self.logger.info(f"KLE Matrices builded")
-
 
 class BaseProblemTest(BaseProblem):
 
