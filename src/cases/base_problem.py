@@ -8,7 +8,7 @@ from viewer.paraviewer import Paraviewer
 from solver.ts_solver import TsSolver
 from matrices.mat_fs import MatFS, Operators
 from matrices.mat_ns import MatNS
-from solver.ksp_solver import KspSolver
+from solver.ksp_solver import KleSolver
 from common.timer import Timer
 import logging
 import numpy as np
@@ -76,8 +76,8 @@ class BaseProblem(object):
         sTime = options['start-time']
         eTime = options['end-time']
         maxSteps = options['max-steps']
-        self.ts.setUpTimes(sTime, eTime, maxSteps)
 
+        self.ts.setUpTimes(sTime, eTime, maxSteps)
         self.ts.initSolver(self.evalRHS, self.convergedStepFunction)
 
     def createNumProcVec(self, step):
@@ -94,7 +94,9 @@ class BaseProblem(object):
         time = ts.time
         step = ts.step_number
         incr = ts.getTimeStep()
-        self.viewer.saveData(step, time, self.vel, self.vort)
+        vort = ts.getSolution()
+        vel = self.solverKLE.getSolution()
+        self.viewer.saveData(step, time, vel, vort)
         self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
@@ -108,35 +110,38 @@ class BaseProblem(object):
     def evalRHS(self, ts, t, vort, f):
         """Evaluate the KLE right hand side."""
         # KLE spatial solution with vorticity given
-        self.solveKLE(t, vort)
-        # FIXME: Generalize for dim = 3 also
-        self.computeVtensV()
-        # self._Aux1 = self.SrT * self._Vel
-        self.operator.SrT.mult(self.vel, self._Aux1)
 
-        # _Aux1 = 2*Mu * S - rho * Vvec ^ VVec
+        self.dom.applyBoundaryConditions(self.vort, "vorticity", t, self.nu)
+        vel = self.solverKLE.getSolution()
+        self.dom.applyBoundaryConditions(vel, "velocity", t, self.nu)
+
+        if self.solverKLE.isNS():
+            self.logger.info("Solving ns")
+            self.solverKLE.solveFS(vort)
+            velFS = self.solverKLE.getFreeSlipSolution()
+            self.dom.applyBoundaryConditions(velFS, "velocity", t, self.nu)
+            self.operator.Curl.mult(velFS, vort)
+
+        self.solverKLE.solve(vort)
+
+        self.computeVtensV(vel)
+        self.operator.SrT.mult(vel, self._Aux1)
         self._Aux1 *= (2.0 * self.mu)
         self._Aux1.axpy(-1.0 * self.rho, self._VtensV)
-
         # FIXME: rhs should be created previously or not?
-        rhs = self.vel.duplicate()
-        # RHS = Curl * Div(SrT) * 2*Mu * S - rho * Vvec ^ VVec
-            # rhs = (self.DivSrT * self._Aux1) / self.rho
+        rhs = vel.duplicate()
         self.operator.DivSrT.mult(self._Aux1, rhs)
         rhs.scale(1/self.rho)
 
         self.operator.Curl.mult(rhs, f)
 
-    def computeVtensV(self, vec=None):
-        if vec is not None:
-            arr = vec.getArray()
-        else:
-            arr = self.vel.getArray()
-
-        sK, eK = self.mat.K.getOwnershipRange()
-        ind = np.arange(int(sK*self.dim_s/self.dim), int(eK*self.dim_s/self.dim), dtype=np.int32)
+    def computeVtensV(self, vec):
+        arr = vec.getArray()
+        startInd, endInd = self.operator.SrT.getOwnershipRange()
+        ind = np.arange(startInd, endInd, dtype=np.int32)
         v_x = arr[::self.dim]
         v_y = arr[1::self.dim]
+
         self._VtensV.setValues(ind[::self.dim_s], v_x**2 , False)
         self._VtensV.setValues(ind[1::self.dim_s], v_x * v_y , False)
         self._VtensV.setValues(ind[2::self.dim_s], v_y**2 , False)
@@ -147,35 +152,27 @@ class BaseProblem(object):
             self._VtensV.setValues(ind[5::self.dim_s], v_z * v_x , False)
         self._VtensV.assemble()
 
-    def solveKLE(self, time, vort):
-        self.vel.set(0.0)
-        self.dom.applyBoundaryConditions(self.vel, "velocity", time, self.nu)
-        self.dom.applyBoundaryConditions(self.vort, "vorticity", time, self.nu)
-
-        self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
-
     def setUpSolver(self):
-        self.mat = MatFS()
-        self.mat.setDomain(self.dom)
-        self.mat.build()
+        bcType = self.dom.getBoundaryType()
+        if bcType == "FS":
+            mat = MatFS()
+        elif bcType =="NS":
+            mat = MatNS()
+        else:
+            raise Exception("FSNS Mat not implemented")
 
-        self.solver = KspSolver()
-        self.solver.createSolver(self.mat.K, self.comm)
-        self.vel = self.mat.K.createVecRight()
-        self.vel.setName("velocity")
-        self.vort = self.mat.Rw.createVecRight()
-        self.vort.setName("vorticity")
-        self.vort.set(0.0)
+        mat.setDomain(self.dom)
+        mat.build()
+        self.mat = mat
 
-        sK, eK = self.mat.K.getOwnershipRange()
-        locRowsK = eK - sK
+        self.solverKLE = KleSolver()
+        self.solverKLE.setMat(mat)
+        self.solverKLE.setUp()
 
-        self.operator = self.mat.getOperators()
+        self.operator = mat.getOperators()
 
-        self._VtensV = PETSc.Vec().createMPI(
-            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
-        self._Aux1 = PETSc.Vec().createMPI(
-            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
+        self._VtensV = self.operator.SrT.createVecLeft()
+        self._Aux1 = self._VtensV.duplicate() 
 
         assert 'initial-conditions' in self.config, "Initial conditions not defined"
         self.setUpInitialConditions()
@@ -183,6 +180,9 @@ class BaseProblem(object):
     def setUpInitialConditions(self):
         self.logger.info("Computing initial conditions")
         initTime = self.ts.getTime()
+        vort = self.operator.Curl.createVecLeft()
+        vort.setName("vorticity")
+        vel = self.solverKLE.getSolution()
 
         initialConditions = self.config['initial-conditions']
         keepCoords = initialConditions.get("keep-coords", False)
@@ -204,11 +204,11 @@ class BaseProblem(object):
             arrVort = funcVort(coords, alpha)
 
             if self.dim == 2:
-                self.vort.setValues(nodes ,arrVort, addv=False)
+                vort.setValues(nodes ,arrVort, addv=False)
             else:
-                self.vort.setValues(inds ,arrVort, addv=False)
+                vort.setValues(inds ,arrVort, addv=False)
 
-            self.vel.setValues(inds, arrVel, addv=False)
+            vel.setValues(inds, arrVel, addv=False)
             if not keepCoords:
                 self.dom.destroyCoordVec()
 
@@ -218,35 +218,20 @@ class BaseProblem(object):
                 velArr = initialConditions['velocity']
                 velArr = np.tile(velArr, len(nodes))
                 self.logger.info("Computing Curl to initial velocity to get initial Vorticity")
-                self.vel.setValues( inds , velArr)
+                vel.setValues( inds , velArr)
 
-        self.vort.assemble()
-        self.vel.assemble()
+        vort.assemble()
+        vel.assemble()
+        self.vort = vort
+        self.ts.setSolution(vort)
+
+        self.viewer.saveData(0, initTime, vel, vort)
+        self.viewer.writeXmf(self.caseName)
 
     def view(self):
         print(f"Case: {self.case}")
         print(f"Domain: {self.dom.view()} ")
         print(f"NGL: {self.dom.getNGL() }")
-
-class NoSlipFreeSlip(BaseProblem):
-    def setUpSolver(self):
-        super().setUpSolver()
-        self.solverFS = KspSolver()
-        self.solverFS.createSolver(self.mat.K + self.mat.Kfs, self.comm)
-        self.velFS = self.vel.copy()
-
-    def solveKLE(self, time, vort):
-        self.vel.set(0.0)
-
-        self.dom.applyBoundaryConditions(self.vel, "velocity", time, self.nu)
-        # self.dom.applyBoundaryConditions(self.vort, "vorticity", time, self.nu)
-
-        self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
-             + self.mat.Krhsfs * self.vel , self.velFS)
-
-        self.dom.applyBoundaryConditions(self.velFS, "velocity", time, self.nu)
-        vort = self.operator.Curl * self.velFS
-        self.solver( self.mat.Rw * vort + self.mat.Krhs * self.vel , self.vel)
 
 class BaseProblemTest(BaseProblem):
 

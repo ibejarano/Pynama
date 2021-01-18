@@ -9,8 +9,8 @@ import yaml
 OptDB = petsc4py.PETSc.Options()
 case = OptDB.getString('case', False)
 
-fsCases = ['uniform', 'taylor-green','taylor-green2d-3d', 'senoidal', 'flat-plate']
-nsCases = ['cavity']
+fsCases = ['cavity','uniform', 'taylor-green','taylor-green2d-3d', 'senoidal', 'flat-plate']
+
 
 if case in fsCases:
     from cases.custom_func import BaseProblem as FemProblem
@@ -18,8 +18,6 @@ elif case == 'ibm-static':
     from cases.immersed_boundary import ImmersedBoundaryStatic as FemProblem
 elif case == 'ibm-dynamic':
     from cases.immersed_boundary import ImmersedBoundaryDynamic as FemProblem
-elif case in nsCases:
-    from cases.cavity import Cavity as FemProblem
 else:
     print("Case not defined unabled to import")
     exit()
@@ -154,7 +152,7 @@ def timeSolving(config):
     if not fem.comm.rank:
         fem.logger.info("Solving problem...")
     fem.timer.tic()
-    fem.ts.solve(fem.vort)
+    fem.ts.solve()
     if not fem.comm.rank:
         fem.logger.info(f"Solver Finished in {fem.timer.toc()} seconds")
         fem.logger.info(f"Total time: {fem.timerTotal.toc()} seconds")
