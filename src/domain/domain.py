@@ -12,18 +12,6 @@ from mpi4py import MPI
 from math import pi, floor
 import copy
 
-def checkOption(optName, optKwargs):
-    OptDB = PETSc.Options()
-    optStr = OptDB.getString(optName, False)
-    if optStr:
-        print(f"Setting {optName} from options: {optStr}")
-        return optStr
-    elif optName in optKwargs:
-        print(f"Setting {optName} from args: {optKwargs[optName]}")
-        return optKwargs[optName]
-    else:
-        return False
-
 class Domain:
     comm = PETSc.COMM_WORLD
     def __init__(self):
@@ -123,6 +111,12 @@ class Domain:
 
     def getMeshType(self):
         return self.__meshType
+
+    def getBoundaryType(self):
+        try:
+            return self.__bc.getType()
+        except:
+            raise Exception("Boundary Type not defined")
 
     def getDimension(self):
         return self.__dm.getDimension()

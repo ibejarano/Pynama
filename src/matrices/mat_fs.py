@@ -1,74 +1,27 @@
 from petsc4py import PETSc
 import numpy as np
 import logging
+from solver.ksp_solver import KspSolver
 
 class MatFS:
     comm = PETSc.COMM_WORLD
+    bcType = "FS"
     def __init__(self):
         self.logger = logging.getLogger(f"[{self.comm.rank}]:MatClass")
         self.kle = list()
         self.operators = list()
 
-        self.__dom = None
-
     def setDomain(self, dom):
-        self.__dom = dom
+        self.dom = dom
 
     def assembleAll(self):
         for m in self.kle:
             m.assemble()
             self.logger.debug(f"Mat {m.getName()} Assembled")
-        
-    def createEmptyKLEMats(self,rStart, rEnd ,  d_nnz_ind , o_nnz_ind, ind_d, ind_o, nodesDir):
-        globalNodesDir = self.getGlobalIndices(nodesDir)
-        locElRow = rEnd - rStart
-        vel_dofs = locElRow * self.dim
-        vort_dofs = locElRow * self.dim_w
-        # Create array of NNZ from d_nnz_ind and o_nnz_ind to create Rw
-        dw_nnz, ow_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim_w, self.dim)
-        # Create array of NNZ from d_nnz_ind and o_nnz_ind to create Rd
-        dd_nnz, od_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, 1, self.dim)
-
-        drhs_nnz_ind = np.zeros(locElRow)
-        orhs_nnz_ind = np.zeros(locElRow)
-
-        for indRow, indSet in enumerate(ind_d):
-            if (indRow + rStart) in globalNodesDir:
-                drhs_nnz_ind[indRow] = 1
-            else:
-                drhs_nnz_ind[indRow] = len(indSet & globalNodesDir)
-                d_nnz_ind[indRow] = d_nnz_ind[indRow] - len(indSet & globalNodesDir)
-                
-        for indRow, indSet in enumerate(ind_o):
-            orhs_nnz_ind[indRow] = len(indSet & globalNodesDir)
-
-        d_nnz, o_nnz = self.createNNZWithArray(d_nnz_ind, o_nnz_ind, self.dim, self.dim )
-        drhs_nnz, orhs_nnz = self.createNNZWithArray(drhs_nnz_ind, orhs_nnz_ind, self.dim, self.dim)
-
-        indicesDIR = [ node*self.dim-(rStart*self.dim) + dof for node in nodesDir for dof in range(self.dim) ]
-
-        d_nnz[indicesDIR] = 1
-        o_nnz[indicesDIR] = 0
-
-        dw_nnz[indicesDIR] = 0
-        ow_nnz[indicesDIR] = 0
-
-        dw_nnz[indicesDIR] = 0
-        ow_nnz[indicesDIR] = 0
-
-        self.K = self.createEmptyMat(vel_dofs, vel_dofs,d_nnz, o_nnz )
-        self.K.setName("K")
-        self.Rw = self.createEmptyMat(vel_dofs, vort_dofs, dw_nnz, ow_nnz)
-        self.Rw.setName("Rw")
-        self.Rd = self.createEmptyMat(vel_dofs, locElRow, dd_nnz, od_nnz)
-        self.Rd.setName("Rd")
-        self.Krhs = self.createEmptyMat(vel_dofs, vel_dofs, drhs_nnz, orhs_nnz)
-        self.Krhs.setName("Krhs")
-        self.mats = [self.K, self.Rw, self.Rd, self.Krhs]
 
     def preAlloc_K_Krhs(self, ind_d, ind_o, d_nnz, o_nnz, locIndicesDir ,globalNodesDir):
-        dim = self.__dom.getDimension()
-        nodeStart, nodeEnd = self.__dom.getNodesRange()
+        dim = self.dom.getDimension()
+        nodeStart, nodeEnd = self.dom.getNodesRange()
 
         locElRow = nodeEnd - nodeStart
         vel_dofs = locElRow * dim
@@ -100,15 +53,13 @@ class MatFS:
         self.kle.append(self.Krhs)
 
     def preAlloc_Rd_Rw(self, diag_nnz, off_nnz, locIndicesDir, createFS=False):
-        dim, dim_w, _ = self.__dom.getDimensions()
-
+        dim, dim_w, _ = self.dom.getDimensions()
         locElRow = len(diag_nnz)
         vel_dofs = locElRow * dim
         vort_dofs = locElRow * dim_w
 
         dw_nnz_ind, ow_nnz_ind = self.createNNZWithArray(diag_nnz, off_nnz, dim_w, dim)
         dd_nnz_ind, od_nnz_ind = self.createNNZWithArray(diag_nnz, off_nnz, 1, dim)
-
 
         if createFS:
             dwns_nnz_ind = np.zeros(locElRow * dim, dtype=np.int32)
@@ -145,7 +96,7 @@ class MatFS:
 
     def preAlloc_operators(self, nnz_diag, nnz_off):
         self.operator = Operators()
-        dims = self.__dom.getDimensions()
+        dims = self.dom.getDimensions()
         self.operator.setDimensions(dims)
         self.operator.createAll(nnz_diag, nnz_off)
 
@@ -179,13 +130,13 @@ class MatFS:
 
     def build(self, buildKLE=True, buildOperators=True):
         locNodesDirichlet = np.array(list(self.__dom.getNodesDirichlet()))
-        nodeStart, _ = self.__dom.getNodesRange()
+        nodeStart, _ = self.dom.getNodesRange()
         locNodesDirichlet -= nodeStart
-        globNodesDirichlet = self.__dom.getNodesDirichlet(collect=True)
+        globNodesDirichlet = self.dom.getNodesDirichlet(collect=True)
 
-        dim = self.__dom.getDimension()
+        dim = self.dom.getDimension()
         locIndDirichlet = [ node*dim+dof for node in locNodesDirichlet for dof in range(dim) ]
-        conn_diag, conn_offset, nnz_diag, nnz_off = self.__dom.getConnectivity()
+        conn_diag, conn_offset, nnz_diag, nnz_off = self.dom.getConnectivity()
 
         if buildOperators:
             self.preAlloc_operators(nnz_diag, nnz_off)
@@ -198,9 +149,9 @@ class MatFS:
 
     def buildFS(self, globNodesDirichlet):
         cellStart , cellEnd = self.__dom.getLocalCellRange()
-        dim = self.__dom.getDimension()
+        dim = self.dom.getDimension()
         for cell in range(cellStart, cellEnd):
-            nodes , inds , localMats = self.__dom.computeLocalKLEMats(cell)
+            nodes , inds , localMats = self.dom.computeLocalKLEMats(cell)
             locK, locRw, _ = localMats
             indicesVel, indicesW = inds
             
@@ -240,10 +191,16 @@ class MatFS:
         if not self.comm.rank:
             self.logger.info(f"KLE Matrices builded")
 
+    def createSolver(self):
+        solver = KspSolver()
+        solver.createSolver(self.K)
+
+        return solver
+
     def buildOperators(self):
-        cellStart, cellEnd = self.__dom.getLocalCellRange()
+        cellStart, cellEnd = self.dom.getLocalCellRange()
         for cell in range(cellStart, cellEnd):
-            nodes, localOperators = self.__dom.computeLocalOperators(cell)
+            nodes, localOperators = self.dom.computeLocalOperators(cell)
             self.operator.setValues(localOperators, nodes)
         self.operator.assembleAll()
         if not self.comm.rank:
