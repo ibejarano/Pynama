@@ -99,7 +99,7 @@ class MatFS:
         self.kle.append(self.K)
         self.kle.append(self.Krhs)
 
-    def preAlloc_Rd_Rw(self, diag_nnz, off_nnz, locIndicesDir):
+    def preAlloc_Rd_Rw(self, diag_nnz, off_nnz, locIndicesDir, createFS=False):
         dim, dim_w, _ = self.__dom.getDimensions()
 
         locElRow = len(diag_nnz)
@@ -108,6 +108,27 @@ class MatFS:
 
         dw_nnz_ind, ow_nnz_ind = self.createNNZWithArray(diag_nnz, off_nnz, dim_w, dim)
         dd_nnz_ind, od_nnz_ind = self.createNNZWithArray(diag_nnz, off_nnz, 1, dim)
+
+
+        if createFS:
+            dwns_nnz_ind = np.zeros(locElRow * dim, dtype=np.int32)
+            owns_nnz_ind = np.zeros(locElRow * dim, dtype=np.int32)
+
+            ddns_nnz_ind = np.zeros(locElRow * dim, dtype=np.int32)
+            odns_nnz_ind = np.zeros(locElRow * dim, dtype=np.int32)
+
+            dwns_nnz_ind = dw_nnz_ind[locIndicesDir]
+            owns_nnz_ind = ow_nnz_ind[locIndicesDir]
+
+            ddns_nnz_ind = dd_nnz_ind[locIndicesDir]
+            odns_nnz_ind = od_nnz_ind[locIndicesDir]
+
+            self.Rwfs =self.createEmptyMat(vel_dofs,vort_dofs, dwns_nnz_ind, owns_nnz_ind)
+            self.Rwfs.setName("Rwfs")
+            self.kle.append(self.Rwfs)
+            self.Rdfs =self.createEmptyMat(vel_dofs,locElRow, ddns_nnz_ind, odns_nnz_ind)
+            self.Rdfs.setName("Rdfs")
+            self.kle.append(self.Rdfs)
 
         dw_nnz_ind[locIndicesDir] = 0
         ow_nnz_ind[locIndicesDir] = 0
@@ -297,7 +318,3 @@ class Operators(MatFS):
         self.weigSrT.destroy()
         self.weigCurl.destroy()
         self.weigDivSrT.destroy()
-
-
-if  __name__ == "__main__":
-    mat = Mat(2)
