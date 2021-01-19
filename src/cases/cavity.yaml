@@ -1,5 +1,6 @@
 ---
 name: Cavity
+save-dir: cavity-test
 
 material-properties:
   rho: 0.5
@@ -8,22 +9,21 @@ material-properties:
 domain:
   ngl: 3
   box-mesh:
-    nelem: [20,20]
+    nelem: [50,50]
     lower: [0,0]
-    upper: [6,6]
+    upper: [1,1]
   
 time-solver:
-  max-steps: 500
+  max-steps: 1200
   start-time: 0
   end-time: 1000
 
 boundary-conditions:
   no-slip:
-    up: [0.1 ,0 ]
+    up: [2 ,0 ]
     down: [0, 0]
     left: [0, 0]
     right: [0, 0]
 
 initial-conditions:
-  velocity: [0, 0]
   vorticity: [0]
