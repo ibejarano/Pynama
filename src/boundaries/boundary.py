@@ -42,6 +42,11 @@ class Boundary:
         val = getattr(self, 'velocity')
         return val
 
+    def getVelocitySettedTangential(self):
+        val = getattr(self, 'velocity')
+        tangDofs = self.__dirs.getTangentials()
+        return val[tangDofs]
+
     def getDirectionsConstrained(self):
         xyz = np.array(('x', 'y', 'z'))
         return str(xyz[self.__dofsConstrained])
@@ -61,6 +66,7 @@ class Boundary:
         pInds = PETSc.IS().createBlock(self.__dofsConstrained, nodes)
         self.__inds = pInds
         self.__size = len(pInds.getIndices())
+        self.__nnodes = len(pInds.getBlockIndices())
 
     def getDofsConstrained(self):
         """Returns an array with dofs constrained in this boundary
@@ -86,6 +92,9 @@ class Boundary:
 
     def getNodes(self):
         return self.__inds.getBlockIndices()
+
+    def getNumOfNodes(self):
+        return self.__nnodes
 
     def getSize(self):
         return self.__size

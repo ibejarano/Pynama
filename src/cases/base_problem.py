@@ -117,9 +117,9 @@ class BaseProblem(object):
         self.dom.applyBoundaryConditions(vel, "velocity", t, self.nu)
 
         if self.solverKLE.isNS():
-            self.solverKLE.solveFS(vort)
+            self.solverKLE.solveFS(self.vort)
             velFS = self.solverKLE.getFreeSlipSolution()
-            self.dom.applyBoundaryConditions(velFS, "velocity", t, self.nu)
+            self.dom.applyBoundaryConditionsFS(velFS, "velocity", t, self.nu)
             self.operator.Curl.mult(velFS, self.vort)
 
         self.solverKLE.solve(vort)
@@ -223,7 +223,7 @@ class BaseProblem(object):
         vort.assemble()
         vel.assemble()
         self.vort = vort
-        self.ts.setSolution(vort)
+        # self.ts.setSolution(vort)
 
         # self.viewer.saveData(0, initTime, vel, vort)
         # self.viewer.writeXmf(self.caseName)

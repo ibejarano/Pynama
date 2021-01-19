@@ -250,6 +250,24 @@ class BoundaryConditions:
             vec.setValues(inds, arr, addv=False)
         vec.assemble()
 
+    def setTangentialValuesToVec(self, vec, name, t, nu):
+        """This method is useful to impose the no slip condition"""
+        
+        for bc in self.__nsBoundaries:
+            
+            indsTang = bc.getTangDofs()
+            collectIndices = self.comm.tompi4py().allgather(indsTang)
+
+            for remoteIndices in collectIndices:
+                indsTang |= remoteIndices
+
+            velTang = bc.getVelocitySettedTangential()
+            numNodes = bc.getNumOfNodes()
+            arr = np.tile( velTang, numNodes)
+            vec.setValues(list(indsTang), arr, addv=False)
+
+        vec.assemble()
+
     def getFreeStreamVelocity(self):
         boundary = self.__boundaries[0]
         vels = boundary.getVelocitySetted()

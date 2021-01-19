@@ -52,7 +52,7 @@ class KspSolver(KSP):
         self.logger = logging.getLogger("KSP Solver")
         self.logger.debug("setupKSP")
         self.create(self.comm)
-        self.setType('preonly')
+        self.setType('gmres')
         pc = PC().create()
         pc.setType('lu')
         self.setPC(pc)
