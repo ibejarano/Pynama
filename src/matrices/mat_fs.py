@@ -120,15 +120,16 @@ class MatFS:
         self.K.assemble()
 
     def printMatsInfo(self):
-        print(" MATS INFO ")
-        print(f"Mat   | Memory Used [B]  | NZ Unneeded")
-        print(f"--------------------------------------")
-        for m in self.mats:
+        self.logger.info(" MATS INFO ")
+        self.logger.info(f"Mat   | Memory Used [B]  | NZ Unneeded")
+        self.logger.info(f"--------------------------------------")
+        for m in self.kle:
             info = m.getInfo()
-            print(self.formatMatInfo(m.getName(), info))
+            self.logger.info(f" {self.formatMatInfo(m.getName(), info)}")
+            self.logger.info(f"La matriz {m.getName()} es simetrica: {m.isSymmetric()}" )
 
     def build(self, buildKLE=True, buildOperators=True):
-        locNodesDirichlet = np.array(list(self.__dom.getNodesDirichlet()))
+        locNodesDirichlet = np.array(list(self.dom.getNodesDirichlet()))
         nodeStart, _ = self.dom.getNodesRange()
         locNodesDirichlet -= nodeStart
         globNodesDirichlet = self.dom.getNodesDirichlet(collect=True)
@@ -147,7 +148,7 @@ class MatFS:
         self.buildOperators()
 
     def buildFS(self, globNodesDirichlet):
-        cellStart , cellEnd = self.__dom.getLocalCellRange()
+        cellStart , cellEnd = self.dom.getLocalCellRange()
         dim = self.dom.getDimension()
         for cell in range(cellStart, cellEnd):
             nodes , inds , localMats = self.dom.computeLocalKLEMats(cell)
@@ -189,12 +190,6 @@ class MatFS:
         self.assembleAll()
         if not self.comm.rank:
             self.logger.info(f"KLE Matrices builded")
-
-    def createSolver(self):
-        solver = KspSolver()
-        solver.createSolver(self.K)
-
-        return solver
 
     def buildOperators(self):
         cellStart, cellEnd = self.dom.getLocalCellRange()

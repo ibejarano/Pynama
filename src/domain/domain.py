@@ -264,6 +264,10 @@ class Domain:
         assert self.__bc, "Boundary conditions not defined"
         self.__bc.setValuesToVec(vec, varName, t, nu)
 
+    def applyBoundaryConditionsFS(self, vec, varName, t=None, nu=None):
+        assert self.__bc, "Boundary conditions not defined"
+        self.__bc.setTangentialValuesToVec(vec, varName, t, nu)
+
     # -- apply values to vec
 
     def applyValuesToVec(self, nodes, vals, vec):
