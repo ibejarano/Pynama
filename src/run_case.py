@@ -152,7 +152,7 @@ def timeSolving(config):
     if not fem.comm.rank:
         fem.logger.info("Solving problem...")
     fem.timer.tic()
-    fem.ts.solve()
+    fem.ts.solve(fem.vort)
     if not fem.comm.rank:
         fem.logger.info(f"Solver Finished in {fem.timer.toc()} seconds")
         fem.logger.info(f"Total time: {fem.timerTotal.toc()} seconds")

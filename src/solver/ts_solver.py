@@ -5,7 +5,7 @@ class TsSolver(TS):
     def __init__(self, comm=COMM_WORLD):
         self.create(comm)
         self.setProblemType(self.ProblemType.NONLINEAR)
-        # self.setEquationType(self.EquationType.ODE_EXPLICIT)
+        self.setEquationType(self.EquationType.ODE_EXPLICIT)
         self.setType('rk')
         self.setRKType('5bs')
 
@@ -21,7 +21,3 @@ class TsSolver(TS):
         self.setRHSFunction(rhsFunction)
         self.setPostStep(convergedStepFunction)
         self.setFromOptions()
-
-    def solve(self):
-        vort = self.getSolution()
-        super().solve(vort)
