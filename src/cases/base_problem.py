@@ -19,7 +19,7 @@ class BaseProblem(object):
         """
         comm: MPI Communicator
         """
-        self.comm = MPI.COMM_WORLD
+        self.comm = PETSc.COMM_WORLD
         self.timerTotal= Timer()
         self.timerTotal.tic()
         self.timer = Timer()
@@ -209,16 +209,15 @@ class BaseProblem(object):
                 vort.setValues(inds ,arrVort, addv=False)
 
             vel.setValues(inds, arrVel, addv=False)
-            if not keepCoords:
-                self.dom.destroyCoordVec()
 
         else:
-            self.dom.destroyCoordVec()
             if "velocity" in initialConditions and "vorticity" not in initialConditions:
                 velArr = initialConditions['velocity']
                 velArr = np.tile(velArr, len(nodes))
                 self.logger.info("Computing Curl to initial velocity to get initial Vorticity")
                 vel.setValues( inds , velArr)
+        if not keepCoords:
+            self.dom.destroyCoordVec()
 
         vort.assemble()
         vel.assemble()

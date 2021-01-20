@@ -8,7 +8,7 @@ from mpi4py import MPI
 from petsc4py import PETSc
 from viewer.paraviewer import Paraviewer
 # from viewer.plotter import DualAxesPlotter
-from solver.ksp_solver import KspSolver
+from solver.kle_solver import KspSolver
 from domain.immersed_body import Circle, Line, BodiesContainer
 # import matplotlib.pyplot as plt
 import yaml
@@ -141,30 +141,17 @@ class ImmersedBoundaryStatic(BaseProblem):
         self.operator.Curl.mult(self.vel, self.vort)
 
     def setUpSolver(self):
-        self.solver = KspSolver()
-        self.solver.createSolver(self.mat.K, self.comm)
-        self.vel = self.mat.K.createVecRight()
-        self.vel.setName("velocity")
-        self.vort = self.mat.Rw.createVecRight()
-        self.vort.setName("vorticity")
-        self.vort.set(0.0)
+        super().setUpSolver()
 
-        self.vel_correction = self.vel.copy()
+        vel = self.solverKLE.getSolution()
+
+        self.vel_correction = vel.copy()
         self.vel_correction.setName("velocity_correction")
-        self.vort_correction = self.vort.copy()
-        self.vort_correction.setName("vorticity_correction")
 
         self.virtualFlux = self.S.createVecRight()
         self.virtualFlux.setName("virtual_flux")
         self.ibm_rhs = self.S.createVecRight()
 
-        sK, eK = self.mat.K.getOwnershipRange()
-        locRowsK = eK - sK
-
-        self._VtensV = PETSc.Vec().createMPI(
-            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
-        self._Aux1 = PETSc.Vec().createMPI(
-            ((locRowsK * self.dim_s / self.dim, None)), comm=self.comm)
 
     def applyBoundaryConditions(self, time):
         self.vel.set(0.0)
@@ -216,7 +203,7 @@ class ImmersedBoundaryStatic(BaseProblem):
         self.H.scale(self.nodeSeparation**2)
         A = self.H.matMult(self.S)
         self.ksp = KspSolver()
-        self.ksp.createSolver(A, self.comm)
+        self.ksp.createSolver(A)
         self.logger.info("IBM Matrices builded")
         return list(nodes)
 
