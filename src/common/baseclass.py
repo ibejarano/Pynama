@@ -5,8 +5,8 @@ class Base(object):
     """
     ex Abstracty
     """
-    def __init__(self, dim, comm=MPI.COMM_WORLD):
-        self.comm = comm
+    def __init__(self, dim):
+        # self.comm = comm
         self.dim = dim
         self.dim_w = 1 if dim == 2 else 3
         self.dim_s = 3 if dim == 2 else 6
