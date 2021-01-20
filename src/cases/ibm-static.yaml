@@ -13,6 +13,10 @@ domain:
   # gmsh-file: sbs-d3-h04.msh
   # h-min: 0.04
 
+initial-conditions:
+  keep-coords: True
+  vorticity: [0]
+
 boundary-conditions:
   uniform:
     re: 10
