@@ -27,3 +27,8 @@ initial-conditions:
   custom-func:
     name: taylor_green
     attributes: ['velocity', 'vorticity', 'alpha']
+
+tests:
+  custom-func:
+    name: taylor_green
+    attributes: ['velocity', 'vorticity', 'alpha']

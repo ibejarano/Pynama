@@ -177,6 +177,15 @@ class BaseProblem(object):
         assert 'initial-conditions' in self.config, "Initial conditions not defined"
         self.setUpInitialConditions()
 
+        self.clean()
+
+
+    def clean(self):
+        keepCoords = self.opts.get('keepCoords')
+        if not keepCoords:
+            self.dom.destroyCoordVec()
+
+
     def setUpInitialConditions(self):
         self.logger.info("Computing initial conditions")
         initTime = self.ts.getTime()
@@ -185,7 +194,6 @@ class BaseProblem(object):
         vel = self.solverKLE.getSolution()
 
         initialConditions = self.config['initial-conditions']
-        keepCoords = initialConditions.get("keep-coords", False)
 
         nodes = self.dom.getAllNodes()
         inds = [ node*self.dim + dof for node in nodes for dof in range(self.dim) ]
@@ -216,8 +224,6 @@ class BaseProblem(object):
                 velArr = np.tile(velArr, len(nodes))
                 self.logger.info("Computing Curl to initial velocity to get initial Vorticity")
                 vel.setValues( inds , velArr)
-        if not keepCoords:
-            self.dom.destroyCoordVec()
 
         vort.assemble()
         vel.assemble()
@@ -234,17 +240,35 @@ class BaseProblem(object):
 
 class BaseProblemTest(BaseProblem):
 
-    def generateExactVecs(self, time):
+    def generateExactVecs(self,vel=None, vort=None ,time=None):
         exactVel = self.mat.K.createVecRight()
         exactVort = self.mat.Rw.createVecRight()
         exactVel.setName(f"{self.caseName}-exact-vel")
         exactVort.setName(f"{self.caseName}-exact-vort")
         allNodes = self.dom.getAllNodes()
-        # generate a new function with t=constant and coords variable
-        fvel_coords = lambda coords: self.velFunction(coords, self.nu, t=time)
-        fvort_coords = lambda coords: self.vortFunction(coords, self.nu, t=time)
-        exactVel = self.dom.applyFunctionVecToVec(allNodes, fvel_coords, exactVel, self.dim)
-        exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort, self.dim_w)
+        inds_w = [node*self.dim_w + dof for node in allNodes for dof in range(self.dim_w)]
+        inds = [node*self.dim + dof for node in allNodes for dof in range(self.dim)]
+        if vel and vort:
+            arrVel = np.tile(vel, len(allNodes))
+            arrVort =  np.tile(vort, len(allNodes))
+        else:
+            customFunc = self.config['tests']['custom-func']
+            relativePath = f".{customFunc['name']}"
+            functionLib = importlib.import_module(relativePath, package='functions')
+
+            funcVel = functionLib.velocity
+            funcVort = functionLib.vorticity
+            alpha = functionLib.alpha(self.nu, time)
+
+            coords = self.dom.getFullCoordArray()
+            arrVel = funcVel(coords, alpha)
+            arrVort = funcVort(coords, alpha)
+
+        exactVort.setValues(inds_w, arrVort)
+        exactVel.setValues(inds, arrVel)
+        exactVel.assemble()
+        exactVort.assemble()
+
         return exactVel, exactVort
 
     def solveKLETests(self, steps=10):
