@@ -1,6 +1,6 @@
 from petsc4py import PETSc
 import logging
-from viewer.xml_generator import XmlGenerator
+from viewer.xml_generator import XmlGenerator2
 import os
 import yaml
 
@@ -16,7 +16,7 @@ class Paraviewer:
         if not self.comm.rank and not os.path.isdir(self.saveDir):
             os.makedirs(f"./{self.saveDir}")
         self.h5name = "vec-data"
-        self.xmlWriter = XmlGenerator(dim, self.h5name)
+        self.xmlWriter = XmlGenerator2(dim, self.h5name)
 
     def saveMesh(self, coords, name='mesh'):
         totalNodes = int(coords.size / self.xmlWriter.dim)
@@ -26,11 +26,11 @@ class Paraviewer:
         coords.setName(name)
         ViewHDF5 = PETSc.Viewer()
         try:
-            ViewHDF5.createHDF5(f'{self.saveDir}/mesh.h5', mode=PETSc.Viewer.Mode.WRITE,
+            ViewHDF5.createHDF5(f'{self.saveDir}/{name}.h5', mode=PETSc.Viewer.Mode.WRITE,
                             comm=self.comm)
         except:
             os.makedirs(f"./{self.saveDir}")
-            ViewHDF5.createHDF5(f'./{self.saveDir}/mesh.h5', mode=PETSc.Viewer.Mode.WRITE,
+            ViewHDF5.createHDF5(f'./{self.saveDir}/{name}.h5', mode=PETSc.Viewer.Mode.WRITE,
                             comm=self.comm)
 
         ViewHDF5.view(obj=coords)

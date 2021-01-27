@@ -42,7 +42,7 @@ class XmlGenerator(object):
         geometryData.set("Dimensions" , str(self.dimensions*self.dim))
         geometryData.set("NumberType", "Float")
         geometryData.set("Format","HDF")
-        geometryData.text = "mesh.h5:/fields/mesh"
+        geometryData.text = "mesh.h5:/mesh"
 
         return meshGrid
 
@@ -129,6 +129,19 @@ class XmlGenerator(object):
             out += "${}, ".format(i)
         out += "${})".format(dof)
         return out
+
+class XmlGenerator2(XmlGenerator):
+    def setVectorAttribute(self, name, step, meshGrid):
+        attr = SubElement(meshGrid, "Attribute")
+        attr.set("Name", name)
+        attr.set("AttributeType", "Vector")
+        attr.set("Center", "Node")
+
+        attrData = SubElement(attr, "DataItem")
+        attrData.set("Dimensions", f"{self.dimensions} {self.dim}")
+        attrData.set("NumberType", "Float")
+        attrData.set("Format", "HDF")
+        attrData.text = f"{self.h5name}-{step:05d}.h5:/fields/{name}"
 
 if __name__ == "__main__":
     # Ejemplo
