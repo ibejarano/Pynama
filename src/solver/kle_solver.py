@@ -52,10 +52,25 @@ class KspSolver(KSP):
         self.logger = logging.getLogger("KSP Solver")
         self.logger.debug("setupKSP")
         self.create(self.comm)
-        self.setType('gmres')
+        self.setType('preonly')
         pc = PC().create()
         pc.setType('lu')
         self.setPC(pc)
         self.setFromOptions()
         self.setOperators(mat)
         self.setUp()
+
+    def setRHS(self, Rw, Krhs):
+        self.Rw = Rw
+        self.Krhs = Krhs
+
+    def solve(self, vort, vel, solution):
+        rhs = self.Rw * vort + self.Krhs * vel
+        super().solve(rhs, solution)
+
+    def destroy(self):
+        if self.Rw and self.Krhs:
+            self.Rw.destroy()
+            self.Krhs.destroy()
+
+        super().destroy()
