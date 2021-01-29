@@ -89,6 +89,10 @@ class Spectral(Element):
             self.computeMats3D(cnodes1D, nodes1D, operWei)
         (self.HCoo1D, _) = self.interpFun1D(cnodes1D, nodes1D)
 
+    def computeJacobian(self, coords):
+        J = self.HrsCoo[0].dot(coords)
+        return J
+
     def getElemKLEMatrices(self, coords):
         """Get the elementary matrices of the KLE Method."""
         # self.logger.debug("getElemKLEMatrices")
@@ -117,12 +121,16 @@ class Spectral(Element):
         # Vorticty curl
         Bw_curl = np.zeros((self.dim, self.dim_w*elTotNodes))
 
+        J = self.computeJacobian(coords)
+        invJ = inv(J)
+        detJ = det(J)
+
         for idx, gp in enumerate(self.gps):
             Hrs = self.Hrs[idx]
             H = self.H[idx]
-            J = self.HrsCoo[idx].dot(coords)
-            Hxy = inv(J).dot(Hrs)
-            detJ = det(J)
+            # J = self.HrsCoo[idx].dot(coords)
+            Hxy = invJ.dot(Hrs)
+            # detJ = det(J)
 
             for nd in range(self.dim):
                 B_gr[self.dim*nd:self.dim*nd + self.dim, nd::self.dim] = Hxy
@@ -140,9 +148,9 @@ class Spectral(Element):
         for idx, gp in enumerate(self.gpsRed):
             Hrs = self.HrsRed[idx]
             H = self.HRed[idx]
-            J = self.HrsCooRed[idx].dot(coords)
-            Hxy = inv(J).dot(Hrs)
-            detJ = det(J)
+            # J = self.HrsCooRed[idx].dot(coords)
+            # Hxy = inv(J).dot(Hrs)
+            # detJ = det(J)
 
             for nd in range(self.dim):
                 B_div[0, nd::self.dim] = Hxy[nd]
@@ -279,8 +287,6 @@ class Spectral(Element):
             auxRow = [reduce(operator.mul, twoPle, 1) for twoPle
                       in itertools.product(*doubleTern)]
             H.append(np.array([auxRow[y] for y in invPerm]))
-            # print("inv",invPerm)
-            # print("aux",auxRow)
 
         # Derivatives of H wrt R & S
         Hrs = list()
@@ -432,3 +438,99 @@ class Spectral(Element):
 
         invPerm = [Permlst.index(val) for val in range(len(Permlst))]
         return invPerm
+
+
+class Spectral2(Spectral):
+    def computeMats2D(self, nodes1D, gps1D, gps1Dwei):
+        (h1D, dh1D) = self.interpFun1D(nodes1D, gps1D)
+        nNodes = len(nodes1D)
+        ngps = len(gps1D)
+        if nNodes > 1:
+            Ind = np.zeros((nNodes, nNodes), dtype=int)
+            Ind[np.ix_([0, -1], [0, -1])] = np.array([[2, 1], [3, 4]])
+
+            if nNodes > 2:
+                Ind[np.ix_([0], range(1, nNodes-1))] = \
+                    np.array([range(5 + nNodes - 3, 4, -1)])
+
+
+                # THIS
+                Ind[np.ix_(range(1, nNodes - 1), [0])] = \
+                    np.array([range(2 * nNodes , 5 + nNodes - 3, -1)]).T
+
+                ## this
+                Ind[np.ix_( [nNodes - 1], range(1, nNodes - 1)  )] = \
+                    np.array([ range( 3 * nNodes - 2, 2 * nNodes ,-1)])
+
+                Ind[np.ix_(range(1, nNodes - 1), [nNodes - 1])] = \
+                    np.array([range(4 * nNodes - 4, 3 * nNodes - 2, -1)]).T
+                Ind[np.ix_(range(1, nNodes - 1), range(1, nNodes - 1))] = \
+                    np.arange(4 * nNodes - 3, nNodes ** 2 + 1).reshape(
+                    nNodes - 2, nNodes - 2).T
+            Ind -= 1
+
+            Permlst = Ind[::-1].T.reshape(1, np.prod(Ind.shape))[0].tolist()
+        else:
+            Permlst = [0]
+
+        invPerm = [Permlst.index(val) for val in range(len(Permlst))]
+
+        # Reorder evaluation points
+        if ngps > 1:
+            Ind2 = np.zeros((ngps, ngps), dtype=int)
+            Ind2[np.ix_([0, -1], [0, -1])] = np.array([[2, 1], [3, 4]])
+
+            if ngps > 2:
+                Ind2[np.ix_([0], range(1, ngps-1))] = \
+                    np.array([range(5 + ngps - 3, 4, -1)])
+
+
+                # THIS
+                Ind2[np.ix_(range(1, ngps - 1), [0])] = \
+                    np.array([range(2 * ngps , 5 + ngps - 3, -1)]).T
+
+                ## this
+                Ind2[np.ix_( [ngps - 1], range(1, ngps - 1)  )] = \
+                    np.array([ range( 3 * ngps - 2, 2 * ngps ,-1)])
+                    
+                Ind2[np.ix_(range(1, ngps - 1), [ngps - 1])] = \
+                    np.array([range(4 * ngps - 4, 3 * ngps - 2, -1)]).T
+                Ind2[np.ix_(range(1, ngps - 1), range(1, ngps - 1))] = \
+                    np.arange(4 * ngps - 3, ngps ** 2 + 1).reshape(
+                    ngps - 2, ngps - 2).T
+            Ind2 -= 1
+
+            Permlst2 = Ind2[::-1].T.reshape(1, np.prod(Ind2.shape))[0].tolist()
+        else:
+            Permlst2 = [0]
+
+        invPerm2 = [Permlst2.index(val) for val in range(len(Permlst2))]
+
+        # Interpolation functions H
+        H = list()
+        for doubleTern in itertools.product(h1D, h1D):
+            auxRow = [reduce(operator.mul, twoPle, 1) for twoPle
+                      in itertools.product(*doubleTern)]
+            H.append(np.array([auxRow[y] for y in invPerm]))
+            # print("inv",invPerm)
+            # print("aux",auxRow)
+
+        # Derivatives of H wrt R & S
+        Hrs = list()
+        for doubleTern in itertools.product(dh1D, h1D):
+            auxRow = [reduce(operator.mul, twoPle, 1) for twoPle
+                      in itertools.product(*doubleTern)]
+            Hrs.append(np.array([[auxRow[y] for y in invPerm],
+                               [0]*len(invPerm)]))
+
+        for ind, doubleTern in enumerate(itertools.product(h1D, dh1D)):
+            auxRow = [reduce(operator.mul, twoPle, 1) for twoPle
+                      in itertools.product(*doubleTern)]
+            Hrs[ind][1, :] = [auxRow[y] for y in invPerm]
+
+        gps = generateGaussPoints2D(gps1D, gps1Dwei)
+        H = [H[i] for i in invPerm2]
+        Hrs = [Hrs[i] for i in invPerm2]
+        gps = [gps[i] for i in invPerm2]
+
+        return (H, Hrs, gps)
