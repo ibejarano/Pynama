@@ -1,13 +1,12 @@
+import petsc4py, sys
+petsc4py.init(sys.argv)
 from matrices.new_mat import Matrices
 from solver.kle_solver import KspSolver
 from viewer.paraviewer import Paraviewer
 from functions.taylor_green import velocity, vorticity, alpha
+
+
 from petsc4py import PETSc
-
-import petsc4py
-import sys
-petsc4py.init(sys.argv)
-
 import numpy as np
 import yaml
 import logging
@@ -30,6 +29,11 @@ class MainProblem(object):
         except:
             self.logger.info(f"File '{config}' file not found")
 
+
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger("Main")
+        self.logger = logger
+        self.logger.info("Init problem...")
         self.opts = kwargs
         # TODO setFromOptions
         self.validate(config)
@@ -77,6 +81,7 @@ class MainProblem(object):
             raise Exception("Wrong boundary conditions")
 
     def setUp(self):
+        OptDB = PETSc.Options()
         self.dm = self.setUpDomain(**self.opts)
         self.bc = None
 
@@ -86,6 +91,7 @@ class MainProblem(object):
 
         self.solver = KspSolver()
         self.solver.createSolver(K)
+        self.solver.setFromOptions()
 
         vort = Rw.createVecRight()
         vort.setName("vorticity")
@@ -129,8 +135,7 @@ class MainProblem(object):
         return dm
         
     def assembleMatrices(self):
-        K, Krhs = self.mats.assembleK()
-        Rw = self.mats.assembleRw()
+        K, Krhs, Rw = self.mats.assembleKLEMatrices()
         return K, Krhs, Rw
 
     def solveKLE(self, vort, t=None):

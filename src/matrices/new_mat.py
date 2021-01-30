@@ -11,7 +11,6 @@ class Matrices:
 
     def preallocKrhs(self):
         dm = self.__dm
-
         bcPoints = set(dm.getStratumIS('marker', 1).getIndices())
         bcCells = dm.getStratumIS('boundary', 1)
         
@@ -68,22 +67,37 @@ class Matrices:
         mat = PETSc.Mat().createAIJ(size=(totalDofsFree, cols),nnz=(d_nnz, 0))
         return mat
 
-    def assembleK(self):
+    def assembleKLEMatrices(self):
         dm = self.__dm
-
+        countCells = 0
         K = dm.createMat()
+        Rw = self.preallocRw()
+        dim = dm.getDimension()
+        assert dim == 2, "Not implemented for dim = 3"
+        dim_w = 1
         borderCells = dm.getStratumIS('boundary', 1)
         assert dm.getDimension() == 2, "Check if celltype = 4 in dim = 3"
         allCells = dm.getStratumIS('celltype', 4)
         insideCells = allCells.difference(borderCells)
+        lgmap = dm.getLGMap()
         for cell in insideCells.getIndices():
-            # Get jacobian insted of this
-            locK, _, _ = dm.computeLocalMatrices(cell)
+            locK, locRw, _ = dm.computeLocalMatrices(cell)
             velDofs = dm.getGlobalVelocityDofsFromCell(cell).astype(np.int32)
-            velDofsElem = list(range(len(velDofs)))
+            allVels = dm.getLocalVelocityDofsFromCell(cell).astype(np.int32)
+            toGl = lgmap.applyInverse(velDofs)
+            velDofsElem = [np.where( allVels == i )[0][0] for i in toGl ]
             
             K.setValues(velDofs, velDofs,
                         locK[np.ix_(velDofsElem, velDofsElem)], addv=True)
+
+            vortDofs = [ int(dof*dim_w/dim) for dof in allVels[::dim]]
+            vortDofsElem = list(range(len(vortDofs)))
+            
+            Rw.setValues(velDofs, vortDofs,
+                       locRw[np.ix_(velDofsElem, vortDofsElem)], addv=True)
+
+            countCells += 1
+            self.printProgress(countCells)
 
         bcPoints = dm.getStratumIS('marker', 1).getIndices()
         
@@ -93,47 +107,43 @@ class Matrices:
             bcDofs = np.append(bcDofs, arrtmp).astype(np.int32)
         
         Krhs = self.preallocKrhs()
-
         bcDofs = set(bcDofs)
-        
         for cell in borderCells.getIndices():
-            velDofs = dm.getLocalVelocityDofsFromCell(cell)
-            localDofsConstraint = list(set(velDofs) & bcDofs)
-            localDofs = list(set(velDofs) - bcDofs)
-            elemDofs = [np.where( velDofs == i )[0][0] for i in localDofs ]
-            elemConstraint = [np.where( velDofs == i )[0][0] for i in localDofsConstraint ]
+            glVelIndices = dm.getLocalVelocityDofsFromCell(cell).astype(np.int32)
+            glVelConstraint = list(set(glVelIndices) & bcDofs)
+            glVelDofs = list(set(glVelIndices) - bcDofs)
+
+            elemDofs = [np.where( glVelIndices == i )[0][0] for i in glVelDofs ]
+            elemConstraint = [np.where( glVelIndices == i )[0][0] for i in glVelConstraint ]
            
-            locK, _, _ = dm.computeLocalMatrices(cell)
-            
-            K.setValuesLocal(localDofs, localDofs, locK[np.ix_(elemDofs, elemDofs)], addv=True)
-            lgmap = K.getLGMap()[0]
-            glDofs = lgmap.apply(localDofs)
-            Krhs.setValues(glDofs, localDofsConstraint,-locK[np.ix_(elemDofs, elemConstraint)], addv=True )
+            locK, locRw, _ = dm.computeLocalMatrices(cell)
+
+            K.setValuesLocal(glVelDofs, glVelDofs, locK[np.ix_(elemDofs, elemDofs)], addv=True)
+
+            localDofs = lgmap.apply(glVelDofs)
+
+            Krhs.setValues(localDofs, glVelConstraint,-locK[np.ix_(elemDofs, elemConstraint)], addv=True )
+
+            vortIndices = [ int(dof*dim_w/dim) for dof in glVelIndices[::dim]]
+            vortDofsElem = list(range(len(vortIndices)))
+            Rw.setValues(localDofs, vortIndices,
+                       locRw[np.ix_(elemDofs, vortDofsElem)], addv=True)
+            countCells += 1
+            self.printProgress(countCells)
+
         K.assemble()
         Krhs.assemble()
-        return K, Krhs
-
-
-    def assembleRw(self):
-        Rw = self.preallocRw()
-        dm = self.__dm
-        dim = dm.getDimension()
-        assert dim == 2, "Not implemented for dim = 3"
-        dim_w = 1
-        lgmap = dm.getLGMap()
-        for cell in range(*dm.getCellRange()):
-            _ , locRw , _ = dm.computeLocalMatrices(cell)
-            velDofs = dm.getGlobalVelocityDofsFromCell(cell).astype(np.int32)
-            allVels = dm.getLocalVelocityDofsFromCell(cell).astype(np.int32)
-
-            toGl = lgmap.applyInverse(velDofs)
-            velDofsElem = [np.where( allVels == i )[0][0] for i in toGl ]
-
-            vortDofs = [ int(dof*dim_w/dim) for dof in allVels[::dim]]
-            vortDofsElem = list(range(len(vortDofs)))
-            
-            Rw.setValues(velDofs, vortDofs,
-                        locRw[np.ix_(velDofsElem, vortDofsElem)], addv=True)
-
         Rw.assemble()
-        return Rw
+        print(" Matrices ensambladas!")
+        return K, Krhs, Rw
+
+    def printProgress(self, currCell, width=50):
+        totCells = self.__dm.getTotalElements()
+        percent = int(currCell*100 / totCells)
+
+        left = width * percent // 100
+        right = width - left
+
+        print('\r[', '#' * left, '-' * right, ']',
+            f'{currCell}/{totCells} cells',
+            sep='', end='', flush=True)
