@@ -75,18 +75,19 @@ class ImmersedBoundaryStatic(BaseProblem):
             step = self.ts.getStepNumber()
             time = self.ts.time
             sol = self.ts.getSolution()
-            self.solveKLE(time, sol)
+            self.solverKLE.solve(sol)
+            vel = self.solverKLE.getSolution()
             self.computeVelocityCorrection()
-            self.operator.Curl.mult(self.vel, self.vort)
+            self.operator.Curl.mult(vel, self.vort)
             dt = self.ts.getTimeStep()
             self.ts.setSolution(self.vort)
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | DT: {dt:.4e}  ")
             if time > self.ts.getMaxTime():
                 break
             elif i % saveSteps == 0:
-                self.viewer.saveData(step, time, self.vort, self.vel, self.ibmZone ,self.affectedNodes)
+                self.viewer.saveData(step, time, self.vort, vel, self.ibmZone ,self.affectedNodes)
                 self.viewer.writeXmf(self.caseName)
-                self.H.mult(self.vel, self.ibm_rhs)
+                self.H.mult(vel, self.ibm_rhs)
             # if i % int(saveSteps/20) == 0:
             #     cd, cl = self.computeDragForce(dt)
             #     cds.append(cd)
@@ -136,9 +137,10 @@ class ImmersedBoundaryStatic(BaseProblem):
         self.affectedNodes = self.ibmZone.copy()
         self.affectedNodes.setName("affected-nodes")
         self.body.setVelRef(self.U_ref)
-        self.solveKLE(startTime, self.vort)
+        self.solverKLE.solve(self.vort)
+        vel = self.solverKLE.getSolution()
         self.computeVelocityCorrection(t=startTime)
-        self.operator.Curl.mult(self.vel, self.vort)
+        self.operator.Curl.mult(vel, self.vort)
 
     def setUpSolver(self):
         super().setUpSolver()
@@ -160,12 +162,13 @@ class ImmersedBoundaryStatic(BaseProblem):
         self.vort.setValues( self.bcNodes, np.zeros(len(self.bcNodes)) , addv=False )
 
     def computeVelocityCorrection(self, **kwargs):
+        vel = self.solverKLE.getSolution()
         bodyVel = self.body.getVelocity()
-        self.H.mult(self.vel, self.ibm_rhs)
+        self.H.mult(vel, self.ibm_rhs)
         self.ibm_rhs.axpy(-1, bodyVel)
         self.ksp.solve( -self.ibm_rhs, self.virtualFlux)
         self.S.mult(self.virtualFlux, self.vel_correction)
-        self.vel += self.vel_correction
+        vel += self.vel_correction
 
     def createEmptyIBMMatrix(self):
         rows = self.body.getTotalNodes() * self.dim
