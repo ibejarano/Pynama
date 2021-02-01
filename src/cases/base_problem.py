@@ -96,8 +96,7 @@ class BaseProblem(object):
         incr = ts.getTimeStep()
         vort = ts.getSolution()
         vel = self.solverKLE.getSolution()
-        velFS = self.solverKLE.getFreeSlipSolution()
-        self.viewer.saveData(step, time, vel, velFS, vort)
+        self.viewer.saveData(step, time, vel, vort)
         self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
