@@ -5,3 +5,6 @@
 re*
 toplot/
 *checkpoint.ipynb
+*.txt
+*.log
+*.lprof
