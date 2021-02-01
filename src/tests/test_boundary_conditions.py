@@ -1,5 +1,5 @@
-from boundaries.boundary_conditions import BoundaryConditions
-from boundaries.boundary import Boundary, FunctionBoundary
+from domain.boundaries.boundary_conditions import BoundaryConditions
+from domain.boundaries.boundary import Boundary, FunctionBoundary
 from functions.taylor_green import velocity_test, vorticity_test
 
 import unittest

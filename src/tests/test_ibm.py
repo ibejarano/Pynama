@@ -18,7 +18,7 @@ class TestSearch(unittest.TestCase):
     #     self.fem.setUp()
 
     caseYaml = 'ibm-static'
-    caseOpts = {"nelem": [10,10] , "ngl": 3, "lower":[-5,-5] ,"upper":[5,5]}
+    caseOpts = {"nelem": [10,10] , "ngl": 3, "lower":[-5,-5] ,"upper":[5,5], 'keepCoords': True}
     def setUp(self):
         with open(f'src/cases/{self.caseYaml}.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
@@ -67,7 +67,7 @@ class TestSearch(unittest.TestCase):
 class TestDiracRegularGrid(unittest.TestCase):
     def setUp(self):
         case = 'ibm-static'
-        domain = {"nelem": [10,10] , "ngl": 3, "lower":[-5,-5] ,"upper":[5,5]}
+        domain = {"nelem": [10,10] , "ngl": 3, "lower":[-5,-5] ,"upper":[5,5], 'keepCoords': True}
         with open(f'src/cases/{case}.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
         self.fem = ImmersedBoundaryStatic(yamlData, case=case, **domain)
@@ -102,7 +102,7 @@ class TestDiracSpectralRegularGrid(unittest.TestCase):
     # TODO: Need to implement this
     def setUp(self):
         case = 'ibm-static'
-        domain = {"nelem": [10,10] , "ngl": 5, "lower":[-5,-5] ,"upper":[5,5]}
+        domain = {"nelem": [10,10] , "ngl": 5, "lower":[-5,-5] ,"upper":[5,5], 'keepCoords': True}
         with open(f'src/cases/{case}.yaml') as f:
             yamlData = yaml.load(f, Loader=yaml.Loader)
         self.fem = ImmersedBoundaryStatic(yamlData, case=case, **domain)
