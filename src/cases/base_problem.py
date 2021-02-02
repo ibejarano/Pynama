@@ -5,7 +5,7 @@ import importlib
 # Local packages
 from domain.domain import Domain
 from viewer.paraviewer import Paraviewer
-from solver.ts_solver import TsSolver
+from solver.ts_solver import TSSolver
 from matrices.mat_fs import MatFS, Operators
 from matrices.mat_ns import MatNS
 from solver.kle_solver import KleSolver
@@ -72,7 +72,7 @@ class BaseProblem(object):
 
     def setUpTimeSolver(self):
         options = self.config.get("time-solver")
-        self.ts = TsSolver(self.comm)
+        self.ts = TSSolver(self.comm)
         sTime = options['start-time']
         eTime = options['end-time']
         maxSteps = options['max-steps']

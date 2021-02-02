@@ -3,15 +3,10 @@ import petsc4py
 petsc4py.init(sys.argv)
 from cases.base_problem import BaseProblem
 import numpy as np
-import yaml
-from mpi4py import MPI
 from petsc4py import PETSc
-from viewer.paraviewer import Paraviewer
 # from viewer.plotter import DualAxesPlotter
 from solver.kle_solver import KspSolver
 from domain.immersed_body import Circle, Line, BodiesContainer
-# import matplotlib.pyplot as plt
-import yaml
 # ibm imports
 from math import sqrt, sin, pi, ceil, erf, exp, cos, radians
 from common.timer import Timer

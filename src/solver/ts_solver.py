@@ -1,6 +1,6 @@
 from petsc4py.PETSc import TS, COMM_WORLD
 
-class TsSolver(TS):
+class TSSolver(TS):
     rk_types = ["3", "5f", "5bs"]
     def __init__(self, comm=COMM_WORLD):
         self.create(comm)
