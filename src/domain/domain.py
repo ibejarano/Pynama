@@ -130,6 +130,9 @@ class Domain:
     def getNGL(self):
         return self.__ngl
 
+    def getDM(self):
+        return self.__dm
+
     def getNumOfElements(self):
         return self.__dm.getTotalElements()
 
