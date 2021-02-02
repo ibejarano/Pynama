@@ -167,6 +167,7 @@ class BaseProblem(object):
         self.solverKLE = KleSolver()
         self.solverKLE.setMat(mat)
         self.solverKLE.setUp()
+        self.solverKLE.solver.setRHS(self.mat.Rw, self.mat.Krhs)
 
         self.operator = mat.getOperators()
 
