@@ -5,7 +5,7 @@ from petsc4py import PETSc
 import numpy as np
 import logging
 from math import pi, floor
-from .elements.spectral import Spectral2
+from .elements.spectral import Spectral
 
 class DMPlexDom(PETSc.DMPlex):
     comm = PETSc.COMM_WORLD
@@ -53,18 +53,24 @@ class DMPlexDom(PETSc.DMPlex):
 
     def createElement(self):
         assert self.__ngl, "NGL Not defined"
-        self.__elem = Spectral2(self.__ngl, self.getDimension())
+        self.__elem = Spectral(self.__ngl, self.getDimension())
         self.computeFullCoordinates()
 
     def getNGL(self):
         return self.__ngl
 
     def getLocalVelocityDofsFromCell(self, cell):
-        points, _ = self.getTransitiveClosure(cell)
+        points, oris = self.getTransitiveClosure(cell)
         arr = np.zeros(0, dtype=np.int32)
         points = self.reorderEntities(points)
-        for poi in points:
+        oris = self.reorderEntities(oris)
+        for i, poi in enumerate(points):
             arrtmp = np.arange(*self.getPointLocal(poi))
+            if oris[i] == -2:
+                tmp = arrtmp.copy()
+                tmp[-2::-2] = arrtmp[::2]
+                tmp[::-2] = arrtmp[1::2]
+                arrtmp = tmp
             arr = np.append(arr, arrtmp)
         return arr
 

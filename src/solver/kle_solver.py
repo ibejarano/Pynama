@@ -31,7 +31,7 @@ class KleSolver:
         return self.__isNS
 
     def solve(self, vort):
-        self.solver(self.mat.Rw * vort + self.mat.Krhs * self.__vel, self.__vel)
+        self.solver.solve(vort, self.__vel, self.__vel)
 
     def solveFS(self, vort):
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\
@@ -52,9 +52,9 @@ class KspSolver(KSP):
         self.logger = logging.getLogger("KSP Solver")
         self.logger.debug("setupKSP")
         self.create(self.comm)
-        self.setType('preonly')
+        self.setType('minres')
         pc = PC().create()
-        pc.setType('lu')
+        pc.setType('cholesky')
         self.setPC(pc)
         self.setFromOptions()
         self.setOperators(mat)
