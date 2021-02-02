@@ -38,6 +38,7 @@ class MainProblem(object):
         # TODO setFromOptions
         self.validate(config)
         self.config = config
+        self.nu = kwargs.get('nu', 1)
 
     def validate(self, configData):
         requiredData = ("domain", "boundary-conditions", "material-properties")
@@ -159,14 +160,14 @@ class MainProblem(object):
             bcDofsToSet = np.append(bcDofsToSet, arrtmp).astype(np.int32)
 
         fullcoordArr = dm.getNodesCoordinates(indices=bcDofsToSet)
-        alp = alpha(0.5/0.01, t=0)
+        alp = alpha(self.nu, t=t)
         values = velocity(fullcoordArr, alp)
         glVec.setValues(bcDofsToSet, values)
         glVec.assemble()
         self.dm.restoreLocalVec(glVec)
 
     def computeExactVort(self, t):
-        alp = alpha(0.5/0.01, t=t)
+        alp = alpha(self.nu, t=t)
         dm = self.dm
         vort = self.vort
         dim = self.dm.getDimension()
@@ -185,6 +186,8 @@ class MainProblem(object):
         globalVel = self.dm.getLocalVec()
         self.viewer.saveData(step, time, globalVel)
         self.viewer.writeXmf("TG-testing")
+        self.dm.restoreLocalVec()
+
 
 class TestingFem(MainProblem):
     def __init__(self, nelem, **kwargs):
@@ -192,53 +195,87 @@ class TestingFem(MainProblem):
         boxMesh = {"nelem": nelem, "lower": [0,0], "upper":[1,1]}
         self.config['domain'] = {"box-mesh": boxMesh}
         self.opts = kwargs
+        self.nu = kwargs.get('nu', 1)
 
     def getVelocityErrorNorm(self, t):
-        glVec = self.dm.getLocalVec()
-        exactVel = self.computeExactVel(t)
-        err = (glVec - exactVel).norm(norm_type=2)
-        exactVel.destroy()
-        return err
+        errVec = self.getErrorVec(t)
+        errNorm = errVec.norm(norm_type=2)
+        errVec.destroy()
+        return errNorm
 
-    def computeExactVel(self, t):
-        alp = alpha(0.5/0.01, t=t)
-        dm = self.dm
-        exactVel = self.dm.getLocalVec().duplicate()
+    def getErrorVec(self, t):
+        alp = alpha(self.nu, t)
+        glVec = self.dm.getLocalVec()
+        exactVel = glVec.duplicate()
+        exactVel.setName('exact-vel')
         allDofs = np.arange(len(exactVel.getArray()), dtype=np.int32)
-        coords = dm.getNodesCoordinates(indices=allDofs)
+        coords = self.dm.getNodesCoordinates(indices=allDofs)
         values = velocity(coords, alp)
         exactVel.setValues(np.arange(len(exactVel.getArray()), dtype=np.int32), values)
-        return exactVel
+
+        err = (exactVel-glVec)
+        err.setName('error')
+        exactVel.destroy()
+        self.dm.restoreLocalVec(glVec)
+        return err
+
+    def saveStep(self, step, time):
+        err = self.getErrorVec(time)
+        globalVel = self.dm.getLocalVec()
+        self.viewer.saveData(step, time,  err, globalVel)
+
+
+    def setUpViewer(self):
+        viewer = Paraviewer()
+
+        from datetime import datetime
+        now = datetime.now()
+        currDate = now.strftime("%F")
+        saveDir =  f"{currDate}-testing"
+
+        dim = self.dm.getDimension()
+        viewer.configure(dim, saveDir)
+
+        return viewer
 
 if __name__ == "__main__":
-    fem = MainProblem('taylor-green')
-    fem.setUp()
-    t = 0.0
-    vort = fem.computeExactVort(t)
-    fem.solveKLE(vort, t)
-    fem.saveStep(1, t)
+    opts = PETSc.Options()
+    runTest = opts.getString('test', False)
+
+    if not runTest:
+        fem = MainProblem('taylor-green')
+        fem.setUp()
+        t = 0.0
+        vort = fem.computeExactVort(t)
+        fem.solveKLE(vort, t)
+        fem.saveStep(1, t)
+        print("Finished")
 
 
     # Convergence test
-
-    if False:
+    if runTest == 'kle':
+        nglStart = opts.getInt('nglStart', 3)
+        nglEnd = opts.getInt('nglEnd', 15)
+        fileOut = opts.getString('file-out', f"kle-convergence-ngl{nglStart}to{nglEnd}" )
         ngls=list()
         timeComputed=list()
         errors= list()
         taus = list()
+        nu = 1
+        viscousTimes = [0, 0.05, 0.2, 0.5, 0.75, 0.9]
+        times = [(tau**2)/(4*nu) for tau in viscousTimes]
 
-        for ngl in range(3,15):
+        print("Running convergence KLE Test from ngl: {nglStart} to {nglEnd}")
+
+        for ngl in range(nglStart,nglEnd):
             print("Running test with ngl:", ngl)
-            testFem = TestingFem([3,3], ngl=ngl)
+            testFem = TestingFem([2,2], ngl=ngl)
             testFem.setUp()
-
-            viscousTimes = np.linspace(0, 1, num=11)
-            times = [(tau**2)/(4*0.5/0.01) for tau in viscousTimes]
 
             for i, t in enumerate(times):
                 vort = testFem.computeExactVort(t)
                 testFem.solveKLE(vort, t)
-                err = testFem.getVelocityErrorNorm(t)
+                err = testFem.getErrorVec(t).norm(norm_type=2)
                 
                 ngls.append(ngl)
                 errors.append(err)
@@ -248,8 +285,25 @@ if __name__ == "__main__":
             testFem.destroy()
 
         output = {"ngl": ngls, "errors": errors, "times": timeComputed, "vTimes": taus  }
-        with open('newerror.yaml', 'w') as f:
+        with open(f"{fileOut}.yaml", 'w') as f:
             yaml.dump(output, f)
 
+        print(f"Test finished. File {fileOut}.yaml created")
 
-    print("Finished")
+    if runTest == 'viewError':
+        fem = TestingFem([2,2], ngl=4)
+        fem.setUp()
+        
+        
+        viscousTimes = [0, 0.05, 0.1 , 0.2, 0.5, 0.75, 0.9]
+        times = [(tau**2)/(4*0.5/0.01) for tau in viscousTimes]
+        
+        for step, t in enumerate(times):
+
+            vort = fem.computeExactVort(t)
+            fem.solveKLE(vort, t)
+            fem.saveStep(step, t)
+
+        fem.viewer.writeXmf("TG-testing")
+
+        print("Finished")
