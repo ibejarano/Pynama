@@ -33,21 +33,23 @@ class DMPlexDom(PETSc.DMPlex):
             cell = self.getSupport(f)
             self.setLabelValue('boundary', cell, 1)
 
-    def setFemIndexing(self, ngl):
+    def setFemIndexing(self, ngl,bc=True, dofs=None, fieldName='velocity'):
         fields = 1
         self.__ngl = ngl
 
         self.setNumFields(fields)
         numComp = [1]
+        dofs = dofs if dofs != None else self.getDimension()
 
-        dim = self.getDimension()
+        numDofVel = [ 1*dofs , dofs * (ngl-2) , dofs * (ngl-2)**2 ]
 
-        numDofVel = [ 1*dim , (ngl-2)*dim , dim * (ngl-2)**2 ]
-
-        bcIs = self.getStratumIS('marker', 1)
-        velSec = self.createSection(numComp, numDofVel, 0, bcPoints=[bcIs])
-        velSec.setFieldName(0, 'velocity')
-
+        if bc:
+            bcIs = self.getStratumIS('marker', 1)
+            velSec = self.createSection(numComp, numDofVel, 0, bcPoints=[bcIs])
+        else:
+            velSec = self.createSection(numComp, numDofVel)
+        
+        velSec.setFieldName(0, fieldName)
         self.setDefaultSection(velSec)
         self.velSec = self.getDefaultGlobalSection()
 
@@ -167,6 +169,13 @@ class DMPlexDom(PETSc.DMPlex):
     def computeLocalMatrices(self, cellNum):
         cornerCoords = self.getCellCornersCoords(cellNum)
         return self.__elem.getElemKLEMatrices(cornerCoords)
+
+    def createVortLGMap(self):
+        assert self.getDimension() == 2, "Not implemented for dim 3"
+        velLGMap = self.getLGMap()
+        arr = velLGMap.getBlockIndices()
+        lg = PETSc.LGMap().create(arr)
+        return lg
 
 class NewBoxDom(DMPlexDom):
     """Estrucuted DMPlex Mesh"""
