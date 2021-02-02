@@ -1,12 +1,12 @@
 import unittest 
-from solver.ts_solver import TsSolver
+from solver.ts_solver import TSSolver
 import numpy as np
 import numpy.testing as np_test
 from petsc4py import PETSc
 
 class TaylorGreenTest(unittest.TestCase):
     def setUp(self):
-        self.ts = TsSolver()
+        self.ts = TSSolver()
 
     def test_rungeKutta(self):
         assert self.ts.getType() == 'rk'
