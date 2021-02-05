@@ -2,12 +2,18 @@ from petsc4py import PETSc
 import numpy as np
 import logging
 
+from utils.dm_spectral import reorderEntities, getLocalDofsFromCell, getGlobalDofsFromCell
+from utils.dm import getTotalCells, getCellCornersCoords
+
 class Matrices:
     def __init__(self):
         self.logger = logging.getLogger("Matrices")
 
     def setDM(self, dm):
         self.__dm = dm
+
+    def setElem(self, elem):
+        self.__elem = elem
 
     def preallocKrhs(self):
         dm = self.__dm
@@ -21,7 +27,7 @@ class Matrices:
         
         for cell in bcCells.getIndices():
             points = dm.getTransitiveClosure(cell)[0]
-            points = dm.reorderEntities(points)
+            points = reorderEntities(points)
             bcCellPoints = set(points) & bcPoints
             bcDofs = 0
             for poi in bcCellPoints:
@@ -44,7 +50,7 @@ class Matrices:
         dm = self.__dm
 
         poiTypes = (4, 1, 0)
-        ngl = dm.getNGL()
+        ngl = self.__elem.ngl
         dim = dm.getDimension()
         dim_w = 1
         totalDofsFree = dm.getGlobalVec().getSize()
@@ -80,10 +86,14 @@ class Matrices:
         allCells = dm.getStratumIS('celltype', 4)
         insideCells = allCells.difference(borderCells)
         lgmap = dm.getLGMap()
+
+        startCell, _ = dm.getHeightStratum(0)
+
         for cell in insideCells.getIndices():
-            locK, locRw, _ = dm.computeLocalMatrices(cell)
-            velDofs = dm.getGlobalVelocityDofsFromCell(cell).astype(np.int32)
-            allVels = dm.getLocalVelocityDofsFromCell(cell).astype(np.int32)
+            cellCornerCoords = getCellCornersCoords(dm, startCell, cell )
+            locK, locRw, _ = self.__elem.getElemKLEMatrices(cellCornerCoords)
+            velDofs = getGlobalDofsFromCell(dm, cell)
+            allVels = getLocalDofsFromCell(dm, cell)
             toGl = lgmap.applyInverse(velDofs)
             velDofsElem = [np.where( allVels == i )[0][0] for i in toGl ]
             
@@ -109,14 +119,15 @@ class Matrices:
         Krhs = self.preallocKrhs()
         bcDofs = set(bcDofs)
         for cell in borderCells.getIndices():
-            glVelIndices = dm.getLocalVelocityDofsFromCell(cell).astype(np.int32)
+            glVelIndices = getLocalDofsFromCell(dm, cell)
             glVelConstraint = list(set(glVelIndices) & bcDofs)
             glVelDofs = list(set(glVelIndices) - bcDofs)
 
             elemDofs = [np.where( glVelIndices == i )[0][0] for i in glVelDofs ]
             elemConstraint = [np.where( glVelIndices == i )[0][0] for i in glVelConstraint ]
            
-            locK, locRw, _ = dm.computeLocalMatrices(cell)
+            cellCornerCoords = getCellCornersCoords(dm, startCell, cell )
+            locK, locRw, _ = self.__elem.getElemKLEMatrices(cellCornerCoords)
 
             K.setValuesLocal(glVelDofs, glVelDofs, locK[np.ix_(elemDofs, elemDofs)], addv=True)
 
@@ -138,7 +149,7 @@ class Matrices:
         return K, Krhs, Rw
 
     def printProgress(self, currCell, width=50):
-        totCells = self.__dm.getTotalElements()
+        totCells = getTotalCells(self.__dm)
         percent = int(currCell*100 / totCells)
 
         left = width * percent // 100

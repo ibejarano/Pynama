@@ -4,7 +4,8 @@ from matrices.new_mat import Matrices
 from solver.kle_solver import KspSolver
 from viewer.paraviewer import Paraviewer
 from functions.taylor_green import velocity, vorticity, alpha
-
+from domain.elements.spectral import Spectral
+from utils.dm_spectral import getCoordinates
 
 from petsc4py import PETSc
 import numpy as np
@@ -83,11 +84,13 @@ class MainProblem(object):
 
     def setUp(self):
         OptDB = PETSc.Options()
-        self.dm = self.setUpDomain(**self.opts)
+        self.dm, self.elem = self.setUpDomain(**self.opts)
         self.bc = None
 
         self.mats = Matrices()
         self.mats.setDM(self.dm)
+        self.mats.setElem(self.elem)
+
         K, Krhs, Rw = self.assembleMatrices()
 
         self.solver = KspSolver()
@@ -104,7 +107,10 @@ class MainProblem(object):
 
         self.solver.setRHS(Rw, Krhs)
         self.viewer = self.setUpViewer()
-        self.viewer.saveMesh(self.dm.fullCoordVec)
+
+        coords = self.dm.computeFullCoordinates(self.elem)
+        self.coordVec = coords
+        self.viewer.saveMesh(coords)
 
     def setUpViewer(self):
         viewer = Paraviewer()
@@ -120,20 +126,23 @@ class MainProblem(object):
         return viewer
 
     def setUpDomain(self, box=True, ngl=None):
+        domData = self.config.get('domain')
         if box:
             from domain.dmplex_bc import NewBoxDom as DM
-            data = self.config['domain']['box-mesh'] 
+            data = domData['box-mesh'] 
         else:
             from domain.dmplex_bc import NewGmshDom as DM
-            data = self.config['domain']['gmsh']
+            data = domData['gmsh']
         dm = DM()
+
         dm.create(data)
-        if ngl:
-            dm.setFemIndexing(ngl)
-        else:    
-            dm.setFemIndexing(self.config['domain']['ngl'])
-        dm.createElement()
-        return dm
+        if not ngl:   
+            ngl = domData['ngl']
+
+        dm.setFemIndexing(ngl)
+        dim = dm.getDimension()
+        elem = Spectral(ngl, dim)
+        return dm, elem
         
     def assembleMatrices(self):
         K, Krhs, Rw = self.mats.assembleKLEMatrices()
@@ -159,7 +168,7 @@ class MainProblem(object):
             arrtmp = np.arange(*dm.getPointLocal(poi)).astype(np.int32)
             bcDofsToSet = np.append(bcDofsToSet, arrtmp).astype(np.int32)
 
-        fullcoordArr = dm.getNodesCoordinates(indices=bcDofsToSet)
+        fullcoordArr = getCoordinates(self.dm, self.coordVec, bcDofsToSet)
         alp = alpha(self.nu, t=t)
         values = velocity(fullcoordArr, alp)
         glVec.setValues(bcDofsToSet, values)
@@ -172,7 +181,7 @@ class MainProblem(object):
         vort = self.vort
         dim = self.dm.getDimension()
         allDofs = np.arange(len(vort.getArray())*dim, dtype=np.int32)
-        coords = dm.getNodesCoordinates(indices=allDofs)
+        coords = getCoordinates(self.dm, self.coordVec , allDofs)
         vortValues = vorticity(coords, alp)
         vort.setValues(np.arange(len(vort.getArray()), dtype=np.int32), vortValues)
         return vort
@@ -186,8 +195,7 @@ class MainProblem(object):
         globalVel = self.dm.getLocalVec()
         self.viewer.saveData(step, time, globalVel)
         self.viewer.writeXmf("TG-testing")
-        self.dm.restoreLocalVec()
-
+        self.dm.restoreLocalVec(globalVel)
 
 class TestingFem(MainProblem):
     def __init__(self, nelem, **kwargs):
