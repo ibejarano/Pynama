@@ -8,9 +8,9 @@ def getLocalDofsFromCell(dm, cell):
     points, oris = dm.getTransitiveClosure(cell)
     arr = np.zeros(0, dtype=np.int32)
     points = reorderEntities(points)
-    oris = dm.reorderEntities(oris)
+    oris = reorderEntities(oris)
     for i, poi in enumerate(points):
-        arrtmp = np.arange(*dm.getPointLocal(poi))
+        arrtmp = np.arange(*dm.getPointLocalField(poi, 0))
         if oris[i] == -2:
             tmp = arrtmp.copy()
             tmp[-2::-2] = arrtmp[::2]
@@ -24,7 +24,7 @@ def getGlobalDofsFromCell(dm, cell):
     arr = np.zeros(0, dtype=np.int32)
     points = reorderEntities(points)
     for poi in points:
-        arrtmp = np.arange(*dm.getPointGlobal(poi))
+        arrtmp = np.arange(*dm.getPointGlobalField(poi, 0))
         arr = np.append(arr, arrtmp)
     return arr.astype(np.int32)
 
