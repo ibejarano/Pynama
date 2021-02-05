@@ -88,7 +88,7 @@ class MainProblem(object):
         self.bc = None
 
         self.mats = Matrices()
-        self.mats.setDM(self.dm)
+        self.mats.setDM(self.velDM)
         self.mats.setElem(self.elem)
 
         K, Krhs, Rw = self.assembleMatrices()
@@ -99,9 +99,9 @@ class MainProblem(object):
 
         vort = Rw.createVecRight()
         vort.setName("vorticity")
-        vel = self.dm.getLocalVec()
+        vel = self.velDM.getLocalVec()
         vel.setName("velocity")
-        self.dm.restoreLocalVec(vel)
+        self.velDM.restoreLocalVec(vel)
 
         self.vort = vort
 
@@ -142,6 +142,11 @@ class MainProblem(object):
         dm.setFemIndexing(ngl)
         dim = dm.getDimension()
         elem = Spectral(ngl, dim)
+
+        _, _ , dms = dm.createFieldDecomposition()
+
+        self.velDM, self.vortDM = dms
+
         return dm, elem
         
     def assembleMatrices(self):
@@ -153,14 +158,14 @@ class MainProblem(object):
             # print(f"Setting time-dependant BC t = {t}")
             self.computeBoundaryConditions(t)
 
-        vel = self.dm.getGlobalVec()
-        glVec = self.dm.getLocalVec()
+        vel = self.velDM.getGlobalVec()
+        glVec = self.velDM.getLocalVec()
         self.solver.solve(vort, glVec, vel)
-        self.dm.globalToLocal(vel, glVec)
-        self.dm.restoreLocalVec(glVec)
+        self.velDM.globalToLocal(vel, glVec)
+        self.velDM.restoreLocalVec(glVec)
 
     def computeBoundaryConditions(self, t):
-        dm = self.dm
+        dm = self.velDM
         glVec = dm.getLocalVec()
         bcs = dm.getStratumIS("marker",1)
         bcDofsToSet = np.zeros(0)
@@ -173,7 +178,8 @@ class MainProblem(object):
         values = velocity(fullcoordArr, alp)
         glVec.setValues(bcDofsToSet, values)
         glVec.assemble()
-        self.dm.restoreLocalVec(glVec)
+        
+        dm.restoreLocalVec(glVec)
 
     def computeExactVort(self, t):
         alp = alpha(self.nu, t=t)
@@ -192,10 +198,12 @@ class MainProblem(object):
         self.solver.destroy()
 
     def saveStep(self, step, time):
-        globalVel = self.dm.getLocalVec()
+        print("saving step...")
+        globalVel = self.velDM.getLocalVec()
+        print(globalVel.getSize())
         self.viewer.saveData(step, time, globalVel)
         self.viewer.writeXmf("TG-testing")
-        self.dm.restoreLocalVec(globalVel)
+        self.velDM.restoreLocalVec(globalVel)
 
 class TestingFem(MainProblem):
     def __init__(self, nelem, **kwargs):
