@@ -5,7 +5,9 @@ from petsc4py import PETSc
 import numpy as np
 import logging
 from math import pi, floor
-from .elements.spectral import Spectral
+
+from utils.dm import getCellCornersCoords
+from utils.dm_spectral import getLocalDofsFromCell
 
 class DMPlexDom(PETSc.DMPlex):
     comm = PETSc.COMM_WORLD
@@ -53,11 +55,6 @@ class DMPlexDom(PETSc.DMPlex):
         self.setDefaultSection(velSec)
         self.velSec = self.getDefaultGlobalSection()
 
-    def createElement(self):
-        assert self.__ngl, "NGL Not defined"
-        self.__elem = Spectral(self.__ngl, self.getDimension())
-        self.computeFullCoordinates()
-
     def getNGL(self):
         return self.__ngl
 
@@ -95,26 +92,18 @@ class DMPlexDom(PETSc.DMPlex):
             arr = np.append(arr, arrtmp)
         return arr.astype(np.int32)
 
-    def getTotalElements(self):
-        firstCell, lastCell = self.getHeightStratum(0)
-        return lastCell - firstCell
-
-    def getCellRange(self):
-        return self.getHeightStratum(0)
-
-    def computeFullCoordinates(self):
+    def computeFullCoordinates(self, spElem):
         dim = self.getDimension()
-        self.fullCoordVec = self.createLocalVec()
-        self.fullCoordVec.setName('Coordinates')
+        fullCoordVec = self.createLocalVec()
+        fullCoordVec.setName('Coordinates')
 
         coordsComponents = dim
-
-        spElem = self.__elem
+        startCell, _ = self.getHeightStratum(0)
 
         for cell in range(*self.getHeightStratum(0)):
-            coords = self.getCellCornersCoords(cell)
+            coords = getCellCornersCoords(self, startCell ,cell)
             coords.shape = (2** coordsComponents , coordsComponents)
-            indices = self.getLocalVelocityDofsFromCell(cell)
+            indices = getLocalDofsFromCell(self, cell)
             elTotNodes = spElem.nnode
             totCoord = np.zeros((coordsComponents*elTotNodes))
 
@@ -122,49 +111,9 @@ class DMPlexDom(PETSc.DMPlex):
                 totCoord[[coordsComponents * idx + d for d in range(coordsComponents)]] = \
                     (spElem.HCooOp[idx]@coords).T
 
-            self.fullCoordVec.setValues(indices.astype(np.int32), totCoord)
-
-        self.fullCoordVec.assemble()
-
-    def getCellCornersCoords(self, cell):
-        start = self.getHeightStratum(0)[0]
-        coordinates = self.getCoordinatesLocal()
-        coordSection = self.getCoordinateSection()
-        return self.vecGetClosure(coordSection,
-                                         coordinates,
-                                         cell+start)
-
-    def getAllNodes(self):
-        raise Exception("Not implemented")
-
-    def getNodesCoordinates(self, nodes=None, indices=None, label=None):
-        """
-        nodes: [Int]
-        """
-        dim = self.getDimension()
-        try:
-            assert nodes is not None
-            indices = self.indicesManager.mapNodesToIndices(nodes, dim)
-            arr = self.fullCoordVec.getValues(indices).reshape((len(nodes),dim))
-        except AssertionError:
-            assert indices is not None
-            numOfNodes = floor(len(indices) / dim)
-            arr = self.fullCoordVec.getValues(indices).reshape((numOfNodes,dim))
-        return arr
-        # raise Exception("Not implemented yet")
-
-    def getEdgesWidth(self):
-        startEnt, _ = self.getDepthStratum(1)
-        coordinates = self.getCoordinatesLocal()
-        coordSection = self.getCoordinateSection()
-        coord = self.vecGetClosure(coordSection, coordinates, startEnt).reshape(2,self.dim)
-        coord = coord[1] - coord[0]
-        norm = np.linalg.norm(coord)
-        return norm
-
-    def getDofsRange(self):
-       sec = self.indicesManager.getGlobalIndicesSection()
-       return sec.getOffsetRange()
+            fullCoordVec.setValues(indices.astype(np.int32), totCoord)
+        fullCoordVec.assemble()
+        return fullCoordVec
 
     def computeLocalMatrices(self, cellNum):
         cornerCoords = self.getCellCornersCoords(cellNum)
