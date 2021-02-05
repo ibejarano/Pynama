@@ -24,10 +24,8 @@ class DMPlexDom(PETSc.DMPlex):
 
         if self.dim == 2:
             self.namingConvention = ["down", "right" , "up", "left"]
-            self.reorderEntities = lambda entities: np.hstack((entities[5:], entities[1:5], entities[0]))
         elif self.dim == 3:
             self.namingConvention = ["back", "front", "down", "up", "right", "left"]
-            self.reorderEntities = lambda entities: np.hstack((entities[19:], entities[7:19], entities[1:7], entities[0]))
 
         self.markBoundaryFaces('boundary', 0)
         faces = self.getStratumIS('boundary', 0)
@@ -35,25 +33,30 @@ class DMPlexDom(PETSc.DMPlex):
             cell = self.getSupport(f)
             self.setLabelValue('boundary', cell, 1)
 
-    def setFemIndexing(self, ngl,bc=True, dofs=None, fieldName='velocity'):
-        fields = 1
+    def setFemIndexing(self, ngl, bc=True, fields=['velocity', 'vorticity']):
         self.__ngl = ngl
+        self.setNumFields(len(fields))
 
-        self.setNumFields(fields)
-        numComp = [1]
-        dofs = dofs if dofs != None else self.getDimension()
-
-        numDofVel = [ 1*dofs , dofs * (ngl-2) , dofs * (ngl-2)**2 ]
+        dim = self.getDimension()
+        dim_w = 1 if dim == 2 else 3
+        numComp = [dim, dim_w]
+        numDofs = []
+        for dofs in numComp:
+            numDofPerPoint = [ 1*dofs , dofs * (ngl-2) , dofs * (ngl-2)**2 ]
+            numDofs.append(numDofPerPoint)
 
         if bc:
             bcIs = self.getStratumIS('marker', 1)
-            velSec = self.createSection(numComp, numDofVel, 0, bcPoints=[bcIs])
+            bcIs = [bcIs] * len(fields)
+            sec = self.createSection(numComp, numDofs, [0, 1] , bcPoints=bcIs)
         else:
-            velSec = self.createSection(numComp, numDofVel)
+            sec = self.createSection(numComp, numDofs)
         
-        velSec.setFieldName(0, fieldName)
-        self.setDefaultSection(velSec)
-        self.velSec = self.getDefaultGlobalSection()
+        for i, fieldName in enumerate(fields):
+            sec.setFieldName(i, fieldName)
+
+        self.setDefaultSection(sec)
+        self.sec = self.getDefaultGlobalSection()
 
     def getNGL(self):
         return self.__ngl
@@ -77,7 +80,6 @@ class DMPlexDom(PETSc.DMPlex):
         points, _ = self.getTransitiveClosure(cell)
         arr = np.zeros(0, dtype=np.int32)
         points = self.reorderEntities(points)
-        # self.setDefaultGlobalSection(self.velSec)
         for poi in points:
             arrtmp = np.arange(*self.getPointGlobal(poi))
             arr = np.append(arr, arrtmp)
@@ -114,10 +116,6 @@ class DMPlexDom(PETSc.DMPlex):
             fullCoordVec.setValues(indices.astype(np.int32), totCoord)
         fullCoordVec.assemble()
         return fullCoordVec
-
-    def computeLocalMatrices(self, cellNum):
-        cornerCoords = self.getCellCornersCoords(cellNum)
-        return self.__elem.getElemKLEMatrices(cornerCoords)
 
     def createVortLGMap(self):
         assert self.getDimension() == 2, "Not implemented for dim 3"
