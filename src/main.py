@@ -97,13 +97,12 @@ class MainProblem(object):
         self.solver.createSolver(K)
         self.solver.setFromOptions()
 
-        vort = Rw.createVecRight()
+        vort = self.vortDM.getLocalVec()
         vort.setName("vorticity")
         vel = self.velDM.getLocalVec()
         vel.setName("velocity")
         self.velDM.restoreLocalVec(vel)
-
-        self.vort = vort
+        self.vortDM.restoreLocalVec(vort)
 
         self.solver.setRHS(Rw, Krhs)
         self.viewer = self.setUpViewer()
@@ -143,8 +142,7 @@ class MainProblem(object):
         dim = dm.getDimension()
         elem = Spectral(ngl, dim)
 
-        _, _ , dms = dm.createFieldDecomposition()
-
+        _, ids , dms = dm.createFieldDecomposition()
         self.velDM, self.vortDM = dms
 
         return dm, elem
@@ -163,9 +161,11 @@ class MainProblem(object):
         self.solver.solve(vort, glVec, vel)
         self.velDM.globalToLocal(vel, glVec)
         self.velDM.restoreLocalVec(glVec)
+        self.vortDM.restoreLocalVec(vort)
 
     def computeBoundaryConditions(self, t):
         dm = self.velDM
+        dim = dm.getDimension()
         glVec = dm.getLocalVec()
         bcs = dm.getStratumIS("marker",1)
         bcDofsToSet = np.zeros(0)
@@ -173,9 +173,13 @@ class MainProblem(object):
             arrtmp = np.arange(*dm.getPointLocal(poi)).astype(np.int32)
             bcDofsToSet = np.append(bcDofsToSet, arrtmp).astype(np.int32)
 
-        fullcoordArr = getCoordinates(self.dm, self.coordVec, bcDofsToSet)
+        nodesBC = [int(n/dim) for n in bcDofsToSet[::dim]]
         alp = alpha(self.nu, t=t)
-        values = velocity(fullcoordArr, alp)
+        nnodes = int(glVec.getSize()/dim)
+
+        fullcoordArr = self.coordVec.getArray().reshape((nnodes, 3))[nodesBC]
+        values = velocity(fullcoordArr[:,:2], alp)
+
         glVec.setValues(bcDofsToSet, values)
         glVec.assemble()
         
@@ -183,25 +187,26 @@ class MainProblem(object):
 
     def computeExactVort(self, t):
         alp = alpha(self.nu, t=t)
-        dm = self.dm
-        vort = self.vort
+        dm = self.vortDM
+        vort = dm.getLocalVec()
         dim = self.dm.getDimension()
-        allDofs = np.arange(len(vort.getArray())*dim, dtype=np.int32)
-        coords = getCoordinates(self.dm, self.coordVec , allDofs)
-        vortValues = vorticity(coords, alp)
-        vort.setValues(np.arange(len(vort.getArray()), dtype=np.int32), vortValues)
+        totNodes = vort.getSize()
+        assert dim == 2
+        vortValues = vorticity(self.coordVec.getArray().reshape((totNodes,3)), alp)
+        inds = np.arange(len(vort.getArray()), dtype=np.int32)
+        vort.setValues(inds, vortValues)
         return vort
 
     def destroy(self):
         self.dm.destroy()
-        self.vort.destroy()
+        # self.vort.destroy()
         self.solver.destroy()
 
     def saveStep(self, step, time):
         print("saving step...")
         globalVel = self.velDM.getLocalVec()
-        print(globalVel.getSize())
-        self.viewer.saveData(step, time, globalVel)
+        globalVort = self.vortDM.getLocalVec()
+        self.viewer.saveData(step, time, globalVel, globalVort)
         self.viewer.writeXmf("TG-testing")
         self.velDM.restoreLocalVec(globalVel)
 
@@ -221,7 +226,7 @@ class TestingFem(MainProblem):
 
     def getErrorVec(self, t):
         alp = alpha(self.nu, t)
-        glVec = self.dm.getLocalVec()
+        glVec = self.velDM.getLocalVec()
         exactVel = glVec.duplicate()
         exactVel.setName('exact-vel')
         allDofs = np.arange(len(exactVel.getArray()), dtype=np.int32)
@@ -232,7 +237,7 @@ class TestingFem(MainProblem):
         err = (exactVel-glVec)
         err.setName('error')
         exactVel.destroy()
-        self.dm.restoreLocalVec(glVec)
+        self.velDM.restoreLocalVec(glVec)
         return err
 
     def saveStep(self, step, time):
@@ -309,7 +314,6 @@ if __name__ == "__main__":
     if runTest == 'viewError':
         fem = TestingFem([2,2], ngl=4)
         fem.setUp()
-        
         
         viscousTimes = [0, 0.05, 0.1 , 0.2, 0.5, 0.75, 0.9]
         times = [(tau**2)/(4*0.5/0.01) for tau in viscousTimes]
