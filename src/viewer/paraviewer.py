@@ -19,7 +19,8 @@ class Paraviewer:
         self.xmlWriter = XmlGenerator2(dim, self.h5name)
 
     def saveMesh(self, coords, name='mesh'):
-        totalNodes = int(coords.size / self.xmlWriter.dim)
+        totalNodes = int(coords.size / 3)
+        print("coods",coords.getSize())
         self.xmlWriter.setUpDomainNodes(totalNodes=totalNodes)
         self.xmlWriter.generateXMLTemplate()
 

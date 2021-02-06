@@ -65,7 +65,7 @@ class KspSolver(KSP):
         self.Krhs = Krhs
 
     def solve(self, vort, vel, solution):
-        rhs = self.Krhs * vel
+        rhs = self.Rw * vort +  self.Krhs * vel
         super().solve(rhs, solution)
 
     def destroy(self):
