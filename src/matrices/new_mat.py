@@ -54,7 +54,9 @@ class Matrices:
         dim = dm.getDimension()
         dim_w = 1
         totalDofsFree = dm.getGlobalVec().getSize()
-        totalDofs = dm.getLocalVec().getSize()
+        locVel = dm.getLocalVec()
+        totalDofs = locVel.getSize()
+        dm.restoreLocalVec(locVel)
         dofsPerVertex = 1
         dofsPerEdge = ngl - 2
         dofsPerCell = (ngl-2)**2

@@ -58,41 +58,21 @@ class DMPlexDom(PETSc.DMPlex):
         self.setDefaultSection(sec)
         self.sec = self.getDefaultGlobalSection()
 
+        names, ids, dms = self.createFieldDecomposition()
+
+        self.velDM, self.vortDM = dms
+        self.setUpVecs()
+
+    def setUpVecs(self):
+        vort = self.getLocalVorticity()
+        vort.setName("vorticity")
+        vel = self.getLocalVelocity()
+        vel.setName("velocity")
+        self.restoreLocalVelocity(vel)
+        self.restoreLocalVorticity(vort)
+        
     def getNGL(self):
         return self.__ngl
-
-    def getLocalVelocityDofsFromCell(self, cell):
-        points, oris = self.getTransitiveClosure(cell)
-        arr = np.zeros(0, dtype=np.int32)
-        points = self.reorderEntities(points)
-        oris = self.reorderEntities(oris)
-        for i, poi in enumerate(points):
-            arrtmp = np.arange(*self.getPointLocal(poi))
-            if oris[i] == -2:
-                tmp = arrtmp.copy()
-                tmp[-2::-2] = arrtmp[::2]
-                tmp[::-2] = arrtmp[1::2]
-                arrtmp = tmp
-            arr = np.append(arr, arrtmp)
-        return arr
-
-    def getGlobalVelocityDofsFromCell(self, cell):
-        points, _ = self.getTransitiveClosure(cell)
-        arr = np.zeros(0, dtype=np.int32)
-        points = self.reorderEntities(points)
-        for poi in points:
-            arrtmp = np.arange(*self.getPointGlobal(poi))
-            arr = np.append(arr, arrtmp)
-        return arr
-
-    def getGlobalVorticityDofsFromCell(self, cell):
-        points, _ = self.getTransitiveClosure(cell)
-        arr = np.zeros(0)
-        points = self.reorderEntities(points)
-        for poi in points:
-            arrtmp = np.arange(*self.getPointGlobal(poi))
-            arr = np.append(arr, arrtmp)
-        return arr.astype(np.int32)
 
     def computeFullCoordinates(self, spElem):
         dim = self.getDimension()
@@ -117,12 +97,29 @@ class DMPlexDom(PETSc.DMPlex):
         fullCoordVec.assemble()
         return fullCoordVec
 
-    def createVortLGMap(self):
-        assert self.getDimension() == 2, "Not implemented for dim 3"
-        velLGMap = self.getLGMap()
-        arr = velLGMap.getBlockIndices()
-        lg = PETSc.LGMap().create(arr)
-        return lg
+    def getGlobalVelocity(self):
+        return self.velDM.getGlobalVec()
+
+    def getLocalVelocity(self):
+        return self.velDM.getLocalVec()
+
+    def getGlobalVorticity(self):
+        return self.vortDM.getGlobalVec()
+
+    def getLocalVorticity(self):
+        return self.vortDM.getLocalVec()
+
+    def restoreGlobalVelocity(self, vec):
+        self.velDM.restoreGlobalVec(vec)
+
+    def restoreLocalVelocity(self, vec):
+        self.velDM.restoreLocalVec(vec)
+    
+    def restoreLocalVorticity(self, vec):
+        self.vortDM.restoreLocalVec(vec)
+
+    def velocityLocalToGlobal(self, glVec, locVec):
+        self.velDM.globalToLocal(glVec, locVec)
 
 class NewBoxDom(DMPlexDom):
     """Estrucuted DMPlex Mesh"""
@@ -140,24 +137,3 @@ class NewGmshDom(DMPlexDom):
         self.createFromFile(fileName)
         self.logger.info("Mesh generated from Gmsh file")
         super().create()
-
-if __name__ == "__main__":
-    data = {"ngl":2, "box-mesh": {
-        "nelem": [2,2],
-        "lower": [0,0],
-        "upper": [1,1]
-    }}
-
-    testData = {
-        "free-slip": {
-            "up": [1, 0],
-            "right": [1, 0]},
-        "no-slip": {
-            "left": [1, 1],
-            "down": [None, 0]
-        }
-    }
-
-    domain = Domain(data)
-    domain.newBCSETUP(testData)
-    # domain.view()

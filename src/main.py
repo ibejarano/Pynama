@@ -88,7 +88,7 @@ class MainProblem(object):
         self.bc = None
 
         self.mats = Matrices()
-        self.mats.setDM(self.velDM)
+        self.mats.setDM(self.dm.velDM)
         self.mats.setElem(self.elem)
 
         K, Krhs, Rw = self.assembleMatrices()
@@ -96,13 +96,6 @@ class MainProblem(object):
         self.solver = KspSolver()
         self.solver.createSolver(K)
         self.solver.setFromOptions()
-
-        vort = self.vortDM.getLocalVec()
-        vort.setName("vorticity")
-        vel = self.velDM.getLocalVec()
-        vel.setName("velocity")
-        self.velDM.restoreLocalVec(vel)
-        self.vortDM.restoreLocalVec(vort)
 
         self.solver.setRHS(Rw, Krhs)
         self.viewer = self.setUpViewer()
@@ -141,10 +134,6 @@ class MainProblem(object):
         dm.setFemIndexing(ngl)
         dim = dm.getDimension()
         elem = Spectral(ngl, dim)
-
-        _, ids , dms = dm.createFieldDecomposition()
-        self.velDM, self.vortDM = dms
-
         return dm, elem
         
     def assembleMatrices(self):
@@ -156,39 +145,39 @@ class MainProblem(object):
             # print(f"Setting time-dependant BC t = {t}")
             self.computeBoundaryConditions(t)
 
-        vel = self.velDM.getGlobalVec()
-        glVec = self.velDM.getLocalVec()
-        self.solver.solve(vort, glVec, vel)
-        self.velDM.globalToLocal(vel, glVec)
-        self.velDM.restoreLocalVec(glVec)
-        self.vortDM.restoreLocalVec(vort)
+        vel = self.dm.getGlobalVelocity()
+        locVel = self.dm.getLocalVelocity()
+        self.solver.solve(vort, locVel, vel)
+        self.dm.velocityLocalToGlobal(vel, locVel)
+        self.dm.restoreLocalVorticity(vort)
+        self.dm.restoreGlobalVelocity(vel)
+        self.dm.restoreLocalVelocity(locVel)
 
     def computeBoundaryConditions(self, t):
-        dm = self.velDM
+        dm = self.dm
         dim = dm.getDimension()
-        glVec = dm.getLocalVec()
+        locVel = dm.getLocalVelocity()
         bcs = dm.getStratumIS("marker",1)
         bcDofsToSet = np.zeros(0)
         for poi in bcs.getIndices():
-            arrtmp = np.arange(*dm.getPointLocal(poi)).astype(np.int32)
+            arrtmp = np.arange(*self.dm.velDM.getPointLocal(poi)).astype(np.int32)
             bcDofsToSet = np.append(bcDofsToSet, arrtmp).astype(np.int32)
 
         nodesBC = [int(n/dim) for n in bcDofsToSet[::dim]]
         alp = alpha(self.nu, t=t)
-        nnodes = int(glVec.getSize()/dim)
+        nnodes = int(locVel.getSize()/dim)
 
         fullcoordArr = self.coordVec.getArray().reshape((nnodes, 3))[nodesBC]
         values = velocity(fullcoordArr[:,:2], alp)
 
-        glVec.setValues(bcDofsToSet, values)
-        glVec.assemble()
-        
-        dm.restoreLocalVec(glVec)
+        locVel.setValues(bcDofsToSet, values)
+        locVel.assemble()
+        dm.restoreLocalVelocity(locVel)
 
     def computeExactVort(self, t):
         alp = alpha(self.nu, t=t)
-        dm = self.vortDM
-        vort = dm.getLocalVec()
+        dm = self.dm
+        vort = dm.getLocalVorticity()
         dim = self.dm.getDimension()
         totNodes = vort.getSize()
         assert dim == 2
@@ -199,16 +188,16 @@ class MainProblem(object):
 
     def destroy(self):
         self.dm.destroy()
-        # self.vort.destroy()
         self.solver.destroy()
 
     def saveStep(self, step, time):
         print("saving step...")
-        globalVel = self.velDM.getLocalVec()
-        globalVort = self.vortDM.getLocalVec()
-        self.viewer.saveData(step, time, globalVel, globalVort)
+        vel = self.dm.getLocalVelocity()
+        vort = self.dm.getLocalVorticity()
+        self.viewer.saveData(step, time, vel, vort)
         self.viewer.writeXmf("TG-testing")
-        self.velDM.restoreLocalVec(globalVel)
+        self.dm.restoreLocalVelocity(vel)
+        self.dm.restoreLocalVorticity(vort)
 
 class TestingFem(MainProblem):
     def __init__(self, nelem, **kwargs):
@@ -226,25 +215,27 @@ class TestingFem(MainProblem):
 
     def getErrorVec(self, t):
         alp = alpha(self.nu, t)
-        glVec = self.velDM.getLocalVec()
-        exactVel = glVec.duplicate()
+        locVel = self.dm.getLocalVelocity()
+        exactVel = locVel.duplicate()
         exactVel.setName('exact-vel')
-        allDofs = np.arange(len(exactVel.getArray()), dtype=np.int32)
-        coords = self.dm.getNodesCoordinates(indices=allDofs)
-        values = velocity(coords, alp)
+
+        nnodes = int(locVel.getSize()/self.dm.getDimension())
+        
+        fullcoordArr = self.coordVec.getArray().reshape((nnodes, 3))
+        values = velocity(fullcoordArr[:,:2], alp)
         exactVel.setValues(np.arange(len(exactVel.getArray()), dtype=np.int32), values)
 
-        err = (exactVel-glVec)
+        err = (exactVel-locVel)
         err.setName('error')
         exactVel.destroy()
-        self.velDM.restoreLocalVec(glVec)
+        self.dm.restoreLocalVelocity(locVel)
         return err
 
     def saveStep(self, step, time):
         err = self.getErrorVec(time)
-        globalVel = self.dm.getLocalVec()
-        self.viewer.saveData(step, time,  err, globalVel)
-
+        vel = self.dm.getLocalVelocity()
+        self.viewer.saveData(step, time,  err, vel)
+        self.dm.restoreLocalVelocity(vel)
 
     def setUpViewer(self):
         viewer = Paraviewer()
@@ -271,7 +262,6 @@ if __name__ == "__main__":
         fem.solveKLE(vort, t)
         fem.saveStep(1, t)
         print("Finished")
-
 
     # Convergence test
     if runTest == 'kle':
