@@ -76,7 +76,7 @@ class DMPlexDom(PETSc.DMPlex):
 
     def computeFullCoordinates(self, spElem):
         dim = self.getDimension()
-        fullCoordVec = self.createLocalVec()
+        fullCoordVec = self.velDM.createLocalVec()
         fullCoordVec.setName('Coordinates')
 
         coordsComponents = dim
@@ -85,7 +85,7 @@ class DMPlexDom(PETSc.DMPlex):
         for cell in range(*self.getHeightStratum(0)):
             coords = getCellCornersCoords(self, startCell ,cell)
             coords.shape = (2** coordsComponents , coordsComponents)
-            indices = getLocalDofsFromCell(self, cell)
+            indices = getLocalDofsFromCell(self.velDM, cell)
             elTotNodes = spElem.nnode
             totCoord = np.zeros((coordsComponents*elTotNodes))
 

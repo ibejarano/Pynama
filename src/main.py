@@ -167,7 +167,7 @@ class MainProblem(object):
         alp = alpha(self.nu, t=t)
         nnodes = int(locVel.getSize()/dim)
 
-        fullcoordArr = self.coordVec.getArray().reshape((nnodes, 3))[nodesBC]
+        fullcoordArr = self.coordVec.getArray().reshape((nnodes, dim))[nodesBC]
         values = velocity(fullcoordArr[:,:2], alp)
 
         locVel.setValues(bcDofsToSet, values)
@@ -181,7 +181,7 @@ class MainProblem(object):
         dim = self.dm.getDimension()
         totNodes = vort.getSize()
         assert dim == 2
-        vortValues = vorticity(self.coordVec.getArray().reshape((totNodes,3)), alp)
+        vortValues = vorticity(self.coordVec.getArray().reshape((totNodes, dim)), alp)
         inds = np.arange(len(vort.getArray()), dtype=np.int32)
         vort.setValues(inds, vortValues)
         return vort
@@ -221,8 +221,8 @@ class TestingFem(MainProblem):
 
         nnodes = int(locVel.getSize()/self.dm.getDimension())
         
-        fullcoordArr = self.coordVec.getArray().reshape((nnodes, 3))
-        values = velocity(fullcoordArr[:,:2], alp)
+        fullcoordArr = self.coordVec.getArray().reshape((nnodes, 2))
+        values = velocity(fullcoordArr, alp)
         exactVel.setValues(np.arange(len(exactVel.getArray()), dtype=np.int32), values)
 
         err = (exactVel-locVel)
@@ -302,7 +302,7 @@ if __name__ == "__main__":
         print(f"Test finished. File {fileOut}.yaml created")
 
     if runTest == 'viewError':
-        fem = TestingFem([2,2], ngl=4)
+        fem = TestingFem([5,5], ngl=5)
         fem.setUp()
         
         viscousTimes = [0, 0.05, 0.1 , 0.2, 0.5, 0.75, 0.9]

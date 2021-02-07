@@ -37,9 +37,10 @@ class XmlGenerator(object):
         topology.set("TopologyType", "Polyvertex")
         topology.set("Dimensions", str(self.dimensions))
         geometry = SubElement(meshGrid, "Geometry")
-        geometry.set("GeometryType", "XYZ")
+        geoType = "XYZ" if self.dim == 3 else "XY"
+        geometry.set("GeometryType",  geoType)
         geometryData = SubElement(geometry, "DataItem")
-        geometryData.set("Dimensions" , f"{self.dimensions} 3")
+        geometryData.set("Dimensions" , f"{self.dimensions} {self.dim}")
         geometryData.set("NumberType", "Float")
         geometryData.set("Format","HDF")
         geometryData.text = "mesh.h5:/mesh"

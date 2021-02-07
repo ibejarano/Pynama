@@ -54,7 +54,7 @@ class KspSolver(KSP):
         self.create(self.comm)
         self.setType('minres')
         pc = PC().create()
-        pc.setType('cholesky')
+        pc.setType('lu')
         self.setPC(pc)
         self.setFromOptions()
         self.setOperators(mat)

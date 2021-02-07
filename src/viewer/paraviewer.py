@@ -16,10 +16,11 @@ class Paraviewer:
         if not self.comm.rank and not os.path.isdir(self.saveDir):
             os.makedirs(f"./{self.saveDir}")
         self.h5name = "vec-data"
+        self.dim = dim
         self.xmlWriter = XmlGenerator2(dim, self.h5name)
 
     def saveMesh(self, coords, name='mesh'):
-        totalNodes = int(coords.size / 3)
+        totalNodes = int(coords.size / self.dim)
         self.xmlWriter.setUpDomainNodes(totalNodes=totalNodes)
         self.xmlWriter.generateXMLTemplate()
 
