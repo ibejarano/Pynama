@@ -121,16 +121,13 @@ class Spectral(Element):
         # Vorticty curl
         Bw_curl = np.zeros((self.dim, self.dim_w*elTotNodes))
 
-        J = self.computeJacobian(coords)
-        invJ = inv(J)
-        detJ = det(J)
-
         for idx, gp in enumerate(self.gps):
             Hrs = self.Hrs[idx]
             H = self.H[idx]
-            # J = self.HrsCoo[idx].dot(coords)
+            J = self.HrsCoo[idx].dot(coords)
+            invJ = inv(J)
             Hxy = invJ.dot(Hrs)
-            # detJ = det(J)
+            detJ = det(J)
 
             for nd in range(self.dim):
                 B_gr[self.dim*nd:self.dim*nd + self.dim, nd::self.dim] = Hxy
@@ -148,9 +145,10 @@ class Spectral(Element):
         for idx, gp in enumerate(self.gpsRed):
             Hrs = self.HrsRed[idx]
             H = self.HRed[idx]
-            # J = self.HrsCooRed[idx].dot(coords)
-            # Hxy = inv(J).dot(Hrs)
-            # detJ = det(J)
+            J = self.HrsCooRed[idx].dot(coords)
+            invJ = inv(J)
+            Hxy = invJ.dot(Hrs)
+            detJ = det(J)
 
             for nd in range(self.dim):
                 B_div[0, nd::self.dim] = Hxy[nd]
