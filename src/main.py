@@ -39,7 +39,7 @@ class MainProblem(object):
         # TODO setFromOptions
         self.validate(config)
         self.config = config
-        self.nu = kwargs.get('nu', 1)
+        self.nu = kwargs.get('nu', 0.01/0.5)
 
     def validate(self, configData):
         requiredData = ("domain", "boundary-conditions", "material-properties")
@@ -231,7 +231,6 @@ class MainProblem(object):
         if ts:
             time = ts.time
             step = ts.step_number
-            incr = ts.getTimeStep()
         vel = self.dm.getLocalVelocity()
         # vort = self.dm.getLocalVorticity()
         self.viewer.saveData(step, time, vel)

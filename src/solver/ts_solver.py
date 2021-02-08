@@ -17,7 +17,7 @@ class TSSolver(TS):
         # self.setExactFinalTime(self.ExactFinalTime.INTERPOLATE)
         # Sundials doesn't support MATCHSTEP (-ts_exact_final_time INTERPOLATE)
 
-    def initSolver(self, rhsFunction, convergedStepFunction, operators, fem):
+    def initSolver(self, rhsFunction, operators, fem):
         opers = { 'curl': operators.Curl, 'div': operators.DivSrT, 'srt': operators.SrT, 'fem': fem}
         self.setRHSFunction(rhsFunction, None , kargs=opers)
         self.setPostStep(fem.saveStep)

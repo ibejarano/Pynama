@@ -52,13 +52,6 @@ def rhsFunc(ts, time, vort, f, curl, srt, div, fem):
     fem.dm.restoreLocalVelocity(vel)
     dm.restoreLocalVec(locF)
 
-def converged(ts):
-    time = ts.time
-    step = ts.step_number
-    incr = ts.getTimeStep()
-    print(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
-
-
 class TestTSSetup(unittest.TestCase):
     nu = 0.5/0.01
     nelem = [40,40]
@@ -85,7 +78,7 @@ class TestTSSetup(unittest.TestCase):
         ts.setUpTimes(0, 1.0, 100)
         ts.setDM(self.fem.dm.vortDM)
 
-        ts.initSolver(rhsFunc, converged, operators, fem)
+        ts.initSolver(rhsFunc, operators, fem)
         self.ts = ts
 
     def test_func_eval(self):
