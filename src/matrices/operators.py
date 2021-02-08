@@ -2,13 +2,21 @@ import numpy as np
 from petsc4py import PETSc
 
 from domain.dmplex_bc import NewBoxDom
+from utils.dm_spectral import reorderEntities, getLocalDofsFromCell, getGlobalDofsFromCell
+from utils.dm import getTotalCells, getCellCornersCoords
 
 class Operators:
     comm = PETSc.COMM_WORLD
     def __init__(self):
         self.Curl = None
-        self.Div = None
-        self.Srt = None
+        self.DivSrT = None
+        self.SrT = None
+
+    def setElem(self, elem):
+        self.__elem = elem
+
+    def setDM(self, dm):
+        self.__dm = dm
 
     def preallocate(self, config, ngl):
         dm = NewBoxDom()
@@ -18,7 +26,7 @@ class Operators:
         self.dim_s = 3 if self.dim == 2 else 6
         assert self.dim_w == 1, "Only for dim = 2"
         
-        dm.setFemIndexing(ngl, bc=False, dofs=self.dim_w, fieldName='vorticity')
+        dm.setFemIndexing(ngl, bc=False, fields=['vorticity'])
         conecMat = dm.createMat()
         rStart, rEnd = conecMat.getOwnershipRange()
         locElRow = rEnd - rStart
@@ -67,3 +75,66 @@ class Operators:
             nnz=(d_nonzero, offset_nonzero), comm=self.comm)
         mat.setUp()
         return mat
+
+    def assemble(self):
+        dm = self.__dm
+        countCells = 0
+        dim = dm.getDimension()
+        assert dim == 2, "Not implemented for dim = 3"
+        borderCells = dm.getStratumIS('boundary', 1)
+        assert dm.getDimension() == 2, "Check if celltype = 4 in dim = 3"
+        allCells = dm.getStratumIS('celltype', 4)
+        insideCells = allCells.difference(borderCells)
+
+        startCell, _ = dm.getHeightStratum(0)
+
+        for cell in insideCells.getIndices():
+            cellCornerCoords = getCellCornersCoords(dm, startCell, cell)
+            locSrT, locDivSrT, locCurl, locWei = self.__elem.getElemKLEOperators(cellCornerCoords)
+            indicesVel = getLocalDofsFromCell(dm, cell)
+            nodes = [int(ind/dim) for ind in indicesVel[::dim]]
+            indicesW = [node*self.dim_w + dof for node in nodes for dof in range(self.dim_w)]
+            indicesSrT = [node*self.dim_s + dof for node in nodes for dof in range(self.dim_s)]
+
+            self.Curl.setValues(indicesW, indicesVel, locCurl, True)
+            self.SrT.setValues(indicesSrT, indicesVel, locSrT, True)
+            self.DivSrT.setValues(indicesVel, indicesSrT, locDivSrT, True)
+
+            self.weigSrT.setValues(indicesSrT, np.repeat(locWei, self.dim_s), True)
+            self.weigDivSrT.setValues(indicesVel, np.repeat(locWei, self.dim), True)
+            self.weigCurl.setValues(indicesW, np.repeat(locWei, self.dim_w), True)
+
+            self.printProgress(countCells)
+
+        self.assembleAll()
+
+    def assembleAll(self):
+        self.SrT.assemble()
+        self.weigSrT.assemble()
+        self.weigSrT.reciprocal()
+        self.SrT.diagonalScale(L=self.weigSrT)
+
+        self.DivSrT.assemble()
+        self.weigDivSrT.assemble()
+        self.weigDivSrT.reciprocal()
+        self.DivSrT.diagonalScale(L=self.weigDivSrT)
+
+        self.Curl.assemble()
+        self.weigCurl.assemble()
+        self.weigCurl.reciprocal()
+        self.Curl.diagonalScale(L=self.weigCurl)
+
+        self.weigSrT.destroy()
+        self.weigCurl.destroy()
+        self.weigDivSrT.destroy()
+
+    def printProgress(self, currCell, width=50):
+        totCells = getTotalCells(self.__dm)
+        percent = int(currCell*100 / totCells)
+
+        left = width * percent // 100
+        right = width - left
+
+        print('\r[', '#' * left, '-' * right, ']',
+            f'{currCell}/{totCells} cells',
+            sep='', end='', flush=True)

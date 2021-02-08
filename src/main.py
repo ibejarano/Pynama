@@ -142,7 +142,7 @@ class MainProblem(object):
 
     def solveKLE(self, vort, t=None):
         if t != None:
-            # print(f"Setting time-dependant BC t = {t}")
+            print(f"Setting time-dependant BC t = {t}")
             self.computeBoundaryConditions(t)
 
         vel = self.dm.getGlobalVelocity()
@@ -168,11 +168,47 @@ class MainProblem(object):
         nnodes = int(locVel.getSize()/dim)
 
         fullcoordArr = self.coordVec.getArray().reshape((nnodes, dim))[nodesBC]
-        values = velocity(fullcoordArr[:,:2], alp)
+        values = velocity(fullcoordArr, alp)
 
         locVel.setValues(bcDofsToSet, values)
         locVel.assemble()
         dm.restoreLocalVelocity(locVel)
+
+    def computeInitialConditions(self, t=0.0):
+        print("computing initial conditions")
+        alp = alpha(self.nu, t=t)
+        dm = self.dm
+        vort = dm.getLocalVorticity()
+        dim = self.dm.getDimension()
+        totNodes = vort.getSize()
+        assert dim == 2
+        vortValues = vorticity(self.coordVec.getArray().reshape((totNodes, dim)), alp)
+        inds = np.arange(len(vort.getArray()), dtype=np.int32)
+        vort.setValues(inds, vortValues)
+        dm.restoreLocalVorticity(vort)
+
+    def computeBoundaryConditionsVort(self, t, vort=None):
+        alp = alpha(self.nu, t=t)
+        dm = self.dm
+        if vort == None:
+            vort = dm.getLocalVorticity()
+  
+        dim = dm.getDimension()
+
+        bcs = dm.getStratumIS("marker",1)
+        bcDofsToSet = np.zeros(0)
+        for poi in bcs.getIndices():
+            arrtmp = np.arange(*self.dm.velDM.getPointLocal(poi)).astype(np.int32)
+            bcDofsToSet = np.append(bcDofsToSet, arrtmp).astype(np.int32)
+
+        totNodes = vort.getSize()
+        assert dim == 2
+        nodesBC = [int(n/dim) for n in bcDofsToSet[::dim]]
+
+        coords = self.coordVec.getArray().reshape((totNodes, dim))[nodesBC]
+        vortValues = vorticity(coords , alp)
+        vort.setValues(nodesBC, vortValues)
+        return vort
 
     def computeExactVort(self, t):
         alp = alpha(self.nu, t=t)
@@ -190,14 +226,17 @@ class MainProblem(object):
         self.dm.destroy()
         self.solver.destroy()
 
-    def saveStep(self, step, time):
+    def saveStep(self, ts=None ,step=None, time=None):
         print("saving step...")
+        if ts:
+            time = ts.time
+            step = ts.step_number
+            incr = ts.getTimeStep()
         vel = self.dm.getLocalVelocity()
-        vort = self.dm.getLocalVorticity()
-        self.viewer.saveData(step, time, vel, vort)
-        self.viewer.writeXmf("TG-testing")
+        # vort = self.dm.getLocalVorticity()
+        self.viewer.saveData(step, time, vel)
+        self.viewer.writeXmf("TS-Solver-TG-testing")
         self.dm.restoreLocalVelocity(vel)
-        self.dm.restoreLocalVorticity(vort)
 
 class TestingFem(MainProblem):
     def __init__(self, nelem, **kwargs):
@@ -260,7 +299,7 @@ if __name__ == "__main__":
         t = 0.0
         vort = fem.computeExactVort(t)
         fem.solveKLE(vort, t)
-        fem.saveStep(1, t)
+        fem.saveStep(step=1, time=t)
         print("Finished")
 
     # Convergence test
@@ -312,7 +351,7 @@ if __name__ == "__main__":
 
             vort = fem.computeExactVort(t)
             fem.solveKLE(vort, t)
-            fem.saveStep(step, t)
+            fem.saveStep(step=step, time=t)
 
         fem.viewer.writeXmf("TG-testing")
 

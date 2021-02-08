@@ -17,7 +17,7 @@ class TestKrhs(unittest.TestCase):
         dm = NewBoxDom()
         dm.create(domain)
         dm.setFemIndexing(ngl)
-        dm.createElement()
+        # dm.createElement()
         mats = Matrices()
         mats.setDM(dm)
         self.dm_test = dm

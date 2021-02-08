@@ -39,11 +39,13 @@ class DMPlexDom(PETSc.DMPlex):
 
         dim = self.getDimension()
         dim_w = 1 if dim == 2 else 3
-        numComp = [dim, dim_w]
+        numComp = []
         numDofs = []
-        for dofs in numComp:
+        for field in fields:
+            dofs = dim if field == 'velocity' else dim_w
             numDofPerPoint = [ 1*dofs , dofs * (ngl-2) , dofs * (ngl-2)**2 ]
             numDofs.append(numDofPerPoint)
+            numComp.append(dofs)
 
         if bc:
             bcIs = self.getStratumIS('marker', 1)
@@ -58,10 +60,11 @@ class DMPlexDom(PETSc.DMPlex):
         self.setDefaultSection(sec)
         self.sec = self.getDefaultGlobalSection()
 
-        names, ids, dms = self.createFieldDecomposition()
+        if bc:
+            names, ids, dms = self.createFieldDecomposition()
 
-        self.velDM, self.vortDM = dms
-        self.setUpVecs()
+            self.velDM, self.vortDM = dms
+            self.setUpVecs()
 
     def setUpVecs(self):
         vort = self.getLocalVorticity()
