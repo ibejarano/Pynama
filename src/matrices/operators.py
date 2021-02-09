@@ -82,14 +82,14 @@ class Operators:
         countCells = 0
         dim = dm.getDimension()
         assert dim == 2, "Not implemented for dim = 3"
-        borderCells = dm.getStratumIS('boundary', 1)
         assert dm.getDimension() == 2, "Check if celltype = 4 in dim = 3"
         allCells = dm.getStratumIS('celltype', 4)
-        insideCells = allCells.difference(borderCells)
 
         startCell, _ = dm.getHeightStratum(0)
 
-        for cell in insideCells.getIndices():
+        print("Ensamblando operadores...")
+
+        for cell in allCells.getIndices():
             cellCornerCoords = getCellCornersCoords(dm, startCell, cell)
             locSrT, locDivSrT, locCurl, locWei = self.__elem.getElemKLEOperators(cellCornerCoords)
             indicesVel = getLocalDofsFromCell(dm, cell)
@@ -105,9 +105,11 @@ class Operators:
             self.weigDivSrT.setValues(indicesVel, np.repeat(locWei, self.dim), True)
             self.weigCurl.setValues(indicesW, np.repeat(locWei, self.dim_w), True)
 
+            countCells +=1
             self.printProgress(countCells)
 
         self.assembleAll()
+        print(" Operadores ensamblados")
 
     def assembleAll(self):
         self.SrT.assemble()

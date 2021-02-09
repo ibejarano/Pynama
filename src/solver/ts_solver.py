@@ -1,5 +1,6 @@
 from petsc4py.PETSc import TS, COMM_WORLD, DMPlex
 from matrices.operators import Operators
+import numpy as np
 
 class TSSolver(TS):
     rk_types = ["3", "5f", "5bs"]
@@ -24,8 +25,6 @@ class TSSolver(TS):
         self.setPostStep(fem.saveStep)
         self.setFromOptions()
 
-
-
 class TimeStepping:
     rk_types = ["3", "5f", "5bs"]
     def __init__(self, comm=COMM_WORLD):
@@ -37,6 +36,8 @@ class TimeStepping:
 
     def setFem(self, fem):
         self.__fem = fem
+        dmVort = self.__fem.dm.vortDM
+        self.__ts.setDM(dmVort)
 
     def setUp(self):
         self.setUpTimes()
@@ -72,9 +73,50 @@ class TimeStepping:
         self.operators.setElem(self.__fem.elem)
         self.operators.assemble()
 
-    def rhsFunction(self, ts, time, vort, f):
-        print("hello!")
-
     def startSolver(self):
-        vort = self.__fem.dm.vortDM.getGlobalVec()
+        startTime = self.__ts.time
+        vort = self.__fem.dm.getGlobalVorticity()
+        self.__fem.computeInitialConditions(vort, startTime)
         self.__ts.solve(vort)
+
+    def rhsFunction(self, ts, time, vort, f):
+        dm = ts.getDM()
+        locVort = dm.getLocalVec()
+        dim = dm.getDimension()
+        dim_s = 3
+
+        # 1 Setear BC a la vorticidad.
+        self.__fem.computeBoundaryConditionsVort(time, locVort)
+        # 2 Setear los valores internos a la vorticidad
+        dm.globalToLocal(vort, locVort)
+        # 3 resolver kle y obtener velocidad
+        self.__fem.solveKLE(locVort, time)
+        vel = self.__fem.dm.getLocalVelocity()
+        # 4 aplicar VtensV
+        VtensV = self.operators.SrT.createVecLeft()
+        startInd, endInd = self.operators.SrT.getOwnershipRange()
+        ind = np.arange(startInd, endInd, dtype=np.int32)
+        arr = vel.getArray()
+        v_x = arr[::dim]
+        v_y = arr[1::dim]
+        VtensV.setValues(ind[::dim_s], v_x**2 , False)
+        VtensV.setValues(ind[1::dim_s], v_x * v_y , False)
+        VtensV.setValues(ind[2::dim_s], v_y**2 , False)
+        VtensV.assemble()
+        # 5 Aplicar en su orden los operadores
+        aux = VtensV.duplicate() 
+        self.operators.SrT.mult(vel, aux)
+
+        # FIXME: Hard code mu and rho
+        mu = 0.01
+        rho = 0.5
+        aux *= (2.0 * mu)
+        aux.axpy(-1.0 * rho, VtensV)
+        rhs = vel.duplicate()
+        self.operators.DivSrT.mult(aux, rhs)
+        rhs.scale(1/rho)
+        locF = dm.getLocalVec()
+        self.operators.Curl.mult(rhs, locF)
+        dm.localToGlobal(locF, f)
+        self.__fem.dm.restoreLocalVelocity(vel)
+        dm.restoreLocalVec(locF)

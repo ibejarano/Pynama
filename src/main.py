@@ -99,7 +99,6 @@ class MainProblem(object):
 
     def solveKLE(self, vort, t=None):
         if t != None:
-            print(f"Setting time-dependant BC t = {t}")
             self.computeBoundaryConditions(t)
 
         vel = self.dm.getGlobalVelocity()
@@ -131,7 +130,7 @@ class MainProblem(object):
         locVel.assemble()
         dm.restoreLocalVelocity(locVel)
 
-    def computeInitialConditions(self, t=0.0):
+    def computeInitialConditions(self, globalVec, t):
         print("computing initial conditions")
         alp = alpha(self.nu, t=t)
         dm = self.dm
@@ -142,6 +141,7 @@ class MainProblem(object):
         vortValues = vorticity(self.coordVec.getArray().reshape((totNodes, dim)), alp)
         inds = np.arange(len(vort.getArray()), dtype=np.int32)
         vort.setValues(inds, vortValues)
+        self.dm.vortDM.localToGlobal(vort, globalVec)
         dm.restoreLocalVorticity(vort)
 
     def computeBoundaryConditionsVort(self, t, vort=None):
@@ -184,13 +184,14 @@ class MainProblem(object):
         self.solver.destroy()
 
     def saveStep(self, ts=None ,step=None, time=None):
-        print("saving step...")
         if ts:
             time = ts.time
             step = ts.step_number
+            incr = ts.getTimeStep()
+            print(f"TS Converged :  Step: {step:6} | Time {time:5.4f} | Delta: {incr:.4f} ")
+        else:
+            print(f"Saving Step {step:6} | Time {time:5.4f} ")
         vel = self.dm.getLocalVelocity()
-        print(f"Converged :  Step: {step:6} | Time {time:5.4f} ")
-
         # vort = self.dm.getLocalVorticity()
         self.viewer.saveData(step, time, vel)
         self.viewer.writeXmf("TS-Solver-TG-testing")
