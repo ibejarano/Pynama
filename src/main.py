@@ -42,6 +42,7 @@ class MainProblem(object):
     def setUp(self):
         OptDB = PETSc.Options()
         self.dm, self.elem = self.setUpDomain(**self.opts)
+        self.vel, self.vort = self.dm.createVecs()
         self.bc = None
 
         self.mats = Matrices()
@@ -101,18 +102,14 @@ class MainProblem(object):
         if t != None:
             self.computeBoundaryConditions(t)
 
-        vel = self.dm.getGlobalVelocity()
-        locVel = self.dm.getLocalVelocity()
-        self.solver.solve(vort, locVel, vel)
-        self.dm.velocityLocalToGlobal(vel, locVel)
-        self.dm.restoreLocalVorticity(vort)
-        self.dm.restoreGlobalVelocity(vel)
-        self.dm.restoreLocalVelocity(locVel)
+        globalVel = self.dm.getGlobalVelocity()
+        self.solver.solve(vort, self.vel, globalVel)
+        self.dm.velDM.globalToLocal(globalVel, self.vel)
+        self.dm.restoreGlobalVelocity(globalVel)
 
     def computeBoundaryConditions(self, t):
         dm = self.dm
         dim = dm.getDimension()
-        locVel = dm.getLocalVelocity()
         bcs = dm.getStratumIS("marker",1)
         bcDofsToSet = np.zeros(0)
         for poi in bcs.getIndices():
@@ -121,34 +118,30 @@ class MainProblem(object):
 
         nodesBC = [int(n/dim) for n in bcDofsToSet[::dim]]
         alp = alpha(self.nu, t=t)
-        nnodes = int(locVel.getSize()/dim)
+        nnodes = int(self.vel.getSize()/dim)
 
         fullcoordArr = self.coordVec.getArray().reshape((nnodes, dim))[nodesBC]
         values = velocity(fullcoordArr, alp)
 
-        locVel.setValues(bcDofsToSet, values)
-        locVel.assemble()
-        dm.restoreLocalVelocity(locVel)
+        self.vel.setValues(bcDofsToSet, values)
+        self.vel.assemble()
 
     def computeInitialConditions(self, globalVec, t):
         print("computing initial conditions")
         alp = alpha(self.nu, t=t)
-        dm = self.dm
-        vort = dm.getLocalVorticity()
         dim = self.dm.getDimension()
-        totNodes = vort.getSize()
+        totNodes = self.vort.getSize()
         assert dim == 2
         vortValues = vorticity(self.coordVec.getArray().reshape((totNodes, dim)), alp)
-        inds = np.arange(len(vort.getArray()), dtype=np.int32)
-        vort.setValues(inds, vortValues)
-        self.dm.vortDM.localToGlobal(vort, globalVec)
-        dm.restoreLocalVorticity(vort)
+        inds = np.arange(len(self.vort.getArray()), dtype=np.int32)
+        self.vort.setValues(inds, vortValues)
+        self.dm.vortDM.localToGlobal(self.vort, globalVec)
 
     def computeBoundaryConditionsVort(self, t, vort=None):
         alp = alpha(self.nu, t=t)
         dm = self.dm
         if vort == None:
-            vort = dm.getLocalVorticity()
+            vort = self.vort
   
         dim = dm.getDimension()
 
@@ -191,11 +184,9 @@ class MainProblem(object):
             print(f"TS Converged :  Step: {step:6} | Time {time:5.4f} | Delta: {incr:.4f} ")
         else:
             print(f"Saving Step {step:6} | Time {time:5.4f} ")
-        vel = self.dm.getLocalVelocity()
-        # vort = self.dm.getLocalVorticity()
-        self.viewer.saveData(step, time, vel)
+
+        self.viewer.saveData(step, time, self.vel)
         self.viewer.writeXmf("TS-Solver-TG-testing")
-        self.dm.restoreLocalVelocity(vel)
 
 class TestingFem(MainProblem):
     def __init__(self, nelem, **kwargs):

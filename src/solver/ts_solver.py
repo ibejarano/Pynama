@@ -81,22 +81,20 @@ class TimeStepping:
 
     def rhsFunction(self, ts, time, vort, f):
         dm = ts.getDM()
-        locVort = dm.getLocalVec()
         dim = dm.getDimension()
         dim_s = 3
 
         # 1 Setear BC a la vorticidad.
-        self.__fem.computeBoundaryConditionsVort(time, locVort)
+        self.__fem.computeBoundaryConditionsVort(time)
         # 2 Setear los valores internos a la vorticidad
-        dm.globalToLocal(vort, locVort)
+        dm.globalToLocal(vort, self.__fem.vort)
         # 3 resolver kle y obtener velocidad
-        self.__fem.solveKLE(locVort, time)
-        vel = self.__fem.dm.getLocalVelocity()
+        self.__fem.solveKLE(self.__fem.vort, time)
         # 4 aplicar VtensV
         VtensV = self.operators.SrT.createVecLeft()
         startInd, endInd = self.operators.SrT.getOwnershipRange()
         ind = np.arange(startInd, endInd, dtype=np.int32)
-        arr = vel.getArray()
+        arr = self.__fem.vel.getArray()
         v_x = arr[::dim]
         v_y = arr[1::dim]
         VtensV.setValues(ind[::dim_s], v_x**2 , False)
@@ -105,18 +103,17 @@ class TimeStepping:
         VtensV.assemble()
         # 5 Aplicar en su orden los operadores
         aux = VtensV.duplicate() 
-        self.operators.SrT.mult(vel, aux)
+        self.operators.SrT.mult(self.__fem.vel, aux)
 
         # FIXME: Hard code mu and rho
         mu = 0.01
         rho = 0.5
         aux *= (2.0 * mu)
         aux.axpy(-1.0 * rho, VtensV)
-        rhs = vel.duplicate()
+        rhs = self.__fem.vel.duplicate()
         self.operators.DivSrT.mult(aux, rhs)
         rhs.scale(1/rho)
         locF = dm.getLocalVec()
         self.operators.Curl.mult(rhs, locF)
         dm.localToGlobal(locF, f)
-        self.__fem.dm.restoreLocalVelocity(vel)
         dm.restoreLocalVec(locF)

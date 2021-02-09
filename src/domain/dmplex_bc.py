@@ -64,15 +64,13 @@ class DMPlexDom(PETSc.DMPlex):
             names, ids, dms = self.createFieldDecomposition()
 
             self.velDM, self.vortDM = dms
-            self.setUpVecs()
 
-    def setUpVecs(self):
-        vort = self.getLocalVorticity()
+    def createVecs(self):
+        vort = self.vortDM.createLocalVec()
         vort.setName("vorticity")
-        vel = self.getLocalVelocity()
+        vel = self.velDM.createLocalVec()
         vel.setName("velocity")
-        self.restoreLocalVelocity(vel)
-        self.restoreLocalVorticity(vort)
+        return vel, vort
         
     def getNGL(self):
         return self.__ngl
