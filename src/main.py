@@ -6,6 +6,7 @@ from viewer.paraviewer import Paraviewer
 from functions.taylor_green import velocity, vorticity, alpha
 from domain.elements.spectral import Spectral
 from utils.dm_spectral import getCoordinates
+from solver.ts_solver import TimeStepping
 
 from petsc4py import PETSc
 import numpy as np
@@ -28,59 +29,15 @@ class MainProblem(object):
             with open(f'{config}.yaml') as f:
                 config = yaml.load(f, Loader=yaml.Loader)
         except:
-            self.logger.info(f"File '{config}' file not found")
-
+            raise Exception(f"File '{config}' file not found")
 
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger("Main")
         self.logger = logger
         self.logger.info("Init problem...")
         self.opts = kwargs
-        # TODO setFromOptions
-        self.validate(config)
         self.config = config
         self.nu = kwargs.get('nu', 0.01/0.5)
-
-    def validate(self, configData):
-        requiredData = ("domain", "boundary-conditions", "material-properties")
-        missingKeys = list()
-        for required in requiredData:
-            if required not in configData.keys():
-                missingKeys.append(required)
-        if len(missingKeys):
-            raise Exception(f"The following key(s) MUST be defined: {missingKeys} ")
-
-    def validateDomain(self, domainData: dict):
-        ngl = domainData.get('ngl', False)
-        if not ngl:
-            raise Exception("NGL not defined")
-        if 'box-mesh' in domainData:
-            boxMesh = domainData['box-mesh']
-            lower = boxMesh.get('lower', [0,0])
-            upper = boxMesh.get('upper', [1,1])
-            nelem = boxMesh.get('nelem', False)
-            if not nelem:
-                raise Exception("Number of elements not defined in boxmesh (Key 'nelem')")
-            # Create boxmesh with the data from that place
-        elif 'gmsh' in domainData:
-            fileLocation = domainData['file']
-            raise Exception("Not implemented yet")
-        else:
-            raise Exception("Domain must incluide 'box-mesh' data or 'gmsh' file location")
-
-    def validateBoundaryConditions(self, bcData: dict):
-        if 'custom-func' in bcData:
-            pass
-        elif 'uniform' in bcData:
-            pass
-        elif ('free-slip' in bcData) and ('no-slip' in bcData):
-            pass
-        elif 'free-slip' in bcData:
-            pass
-        elif 'no-slip' in bcData:
-            pass
-        else:
-            raise Exception("Wrong boundary conditions")
 
     def setUp(self):
         OptDB = PETSc.Options()
@@ -232,6 +189,8 @@ class MainProblem(object):
             time = ts.time
             step = ts.step_number
         vel = self.dm.getLocalVelocity()
+        print(f"Converged :  Step: {step:6} | Time {time:5.4f} ")
+
         # vort = self.dm.getLocalVorticity()
         self.viewer.saveData(step, time, vel)
         self.viewer.writeXmf("TS-Solver-TG-testing")
@@ -295,11 +254,16 @@ if __name__ == "__main__":
     if not runTest:
         fem = MainProblem('taylor-green')
         fem.setUp()
-        t = 0.0
-        vort = fem.computeExactVort(t)
-        fem.solveKLE(vort, t)
-        fem.saveStep(step=1, time=t)
-        print("Finished")
+
+        ts = TimeStepping()
+        ts.setFem(fem)
+        ts.setUp()
+        ts.startSolver()
+        # t = 0.0
+        # vort = fem.computeExactVort(t)
+        # fem.solveKLE(vort, t)
+        # fem.saveStep(step=1, time=t)
+        print("Time stepping Finished")
 
     # Convergence test
     if runTest == 'kle':

@@ -90,3 +90,4 @@ class TestTSSetup(unittest.TestCase):
         dm.restoreLocalVec(localVort)
         self.ts.solve(globalVort)
         raise Exception('noera')
+

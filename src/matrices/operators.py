@@ -18,9 +18,10 @@ class Operators:
     def setDM(self, dm):
         self.__dm = dm
 
-    def preallocate(self, config, ngl):
-        dm = NewBoxDom()
-        dm.create(config)
+    def preallocate(self, config=None, ngl=None, dm=None):
+        if not dm:
+            dm = NewBoxDom()
+            dm.create(config)
         self.dim = dm.getDimension()
         self.dim_w = 1 if self.dim == 2 else 3
         self.dim_s = 3 if self.dim == 2 else 6
