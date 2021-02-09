@@ -121,6 +121,10 @@ class DMPlexDom(PETSc.DMPlex):
     def restoreLocalVorticity(self, vec):
         self.vortDM.restoreLocalVec(vec)
 
+    def restoreGlobalVorticity(self, vec):
+        print("Restoring....")
+        self.vortDM.restoreLocalVec(vec)
+
     def velocityLocalToGlobal(self, glVec, locVec):
         self.velDM.globalToLocal(glVec, locVec)
 
