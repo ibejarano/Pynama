@@ -30,8 +30,11 @@ class KleSolver:
     def isNS(self):
         return self.__isNS
 
-    def solve(self, vort):
-        self.solver(self.mat.Rw * vort + self.mat.Krhs * self.__vel, self.__vel)
+    def solve(self, vort, vec=None):
+        if not vec:
+            self.solver(self.mat.Rw * vort + self.mat.Krhs * self.__vel, self.__vel)
+        else:
+            self.solver(self.mat.Rw * vort + self.mat.Krhs * vec, vec)
 
     def solveFS(self, vort):
         self.solverFS( self.mat.Rw * vort + self.mat.Rwfs * vort\

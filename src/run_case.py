@@ -10,17 +10,21 @@ OptDB = petsc4py.PETSc.Options()
 case = OptDB.getString('case', False)
 
 fsCases = ['cavity','uniform', 'taylor-green','taylor-green2d-3d', 'senoidal', 'flat-plate']
+runTests = OptDB.getString('test', False)
 
+if runTests:
+    from cases.base_problem import BaseProblemTest as FemProblem
+else:
+    from cases.base_problem import BaseProblem as FemProblem
 
-if case in fsCases:
-    from cases.custom_func import BaseProblem as FemProblem
-elif case == 'ibm-static':
+if case == 'ibm-static':
     from cases.immersed_boundary import ImmersedBoundaryStatic as FemProblem
 elif case == 'ibm-dynamic':
     from cases.immersed_boundary import ImmersedBoundaryDynamic as FemProblem
 else:
-    print("Case not defined unabled to import")
-    exit()
+    pass
+    # print("Case not defined unabled to import")
+    # exit()
 
 MARKERS = ['o','*','>','p','+','1','2','3','4','s','+']
 
@@ -34,7 +38,7 @@ def generateChart(config, viscousTime=[0.01,0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0
     viscousTime = [0.2,0.4,0.6,0.8,0.9]
     hAx = list()
     vAx = list()
-    totalNgl = 21
+    totalNgl = 11
     plt.figure(figsize=(10,10))
     plt.legend()
     plt.xlabel(r'$N*$')
@@ -161,6 +165,7 @@ def main():
     case = OptDB.getString('case', False)
     log = OptDB.getString('log', 'INFO')
     runTests = OptDB.getString('test', False)
+
     logging.basicConfig(level=log.upper() )
     logger = logging.getLogger("Init")
     try:
@@ -178,6 +183,7 @@ def main():
     elif runTests == 'chartkle':
         generateChartKLE(yamlData)
     else:
+        from cases.custom_func import BaseProblem as FemProblem
         timeSolving(yamlData)
 
 if __name__ == "__main__":

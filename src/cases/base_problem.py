@@ -96,8 +96,8 @@ class BaseProblem(object):
         incr = ts.getTimeStep()
         vort = ts.getSolution()
         vel = self.solverKLE.getSolution()
-        velFS = self.solverKLE.getFreeSlipSolution()
-        self.viewer.saveData(step, time, vel, velFS, vort)
+        # velFS = self.solverKLE.getFreeSlipSolution()
+        self.viewer.saveData(step, time, vel, vort)
         self.viewer.writeXmf(self.caseName)
         if not self.comm.rank:
             self.logger.info(f"Converged: Step {step:4} | Time {time:.4e} | Increment Time: {incr:.2e} ")
@@ -176,15 +176,6 @@ class BaseProblem(object):
 
         assert 'initial-conditions' in self.config, "Initial conditions not defined"
         self.setUpInitialConditions()
-
-        self.clean()
-
-
-    def clean(self):
-        keepCoords = self.opts.get('keepCoords')
-        if not keepCoords:
-            self.dom.destroyCoordVec()
-
 
     def setUpInitialConditions(self):
         self.logger.info("Computing initial conditions")
@@ -273,27 +264,25 @@ class BaseProblemTest(BaseProblem):
 
     def solveKLETests(self, steps=10):
         self.logger.info("Running KLE Tests")
+        dm = self.dom.getDM()
         startTime = self.ts.getTime()
         endTime = self.ts.getMaxTime()
         times = np.linspace(startTime, endTime, steps)
         viscousTimes=[0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
         times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
-        nodesToPlot, coords = self.dom.getNodesOverline("x", 0.5)
-        plotter = Plotter(r"$\frac{u}{U}$" , r"$\frac{y}{Y}$")
+        # nodesToPlot, coords = self.dom.getNodesOverline("x", 0.5)
         for step,time in enumerate(times):
-            exactVel, exactVort = self.generateExactVecs(time)
-            self.applyBoundaryConditions(time)
-            self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+            exactVel, exactVort = self.generateExactVecs(time=time)
+            self.dom.applyBoundaryConditions(self.vort, "vorticity", time, self.nu)
+            vel = self.solverKLE.getSolution()
+            self.dom.applyBoundaryConditions(vel, "velocity", time, self.nu)
+            self.solverKLE.solve(exactVort)
             self.operator.Curl.mult( exactVel , self.vort )
-            self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort)
-            exact_x , _ = self.dom.getVecArrayFromNodes(exactVel, nodesToPlot)
-            calc_x, _ = self.dom.getVecArrayFromNodes(self.vel, nodesToPlot)
-            # plotter.updatePlot(exact_x, [{"name": fr"$\tau$ = ${viscousTimes[step]}$" ,"data":coords}], step )
-            # plotter.scatter(calc_x , coords, "calc")
-            # plotter.plt.pause(0.001)
+            self.viewer.saveData(step, time, vel, self.vort, exactVel, exactVort)
+            # exact_x , _ = dm.getVecArrayFromNodes(exactVel, nodesToPlot)
+            # calc_x, _ = dm.getVecArrayFromNodes(vel, nodesToPlot)
             self.logger.info(f"Saving time: {time:.1f} | Step: {step}")
-        # plotter.plt.legend()
-        # plotter.show()
+
         self.viewer.writeXmf(self.caseName)
 
     def generateExactOperVecs(self,time):
@@ -319,7 +308,7 @@ class BaseProblemTest(BaseProblem):
 
     def OperatorsTests(self, viscousTime=1):
         time = (viscousTime**2)/(4*self.nu)
-        self.applyBoundaryConditions(time, boundaryNodes)
+        self.dom.applyBoundaryConditions(time, boundaryNodes)
         step = 0
         exactVel, exactVort, exactConv, exactDiff = self.generateExactOperVecs(time)
         #exactDiff.scale(2*self.mu)
@@ -381,9 +370,11 @@ class BaseProblemTest(BaseProblem):
         times = [(tau**2)/(4*self.nu) for tau in viscousTimes]
         errors = list()
         for time in times:
-            exactVel, exactVort = self.generateExactVecs(time)
-            self.applyBoundaryConditions(time)
-            self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
-            error = (exactVel - self.vel).norm(norm_type=2)
+            exactVel, exactVort = self.generateExactVecs(time=time)
+            self.dom.applyBoundaryConditions(self.vort, "vorticity", time, self.nu)
+            vel = self.solverKLE.getSolution()
+            self.dom.applyBoundaryConditions(vel, "velocity", time, self.nu)
+            self.solverKLE.solve(exactVort)
+            error = (exactVel - vel).norm(norm_type=2)
             errors.append(error)
         return errors

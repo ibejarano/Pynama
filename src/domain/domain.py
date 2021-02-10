@@ -105,7 +105,10 @@ class Domain:
             inds = self.__bc.getIndicesByName(borderName)
             coords = self.getCoordinates(inds)
             self.__bc.setBoundaryCoords(borderName, coords)
-        
+    
+    def getDM(self):
+        return self.__dm
+
     def setUpLabels(self):
         self.__dm.setLabelToBorders()
 
@@ -192,6 +195,19 @@ class Domain:
 
     def getBoundarySharedIndices(self):
         return self.__bc.getSharedIndices()
+
+    def getNodesOverline(self, line: str, val: float, invert=False):
+        assert line in ['x', 'y']
+        dim = self.__dm.getDimension()
+        dof, orderDof = (0,1) if line == 'x' else (1,0)
+        coords = self.__dm.fullCoordVec.getArray()
+        nodes = np.where(coords[dof::dim] == val)[0]
+        coords = coords[nodes*dim+orderDof]
+        tmp = np.stack( (coords, nodes), axis=1)
+        tmp = np.sort(tmp.view('i8,i8'), order=['f0'], axis=0).view(np.float)
+        coords = tmp[:,0]
+        nodes = tmp[:,1].astype(int) 
+        return nodes, coords
 
     def getNodeSeparationIBM(self):
         dm = self.__dm

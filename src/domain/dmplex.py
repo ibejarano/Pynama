@@ -371,18 +371,6 @@ class DMPlexDom(PETSc.DMPlex):
         conecMat.destroy()
         return ind_d, ind_o, nnz_diag, nnz_off
 
-    def getNodesOverline(self, line: str, val: float, invert=False):
-        assert line in ['x', 'y']
-        dof, orderDof = (0,1) if line == 'x' else (1,0)
-        coords = self.fullCoordVec.getArray()
-        nodes = np.where(coords[dof::self.dim] == val)[0]
-        coords = coords[nodes*self.dim+orderDof]
-        tmp = np.stack( (coords, nodes), axis=1)
-        tmp = np.sort(tmp.view('i8,i8'), order=['f0'], axis=0).view(np.float)
-        coords = tmp[:,0]
-        nodes = tmp[:,1].astype(int) 
-        return nodes, coords
-
     def getVecArrayFromNodes(self, vec, nodes):
         vecArr = vec.getArray()
         arr_x = vecArr[nodes*self.dim]
