@@ -44,3 +44,9 @@ def vorticity_test(coord, nu, t):
     expon = Uref * exp(-4 * (pi**2) * nu * t * (1.0 / Lx ** 2 + 1.0 / Ly ** 2))
     vort = -2 * pi * (1.0 / Lx + 1.0 / Ly) * cos(x_) * cos(y_) * expon
     return [vort]
+
+def convective(coord, alpha):
+    pass
+
+def diffusive(coord, alpha):
+    pass

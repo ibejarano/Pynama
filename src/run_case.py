@@ -83,11 +83,11 @@ def generateChartOperators(config):
     errors = [[list(), list(), list()],[list(), list(), list()]]
     errors_h = [list(), list(), list()]
     names = ["convective", "diffusive", "curl"]
-    totalNgl = 21
-    dim = len(config.get("domain").get("nelem"))
+    totalNgl = 11
+    # dim = len(config.get("domain").get("nelem"))
     for x, elem in enumerate(range(2,5,2)):
         for i, ngl in enumerate(range(3,totalNgl,1)):
-            fem = FemProblem(config, ngl=ngl, nelem=[elem]*dim)
+            fem = FemProblem(config, ngl=ngl, nelem=[2,2])
             fem.setUp()
             fem.setUpSolver()
             errorConv, errorDiff, errorCurl = fem.OperatorsTests()
@@ -102,7 +102,7 @@ def generateChartOperators(config):
     print(totalNodes)
     for n in totalNodes:
         nelem = int((n - 1)/2)
-        fem = FemProblem(config, ngl=3, nelem=[nelem]*dim)
+        fem = FemProblem(config, ngl=3, nelem=[2,2])
         fem.setUp()
         fem.setUpSolver()
         errorConv, errorDiff, errorCurl = fem.OperatorsTests()

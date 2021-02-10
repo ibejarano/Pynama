@@ -12,7 +12,7 @@ from solver.kle_solver import KleSolver
 from common.timer import Timer
 import logging
 import numpy as np
-from math import cos, sin, radians
+from math import cos, sin, radians, sqrt
 
 class BaseProblem(object):
     def __init__(self, config,**kwargs):
@@ -290,35 +290,43 @@ class BaseProblemTest(BaseProblem):
         exactVort = self.mat.Rw.createVecRight()
         exactConv = exactVort.copy()
         exactDiff = exactVort.copy()
-        exactVel.setName(f"{self.caseName}-exact-vel")
-        exactVort.setName(f"{self.caseName}-exact-vort")
-        exactConv.setName(f"{self.caseName}-exact-convective")
-        exactDiff.setName(f"{self.caseName}-exact-diffusive")
+        exactVecs = [ exactVel, exactVort, exactConv, exactDiff]
         allNodes = self.dom.getAllNodes()
-        # generate a new function with t=constant and coords variable
-        fvel_coords = lambda coords: self.velFunction(coords, self.nu, t = time)
-        fvort_coords = lambda coords: self.vortFunction(coords, self.nu, t = time)
-        fconv_coords = lambda coords: self.convectiveFunction(coords, self.nu, t = time)
-        fdiff_coords = lambda coords: self.diffusiveFunction(coords, self.nu, t = time)
-        exactVel = self.dom.applyFunctionVecToVec(allNodes, fvel_coords, exactVel, self.dim)
-        exactVort = self.dom.applyFunctionVecToVec(allNodes, fvort_coords, exactVort, self.dim_w)
-        exactConv = self.dom.applyFunctionVecToVec(allNodes, fconv_coords, exactConv, self.dim_w )
-        exactDiff = self.dom.applyFunctionVecToVec(allNodes, fdiff_coords, exactDiff, self.dim_w )
+        customFuncs = self.config['tests']['custom-func']
+        relativePath = f".{customFuncs['name']}"
+        vecNames = 'velocity vorticity convective diffusive'.split()
+        functionLib = importlib.import_module(relativePath, package='functions')
+        alpha = functionLib.alpha(self.nu, time)
+        coords = self.dom.getFullCoordArray()
+        allNodes = self.dom.getAllNodes()
+
+        for i, name in enumerate(vecNames):
+            vec = exactVecs[i]
+            vec.setName(name)
+            func = functionLib.__getattribute__(name)
+            values = func(coords, alpha)
+            if name == 'velocity':
+                inds = [node*dof + dof for node in allNodes for dof in range(self.dim)]
+                vec.setValues(inds, values)
+            else:
+                vec.setValues(allNodes, values)
+            vec.assemble()
+
         return exactVel, exactVort, exactConv, exactDiff
 
     def OperatorsTests(self, viscousTime=1):
         time = (viscousTime**2)/(4*self.nu)
-        self.dom.applyBoundaryConditions(time, boundaryNodes)
+        vel = self.solverKLE.getSolution()
         step = 0
         exactVel, exactVort, exactConv, exactDiff = self.generateExactOperVecs(time)
-        #exactDiff.scale(2*self.mu)
-        self.solver( self.mat.Rw * exactVort + self.mat.Krhs * self.vel , self.vel)
+        self.dom.applyBoundaryConditions(vel, "velocity", time, self.nu)
+        self.solverKLE.solve(exactVort)
         convective = self.getConvective(exactVel, exactConv)
         convective.setName("convective")
         diffusive = self.getDiffusive(exactVel, exactDiff)
         diffusive.setName("diffusive")
         self.operator.Curl.mult(exactVel, self.vort)
-        self.viewer.saveData(step, time, self.vel, self.vort, exactVel, exactVort,exactConv,exactDiff,convective,diffusive )
+        self.viewer.saveData(step, time, vel, self.vort, exactVel, exactVort,exactConv,exactDiff,convective,diffusive )
         self.viewer.writeXmf(self.caseName)
         self.operator.weigCurl.reciprocal()
         err = convective - exactConv
@@ -332,16 +340,18 @@ class BaseProblemTest(BaseProblem):
 
     def getConvective(self, exactVel, exactConv):
         convective = exactConv.copy()
-        self.computeVtensV()
-        aux=self.vel.copy()
+        vel = self.solverKLE.getSolution()
+        self.computeVtensV(vel)
+        aux= vel.copy()
         self.operator.DivSrT.mult(self._VtensV, aux)
         self.operator.Curl.mult(aux,convective)
         return convective
 
     def getDiffusive(self, exactVel, exactDiff):
         diffusive = exactDiff.copy()
+        vel = self.solverKLE.getSolution()
         self.operator.SrT.mult(exactVel, self._Aux1)
-        aux=self.vel.copy()
+        aux = vel.copy()
         self._Aux1 *= (2.0 * self.mu)
         self.operator.DivSrT.mult(self._Aux1, aux)
         aux.scale(1/self.rho)
