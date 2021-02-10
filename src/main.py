@@ -3,16 +3,15 @@ petsc4py.init(sys.argv)
 from matrices.new_mat import Matrices
 from solver.kle_solver import KspSolver
 from viewer.paraviewer import Paraviewer
-from functions.taylor_green import velocity, vorticity, alpha
 from domain.elements.spectral import Spectral
-from utils.dm_spectral import getCoordinates
 from solver.ts_solver import TimeStepping
+from domain.boundaries.boundary_conditions import BoundaryConditions
 
 from petsc4py import PETSc
 import numpy as np
 import yaml
 import logging
-
+import importlib
 class MainProblem(object):
 
     def __init__(self, config, **kwargs):
@@ -42,8 +41,13 @@ class MainProblem(object):
     def setUp(self):
         OptDB = PETSc.Options()
         self.dm, self.elem = self.setUpDomain(**self.opts)
+        coords = self.dm.computeFullCoordinates(self.elem)
         self.vel, self.vort = self.dm.createVecs()
-        self.bc = None
+
+        bcData = self.config.get('boundary-conditions', None)
+        self.bc = BoundaryConditions(self.dm)
+        self.bc.setBoundaryConditions(bcData)
+        self.bc.setUp(coords)
 
         self.mats = Matrices()
         self.mats.setDM(self.dm.velDM)
@@ -58,7 +62,6 @@ class MainProblem(object):
         self.solver.setRHS(Rw, Krhs)
         self.viewer = self.setUpViewer()
 
-        coords = self.dm.computeFullCoordinates(self.elem)
         self.coordVec = coords
         self.viewer.saveMesh(coords)
 
@@ -98,67 +101,37 @@ class MainProblem(object):
         K, Krhs, Rw = self.mats.assembleKLEMatrices()
         return K, Krhs, Rw
 
-    def solveKLE(self, vort, t=None):
-        if t != None:
-            self.computeBoundaryConditions(t)
-
+    def solveKLE(self, vort):
         globalVel = self.dm.getGlobalVelocity()
         self.solver.solve(vort, self.vel, globalVel)
         self.dm.velDM.globalToLocal(globalVel, self.vel)
         self.dm.restoreGlobalVelocity(globalVel)
 
     def computeBoundaryConditions(self, t):
-        dm = self.dm
-        dim = dm.getDimension()
-        bcs = dm.getStratumIS("marker",1)
-        bcDofsToSet = np.zeros(0)
-        for poi in bcs.getIndices():
-            arrtmp = np.arange(*self.dm.velDM.getPointLocal(poi)).astype(np.int32)
-            bcDofsToSet = np.append(bcDofsToSet, arrtmp).astype(np.int32)
+        self.bc.setValuesToVec(self.vel, 'velocity', t, self.nu)
+        self.bc.setValuesToVec(self.vort, 'vorticity', t, self.nu)
 
-        nodesBC = [int(n/dim) for n in bcDofsToSet[::dim]]
-        alp = alpha(self.nu, t=t)
-        nnodes = int(self.vel.getSize()/dim)
-
-        fullcoordArr = self.coordVec.getArray().reshape((nnodes, dim))[nodesBC]
-        values = velocity(fullcoordArr, alp)
-
-        self.vel.setValues(bcDofsToSet, values)
-        self.vel.assemble()
-
-    def computeInitialConditions(self, globalVec, t):
-        print("computing initial conditions")
-        alp = alpha(self.nu, t=t)
+    def computeInitialConditions(self, globalVec, initTime):
+        print("initial conditions")
+        initialConditions = self.config['initial-conditions']
+        inds = list(range(*self.vort.getOwnershipRange()))
+        numNodes = self.vort.getSize()
         dim = self.dm.getDimension()
-        totNodes = self.vort.getSize()
-        assert dim == 2
-        vortValues = vorticity(self.coordVec.getArray().reshape((totNodes, dim)), alp)
-        inds = np.arange(len(self.vort.getArray()), dtype=np.int32)
-        self.vort.setValues(inds, vortValues)
+        if 'custom-func' in initialConditions:
+            customFunc = initialConditions['custom-func']
+            relativePath = f".{customFunc['name']}"
+            functionLib = importlib.import_module(relativePath, package='functions')
+
+            funcVort = functionLib.vorticity
+            alpha = functionLib.alpha(self.nu, initTime)
+
+            coords = self.coordVec.getArray().reshape((numNodes ,dim))
+            arrVort = funcVort(coords, alpha)
+            self.vort.setValues(inds ,arrVort, addv=False)
+        else:
+            self.vort.set(0.0)
+
         self.dm.vortDM.localToGlobal(self.vort, globalVec)
-
-    def computeBoundaryConditionsVort(self, t, vort=None):
-        alp = alpha(self.nu, t=t)
-        dm = self.dm
-        if vort == None:
-            vort = self.vort
-  
-        dim = dm.getDimension()
-
-        bcs = dm.getStratumIS("marker",1)
-        bcDofsToSet = np.zeros(0)
-        for poi in bcs.getIndices():
-            arrtmp = np.arange(*self.dm.velDM.getPointLocal(poi)).astype(np.int32)
-            bcDofsToSet = np.append(bcDofsToSet, arrtmp).astype(np.int32)
-
-        totNodes = vort.getSize()
-        assert dim == 2
-        nodesBC = [int(n/dim) for n in bcDofsToSet[::dim]]
-
-        coords = self.coordVec.getArray().reshape((totNodes, dim))[nodesBC]
-        vortValues = vorticity(coords , alp)
-        vort.setValues(nodesBC, vortValues)
-        return vort
 
     def computeExactVort(self, t):
         alp = alpha(self.nu, t=t)
@@ -251,10 +224,6 @@ if __name__ == "__main__":
         ts.setFem(fem)
         ts.setUp()
         ts.startSolver()
-        # t = 0.0
-        # vort = fem.computeExactVort(t)
-        # fem.solveKLE(vort, t)
-        # fem.saveStep(step=1, time=t)
         print("Time stepping Finished")
 
     # Convergence test

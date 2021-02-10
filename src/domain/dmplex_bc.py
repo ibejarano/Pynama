@@ -75,6 +75,27 @@ class DMPlexDom(PETSc.DMPlex):
     def getNGL(self):
         return self.__ngl
 
+    def getBoundaryNames(self):
+        return self.namingConvention
+
+    def getBorderEntities(self, borderName=None, borderNum=None):
+        # faceNum = self.__mapFaceNameToNum(name)
+        if borderName:
+            borderNum = self.namingConvention.index(borderName) + 1
+        try:
+            faces = self.getStratumIS("Face Sets", borderNum).getIndices()
+        except:
+            faces = []
+        return faces
+
+    def getBorderDofs(self, name):
+        entities = self.getBorderEntities(name)
+        nodesSet = set()
+        for entity in entities:
+            nodes = getLocalDofsFromCell(self.velDM, entity)
+            nodesSet |= set(nodes)
+        return list(nodesSet)
+
     def computeFullCoordinates(self, spElem):
         dim = self.getDimension()
         fullCoordVec = self.velDM.createLocalVec()

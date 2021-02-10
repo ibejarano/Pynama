@@ -85,11 +85,11 @@ class TimeStepping:
         dim_s = 3
 
         # 1 Setear BC a la vorticidad.
-        self.__fem.computeBoundaryConditionsVort(time)
+        self.__fem.computeBoundaryConditions(time)
         # 2 Setear los valores internos a la vorticidad
         dm.globalToLocal(vort, self.__fem.vort)
         # 3 resolver kle y obtener velocidad
-        self.__fem.solveKLE(self.__fem.vort, time)
+        self.__fem.solveKLE(self.__fem.vort)
         # 4 aplicar VtensV
         VtensV = self.operators.SrT.createVecLeft()
         startInd, endInd = self.operators.SrT.getOwnershipRange()

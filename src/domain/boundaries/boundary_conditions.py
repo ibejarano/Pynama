@@ -9,7 +9,7 @@ class BoundaryConditions:
     types = ["FS", "NS", "FS-NS"]
     bcTypesAvailable = ("uniform", "custom-func", "free-slip", "no-slip")
     comm = COMM_WORLD
-    def __init__(self, sides: list):
+    def __init__(self, dm):
         self.__boundaries = list()
         self.__nsBoundaries = list()
         self.__fsBoundaries = list()
@@ -17,9 +17,9 @@ class BoundaryConditions:
         self.__ByName = dict()
         self.__ByType = { "free-slip": [], "no-slip": []}
         self.__needsCoords = list()
-        self.__borderNames = sides
-        self.__dim = 2 if len(sides) == 4 else 3
-
+        self.__borderNames = dm.getBoundaryNames()
+        self.__dim = dm.getDimension()
+        self.__dm = dm
         self.logger = logging.getLogger(f"[{self.comm.rank}]Boundary Conditions:")
 
     def __repr__(self):
@@ -66,6 +66,22 @@ class BoundaryConditions:
             self.__setPerBoundaries('no-slip', data['no-slip'])
         else:
             raise Exception("Boundary Conditions not defined")
+
+    def setUp(self, coords):
+        """
+        this method must be called after setBoundaryConditions
+        It sets the nodes that belongs to each boundary and get the correspond value
+        """
+        for name in self.__borderNames:
+            dofs = self.__dm.getBorderDofs(name)
+            dim = self.__dim
+            nodes = [int(dof / dim) for dof in dofs[::dim]]
+            self.setBoundaryNodes(name, nodes)
+        
+        for name in self.__needsCoords:
+            dofs = self.getIndicesByName(name)
+            arrCoords = coords.getArray()[dofs]
+            self.setBoundaryCoords(name, arrCoords)
 
     def getType(self):
         return self.__type
