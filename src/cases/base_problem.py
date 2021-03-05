@@ -95,7 +95,7 @@ class BaseProblem(object):
         step = ts.step_number
         incr = ts.getTimeStep()
         vort = ts.getSolution()
-        vel = self.solverKLE.getSolution()
+        vel = self.solverKLE.getSolution()    
         # velFS = self.solverKLE.getFreeSlipSolution()
         self.viewer.saveData(step, time, vel, vort)
         self.viewer.writeXmf(self.caseName)
@@ -119,10 +119,10 @@ class BaseProblem(object):
         if self.solverKLE.isNS():
             self.solverKLE.solveFS(self.vort)
             velFS = self.solverKLE.getFreeSlipSolution()
-            self.dom.applyBoundaryConditionsFS(velFS, "velocity", t, self.nu)
+            self.dom.applyBoundaryConditionsNS(velFS, "velocity", t, self.nu)
             self.operator.Curl.mult(velFS, self.vort)
 
-        self.solverKLE.solve(vort)
+        self.solverKLE.solve(self.vort)
 
         self.computeVtensV(vel)
         self.operator.SrT.mult(vel, self._Aux1)
@@ -134,6 +134,7 @@ class BaseProblem(object):
         rhs.scale(1/self.rho)
 
         self.operator.Curl.mult(rhs, f)
+        
 
     def computeVtensV(self, vec):
         arr = vec.getArray()
