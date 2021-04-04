@@ -16,31 +16,31 @@ class TestKrhs(unittest.TestCase):
         fem  = MainProblem('taylor-green')
         fem.setUp()
         self.fem = fem
-        operators = Operators()
-        self.operators = operators
 
     def test_preallocation(self):
-        self.operators.preallocate(self.domain, self.ngl)
+        operators = Operators()
+        operators.preallocate(self.domain, self.ngl)
 
-        curl = self.operators.Curl
-        div = self.operators.DivSrT
-        srt = self.operators.SrT
+        curl= operators.Curl
+        div = operators.DivSrT
+        srt = operators.SrT
 
         assert curl.getSize() == (25, 50)
         assert div.getSize() == (50, 75)
         assert srt.getSize() == (75, 50)
 
     def test_vorticity_vec(self):
-        self.operators.preallocate(self.domain, self.ngl)
-        vort = self.operators.Curl.createVecLeft()
+        operators = Operators()
+        operators.preallocate(self.domain, self.ngl)
+        vort = operators.Curl.createVecLeft()
         assert vort.getSize() == 25
         vort.assemble()
 
     def test_assemble_mats(self):
         dm = self.fem.dm.velDM
-        self.operators.preallocate(self.domain, self.ngl)
-        self.operators.setDM(dm)
-        dim = dm.getDimension()
-        elem = Spectral(self.ngl, dim)
-        self.operators.setElem(elem)
-        self.operators.assemble()
+        ngl = self.fem.dm.getNGL()
+        operators = Operators()
+        operators.preallocate(config=self.domain, ngl=ngl)
+        operators.setDM(dm)
+        operators.setElem(self.fem.elem)
+        operators.assemble()
