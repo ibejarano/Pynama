@@ -6,15 +6,15 @@ from viewer.paraviewer import Paraviewer
 from domain.elements.spectral import Spectral
 from solver.ts_solver import TimeStepping
 from domain.boundaries.boundary_conditions import BoundaryConditions
+from utils.yaml_handler import readYaml
 
 from petsc4py import PETSc
 import numpy as np
-import yaml
 import logging
 import importlib
 class MainProblem(object):
 
-    def __init__(self, config, **kwargs):
+    def __init__(self, configFile, **kwargs):
         """Main class that operates the entire process of solving a problem
 
         Args:
@@ -22,20 +22,18 @@ class MainProblem(object):
                                   dict - Describing the actual problem
         """
         try:
-            with open(f'src/cases/{config}.yaml') as f:
-                config = yaml.load(f, Loader=yaml.Loader)
+            data = readYaml(f'src/cases/{configFile}')
         except FileNotFoundError:
-            with open(f'{config}.yaml') as f:
-                config = yaml.load(f, Loader=yaml.Loader)
+            data = readYaml(configFile)
         except:
-            raise Exception(f"File '{config}' file not found")
+            raise Exception(f"File '{configFile}' file not found")
 
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger("Main")
         self.logger = logger
         self.logger.info("Init problem...")
         self.opts = kwargs
-        self.config = config
+        self.config = data
         self.nu = kwargs.get('nu', 0.01/0.5)
 
     def setUp(self):

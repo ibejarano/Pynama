@@ -1,6 +1,8 @@
 from domain.boundaries.boundary_conditions import BoundaryConditions
 from domain.boundaries.boundary import Boundary, FunctionBoundary
 from functions.taylor_green import velocity_test, vorticity_test
+from utils.yaml_handler import readYaml
+from domain.dmplex_bc import NewBoxDom
 
 import unittest
 import numpy as np
@@ -110,6 +112,13 @@ class TestBasicBoundary3D(TestBasicBoundary):
 class TestBoundaryConditions(unittest.TestCase):
     bcNames = ['up','down', 'right', 'left']
 
+    def setUp(self):
+        config = readYaml('src/tests/dm_1')
+        dm = NewBoxDom()
+        dm.create(config['domain']['box-mesh'])
+        dm.setFemIndexing(config['domain']['ngl'])
+        self.dm = dm
+
     def test_set_up_onlyFS(self):
         valsFS = {"velocity": [1,0], "vorticity": [0]}
         testData = {"free-slip": {
@@ -118,7 +127,7 @@ class TestBoundaryConditions(unittest.TestCase):
                 "left": valsFS,
                 "up": valsFS}}
 
-        bcs = BoundaryConditions(self.bcNames)
+        bcs = BoundaryConditions(self.dm)
         bcs.setBoundaryConditions(testData)
         assert "FS" == bcs.getType()
 
@@ -131,7 +140,7 @@ class TestBoundaryConditions(unittest.TestCase):
         custFS = {"name": 'taylor_green', "attributes": ['velocity', 'vorticity']}
         testData = {"custom-func": custFS}
 
-        bcs = BoundaryConditions(self.bcNames)
+        bcs = BoundaryConditions(self.dm)
         bcs.setBoundaryConditions(testData)
         assert "FS" == bcs.getType()
 
@@ -154,7 +163,7 @@ class TestBoundaryConditions(unittest.TestCase):
                 "left": {"custom-func": custFS},
                 "up": valsFS}}
 
-        bcs = BoundaryConditions(self.bcNames)
+        bcs = BoundaryConditions(self.dm)
         bcs.setBoundaryConditions(testData)
         assert "FS" == bcs.getType()
 
@@ -176,7 +185,7 @@ class TestBoundaryConditions(unittest.TestCase):
                 "left": valsNS,
                 "up": valsNS}}
 
-        bcs = BoundaryConditions(self.bcNames)
+        bcs = BoundaryConditions(self.dm)
         bcs.setBoundaryConditions(testData)
         assert "NS" == bcs.getType()
 
@@ -198,7 +207,7 @@ class TestBoundaryConditions(unittest.TestCase):
                 "left": valsNS,
                 "up": valsNS }}
 
-        bcs = BoundaryConditions(self.bcNames)
+        bcs = BoundaryConditions(self.dm)
         bcs.setBoundaryConditions(testData)
         assert "FS-NS" == bcs.getType()
 
@@ -228,7 +237,7 @@ class TestBoundaryConditions(unittest.TestCase):
         "left": valsNS,
         "up": valsNS}}
 
-        bcs = BoundaryConditions(self.bcNames)
+        bcs = BoundaryConditions(self.dm)
         bcs.setBoundaryConditions(testData)
 
         bcs.setBoundaryNodes("down", nodes_down)

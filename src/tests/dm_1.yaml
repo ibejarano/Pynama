@@ -1,6 +1,6 @@
 ---
-name: Uniform Flow
-save-dir: uniform-flow
+name: test_1
+save-dir: test_1_DELETE
 
 material-properties:
   rho: 1
@@ -9,7 +9,7 @@ material-properties:
 domain:
   ngl: 3
   box-mesh:
-    nelem: [10,10]
+    nelem: [3,3]
     lower: [0,0]
     upper: [1,1]
 
@@ -22,3 +22,6 @@ boundary-conditions:
   uniform:
     velocity: [4, 0]
     vorticity: [0]
+
+initial-conditions:
+  velocity: [4,0]
