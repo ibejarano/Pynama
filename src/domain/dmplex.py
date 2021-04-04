@@ -405,24 +405,3 @@ class GmshDom(DMPlexDom):
         self.createFromFile(fileName)
         self.logger.info("Mesh generated from Gmsh file")
         super().create()
-
-if __name__ == "__main__":
-    data = {"ngl":2, "box-mesh": {
-        "nelem": [2,2],
-        "lower": [0,0],
-        "upper": [1,1]
-    }}
-
-    testData = {
-        "free-slip": {
-            "up": [1, 0],
-            "right": [1, 0]},
-        "no-slip": {
-            "left": [1, 1],
-            "down": [None, 0]
-        }
-    }
-
-    domain = Domain(data)
-    domain.newBCSETUP(testData)
-    # domain.view()
