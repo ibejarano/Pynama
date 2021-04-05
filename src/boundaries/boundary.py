@@ -81,14 +81,21 @@ class Boundary:
         arr = arr[normalDof::self.__dofsConstrained]
         return set(arr)
 
-    def getTangDofs(self):
+    def getTangDofs(self, tangDir=None):
         out = set()
         arr = np.array(self.__inds.getIndices())
-        tanDofs = self.__dirs.getTangentials()
-        for dof in tanDofs:
-            arrSet = arr[dof::self.__dofsConstrained]
-            out |= set(arrSet)
-        return out
+        if tangDir != None:
+            arrSet = arr[tangDir::self.__dofsConstrained]
+            return set(arrSet)
+        else:
+            tanDofs = self.__dirs.getTangentials()
+            for dof in tanDofs:
+                arrSet = arr[dof::self.__dofsConstrained]
+                out |= set(arrSet)
+            return out
+
+    def getTangDirections(self):
+        return self.__dirs.getTangentials()
 
     def getNodes(self):
         return self.__inds.getBlockIndices()

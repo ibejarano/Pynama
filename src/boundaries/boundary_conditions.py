@@ -254,17 +254,18 @@ class BoundaryConditions:
         """This method is useful to impose the no slip condition"""
         
         for bc in self.__nsBoundaries:
-            
-            indsTang = bc.getTangDofs()
-            collectIndices = self.comm.tompi4py().allgather(indsTang)
+            tangDirs = bc.getTangDirections()
+            vel = bc.getVelocitySetted()
+            numOfNodes = bc.getNumOfNodes()
+            for tang in tangDirs:
+                indsTang = bc.getTangDofs(tang)
+                collectIndices = self.comm.tompi4py().allgather(indsTang)
 
-            for remoteIndices in collectIndices:
-                indsTang |= remoteIndices
-
-            velTang = bc.getVelocitySettedTangential()
-            numNodes = bc.getNumOfNodes()
-            arr = np.tile( velTang, numNodes)
-            vec.setValues(list(indsTang), arr, addv=False)
+                for remoteIndices in collectIndices:
+                    indsTang |= remoteIndices
+                
+                velTang = np.repeat(vel[tang], numOfNodes)
+                vec.setValues(list(indsTang), velTang , addv=False)
 
         vec.assemble()
 
