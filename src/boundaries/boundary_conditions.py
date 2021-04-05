@@ -66,6 +66,7 @@ class BoundaryConditions:
             self.__setPerBoundaries('no-slip', data['no-slip'])
         else:
             raise Exception("Boundary Conditions not defined")
+        print(self.__type)
 
     def getType(self):
         return self.__type
@@ -118,6 +119,7 @@ class BoundaryConditions:
         if type(vals) == list:
             boundary.setValues('velocity', vals)
             boundary.setValues('vorticity', [0] if self.__dim==2 else [0]*3)
+            print(typ,name,vals)
         else:
             for attrName, val in vals.items():
                 boundary.setValues(attrName, val)
@@ -224,13 +226,20 @@ class BoundaryConditions:
 
     def getNoSlipNormalDofs(self, allGather=False):
         dofs = set()
+        removeSet = set()
         for bc in self.__nsBoundaries:
             locDofs = bc.getNormalDofs()
             if allGather:
                 collectIndices = self.comm.tompi4py().allgather(locDofs)
                 for remoteIndices in collectIndices:
+                    if bc.getName() in ["left","right"]:
+                        remoteIndicesT = remoteIndices.copy()
+                        for ind in remoteIndicesT:
+                            if (ind+1) in dofs:
+                                removeSet.add(ind)
                     locDofs |= remoteIndices
             dofs |= locDofs
+        dofs-=removeSet
         return dofs
 
     def getFreeSlipIndices(self):
@@ -261,22 +270,9 @@ class BoundaryConditions:
                 indsTang = bc.getTangDofs(tang)
                 collectIndices = self.comm.tompi4py().allgather(indsTang)
 
-                for remoteIndices in collectIndices:
-                    indsTang |= remoteIndices
                 
                 velTang = np.repeat(vel[tang], numOfNodes)
                 vec.setValues(list(indsTang), velTang , addv=False)
 
         vec.assemble()
-
-    def getFreeStreamVelocity(self):
-        boundary = self.__boundaries[0]
-        vels = boundary.getVelocitySetted()
-        return vels
-
-    def getSharedIndices(self):
-        inds = IS().createGeneral([])
-        for bc in self.__boundaries:
             bcIS = bc.getIS()
-            inds.union(bcIS)
-        return inds.getIndices()
