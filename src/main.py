@@ -1,6 +1,6 @@
 import petsc4py, sys
 petsc4py.init(sys.argv)
-from matrices.new_mat import Matrices
+from matrices.matrices import Matrices
 from solver.kle_solver import KspSolver
 from viewer.paraviewer import Paraviewer
 from domain.elements.spectral import Spectral
@@ -79,10 +79,10 @@ class MainProblem(object):
     def setUpDomain(self, box=True, ngl=None):
         domData = self.config.get('domain')
         if box:
-            from domain.dmplex_bc import NewBoxDom as DM
+            from domain.dmplex import BoxDM as DM
             data = domData['box-mesh'] 
         else:
-            from domain.dmplex_bc import NewGmshDom as DM
+            from domain.dmplex import GmshDM as DM
             data = domData['gmsh']
         dm = DM()
 

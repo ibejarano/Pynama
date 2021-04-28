@@ -1,7 +1,7 @@
 import numpy as np 
 from petsc4py import PETSc
 
-from domain.dmplex_bc import NewBoxDom
+from domain.dmplex import BoxDM
 from utils.dm_spectral import reorderEntities, getLocalDofsFromCell, getGlobalDofsFromCell
 from utils.dm import getTotalCells, getCellCornersCoords
 
@@ -20,7 +20,7 @@ class Operators:
 
     def preallocate(self, config=None, ngl=None, dm=None):
         if not dm:
-            dm = NewBoxDom()
+            dm = BoxDM()
             dm.create(config)
         self.dim = dm.getDimension()
         self.dim_w = 1 if self.dim == 2 else 3
