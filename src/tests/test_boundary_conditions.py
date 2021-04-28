@@ -2,7 +2,7 @@ from domain.boundaries.boundary_conditions import BoundaryConditions
 from domain.boundaries.boundary import Boundary, FunctionBoundary
 from functions.taylor_green import velocity_test, vorticity_test
 from utils.yaml_handler import readYaml
-from domain.dmplex_bc import NewBoxDom
+from domain.dmplex import BoxDM
 
 import unittest
 import numpy as np
@@ -114,7 +114,7 @@ class TestBoundaryConditions(unittest.TestCase):
 
     def setUp(self):
         config = readYaml('src/tests/dm_1')
-        dm = NewBoxDom()
+        dm = BoxDM()
         dm.create(config['domain']['box-mesh'])
         dm.setFemIndexing(config['domain']['ngl'])
         self.dm = dm
