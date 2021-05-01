@@ -58,7 +58,7 @@ class TestBoundaryConditionsUniform(BaseBoundaryTest):
         dofs = self.dm.getDimension()
         assert len(fs_test) == self.tot_nodes * dofs
 
-    def test_set_boundary_conditions(self):
+    def test_set_boundary_conditions_quantity(self):
         # get the global vel vec (n-size)
         self.vel.set(0.0)
         n = self.vel.getSize()
@@ -78,6 +78,16 @@ class TestBoundaryConditionsUniform(BaseBoundaryTest):
         assert count_values[1.2] == bcs_x
         assert count_values[3.4] == bcs_y
 
+    def test_set_boundary_pattern(self):
+        # get Velocity index
+        self.vel.set(0.0)
+        fs_dofs = list(self.bcs.getFreeSlipIndices())
+        self.bcs.setValuesToVec(self.vel, 'velocity', t=0, nu=1)
+        vel_array = self.vel.getArray()
+        pattern_test = vel_array[fs_dofs]
+        pattern_want = self.valsFS['velocity'] * int(len(fs_dofs)/ 2)
+        np_test.assert_array_equal(pattern_test, pattern_want)
+        
 class TestBoundaryConditionsCustomFunc(BaseBoundaryTest):
     bcNames = ['up','down', 'right', 'left']
     custFS = {"name": 'taylor_green', "attributes": ['velocity', 'vorticity']}

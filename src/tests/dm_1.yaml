@@ -9,7 +9,7 @@ material-properties:
 domain:
   ngl: 3
   box-mesh:
-    nelem: [3,3]
+    nelem: [10,10]
     lower: [0,0]
     upper: [1,1]
 
