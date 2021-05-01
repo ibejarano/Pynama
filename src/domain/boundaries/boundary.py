@@ -25,14 +25,9 @@ class Boundary:
             raise Exception(f"Error setting {attrName} with value; {vals} to {self.__name} boundary")
 
     def getValues(self, attrName, t=None, nu=None):
-        try:
-           val = getattr(self, attrName)
-           nodesNum = len(self.getNodes())
-        #    assert nodesNum > 0, f"Nodes not defined in boundary {self.__name} "
-           arr = np.tile(val, nodesNum)
-           return arr
-        except AttributeError:
-            raise Exception(f"{attrName} Not defined")
+        val = getattr(self, attrName)
+        nodesNum = len(self.getNodes())
+        arr = np.tile(val, nodesNum)
         return arr
 
     def getName(self):
