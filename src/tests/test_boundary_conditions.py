@@ -53,11 +53,6 @@ class TestBoundaryConditionsUniform(BaseBoundaryTest):
         assert len(bcsFSNames) == len(self.bcNames)
         assert bcsNSNames == []
 
-    def test_fs_nodes_quantity(self):
-        fs_test = self.bcs.getFreeSlipIndices() 
-        dofs = self.dm.getDimension()
-        assert len(fs_test) == self.tot_nodes * dofs
-
     def test_set_boundary_conditions_quantity(self):
         # get the global vel vec (n-size)
         self.vel.set(0.0)
