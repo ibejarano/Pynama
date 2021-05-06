@@ -9,9 +9,8 @@ from petsc4py import PETSc
 from functions.taylor_green import velocity_test, vorticity_test
 
 class TestBoxDM(unittest.TestCase):
-    test_case = {'lower': [0,0], 'upper': [1,1], 'nelem': [8,5]}
-    ngl = 5
-
+    test_case = {'lower': [0,0], 'upper': [1,1], 'nelem': [7,7]}
+    ngl = 3
 
     def setUp(self):
         self.dm_test = BoxDM()
@@ -58,8 +57,7 @@ class TestBoxDM(unittest.TestCase):
     def test_get_border_dofs(self):
         for border in self.borders:
             dofs = self.dm_test.getBorderDofs(border['name'])
-            assert len(dofs) == (border['dofs'] * 2)
-
+            assert len(set(dofs)) == (border['dofs']*2)
 class TestBoxDMCaseB(TestBoxDM):
     test_case = {'lower': [0,0], 'upper': [1,1], 'nelem': [14,55]}
     ngl = 4

@@ -215,7 +215,7 @@ if __name__ == "__main__":
     runTest = opts.getString('test', False)
 
     if not runTest:
-        fem = MainProblem('taylor-green')
+        fem = MainProblem('uniform')
         fem.setUp()
 
         ts = TimeStepping()

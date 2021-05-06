@@ -67,21 +67,19 @@ class BoundaryConditions:
         else:
             raise Exception("Boundary Conditions not defined")
 
-    def setUp(self, coords):
+    def setUp(self, coords=None):
         """
         this method must be called after setBoundaryConditions
         It sets the nodes that belongs to each boundary and get the correspond value
         """
         for name in self.__borderNames:
-            dofs = self.__dm.getBorderDofs(name)
-            dim = self.__dim
-            nodes = [int(dof / dim) for dof in dofs[::dim]]
-            self.setBoundaryNodes(name, nodes)
+            self.setBoundaryNodes(name)
         
-        for name in self.__needsCoords:
-            dofs = self.getIndicesByName(name)
-            arrCoords = coords.getArray()[dofs]
-            self.setBoundaryCoords(name, arrCoords)
+        if coords:
+            for name in self.__needsCoords:
+                dofs = self.getIndicesByName(name)
+                arrCoords = coords.getArray()[dofs]
+                self.setBoundaryCoords(name, arrCoords)
 
     def getType(self):
         return self.__type
@@ -180,9 +178,17 @@ class BoundaryConditions:
         border = self.__ByName[name]
         return border.getDofsConstrained()
 
-    def setBoundaryNodes(self, bName, nodes):
+    def setBoundaryNodes(self, name):
         try:
-            boundary = self.__ByName[bName]
+            dofs = self.__dm.getBorderDofs(name)
+            dim = self.__dim
+            nodes = [int(dof / dim) for dof in dofs[::dim]]
+            print(len(set(nodes)))
+            print(len(set(dofs)))
+            print(nodes)
+            print(dofs[::2])
+            print(dofs)
+            boundary = self.__ByName[name]
             boundary.setNodes(nodes)
         except:
             raise Exception("Boundary Not found")
@@ -250,11 +256,11 @@ class BoundaryConditions:
         return dofs
 
     def getFreeSlipIndices(self):
-        inds = IS().createGeneral([])
+        inds = set()
         for bc in self.__fsBoundaries:
             bcIS = bc.getIS()
-            inds = bcIS.union(inds)
-        return set(inds.getIndices())
+            inds |= set(bcIS.getIndices())
+        return inds
 
     def setValuesToVec(self, vec, name, t, nu):
         for b in self.__boundaries:
